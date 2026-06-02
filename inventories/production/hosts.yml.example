@@ -1,0 +1,32 @@
+---
+# Production inventory template — copy to hosts.yml (gitignored).
+#
+#   cp inventories/production/hosts.yml.example inventories/production/hosts.yml
+#
+# Production runs MUST use scripts/prod-run.sh. See docs/run-order.md.
+
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  children:
+    domain_controllers:
+      hosts:
+        dc.example.home:
+          ansible_host: 203.0.113.10
+
+    hypervisors:
+      hosts:
+        kvm01.example.home:
+          ansible_host: 203.0.113.20
+
+    fileservers:
+      hosts:
+        nas.example.home:
+          ansible_host: 203.0.113.30
+
+    linux:
+      children:
+        domain_controllers:
+        hypervisors:
+        fileservers:

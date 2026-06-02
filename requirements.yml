@@ -1,0 +1,14 @@
+---
+# Ansible Galaxy collections for home-network-v3.
+# Install: ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: ansible.posix
+    version: ">=2.0.0,<3.0.0"
+  - name: community.general
+    version: ">=10.0.0,<13.0.0"
+  - name: community.crypto
+    version: ">=2.0.0,<4.0.0"
+  - name: community.libvirt
+    version: ">=1.0.0,<3.0.0"
+  - name: community.docker
+    version: ">=4.0.0,<6.0.0"

@@ -1,0 +1,35 @@
+# Vault password files — never commit
+.vault_pass
+.vault_pass_lab
+.vault-pass
+.vault-pass-lab
+
+# Lab SSH private key (public key is committed)
+scripts/lab/keys/lab_id_ed25519
+
+# Production inventory (real IPs and hostnames)
+inventories/production/hosts.yml
+inventories/production/host_vars/
+inventories/production/group_vars/vault.yml
+
+# Lab runtime artifacts
+.lab/
+
+# Python virtual environment
+.venv/
+
+# Ansible retry files
+*.retry
+
+# Production run logs
+logs/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*.swo

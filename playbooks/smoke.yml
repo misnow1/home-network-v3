@@ -1,0 +1,17 @@
+---
+# Smoke playbook for syntax-check and CI validation.
+# Slice 1 replaces this with playbooks/baseline.yml.
+
+- name: Smoke — validate lab inventory loads
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Smoke | lab group has hosts
+      ansible.builtin.assert:
+        that:
+          - groups['lab'] | length > 0
+
+    - name: Smoke | lab domain is lab.test
+      ansible.builtin.assert:
+        that:
+          - hostvars[groups['lab'][0]].lab_domain == 'lab.test'

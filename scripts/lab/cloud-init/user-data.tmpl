@@ -1,0 +1,47 @@
+#cloud-config
+hostname: ${LAB_HOST_SHORT}
+fqdn: ${LAB_FQDN}
+manage_etc_hosts: true
+
+users:
+  - name: ansible
+    gecos: Ansible automation user
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${LAB_SSH_PUBKEY}
+    lock_passwd: true
+
+ssh_pwauth: false
+disable_root: true
+
+package_update: true
+packages:
+  - python3
+  - python3-apt
+  - openssh-server
+  - cloud-init
+  - cloud-guest-utils
+
+write_files:
+  - path: /etc/netplan/99-lab-static.yaml
+    permissions: '0644'
+    content: |
+      network:
+        version: 2
+        ethernets:
+          ${LAB_NIC}:
+            dhcp4: false
+            addresses:
+              - ${LAB_VM_IP}/24
+            routes:
+              - to: default
+                via: 192.168.100.1
+            nameservers:
+              addresses:
+                - 192.168.100.1
+              search:
+                - lab.test
+
+runcmd:
+  - netplan apply

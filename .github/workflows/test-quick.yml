@@ -1,0 +1,42 @@
+---
+# GitHub Actions — tier 1+2 (linters and structural tests).
+# Tier 3 integration tests run manually on kvm01 via scripts/test-integration.sh.
+
+name: Test Quick
+
+'on':
+  push:
+  pull_request:
+
+jobs:
+  quick:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Cache Galaxy collections
+        uses: actions/cache@v4
+        with:
+          path: ~/.ansible/collections
+          key: galaxy-${{ hashFiles('requirements.yml') }}
+
+      - name: Install Galaxy collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Write lab vault password
+        run: printf '%s' "${{ secrets.VAULT_PASS_LAB }}" > .vault_pass_lab
+
+      - name: Run quick tests
+        run: ./scripts/test-quick.sh
+        env:
+          VAULT_PASS_LAB: ${{ secrets.VAULT_PASS_LAB }}

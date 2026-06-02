@@ -1,0 +1,83 @@
+---
+# Structural tests for repository layout and safety conventions.
+
+- name: Structural — repository layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    required_paths:
+      - playbooks
+      - roles
+      - inventories/lab
+      - inventories/production
+      - scripts/lib
+      - scripts/lab
+      - tests/structural
+      - docs/ROADMAP.md
+      - docs/vault-schema.md
+      - docs/run-order.md
+  tasks:
+    - name: Layout | required paths exist
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/{{ item }}"
+      register: layout_stats
+      loop: "{{ required_paths }}"
+
+    - name: Layout | assert repository skeleton
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ layout_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+- name: Structural — lab inventory conventions
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    lab_hosts: "{{ repo_root }}/inventories/lab/hosts.yml"
+    prod_hosts: "{{ repo_root }}/inventories/production/hosts.yml"
+  tasks:
+    - name: Lab | lab inventory defines lab group hosts
+      ansible.builtin.assert:
+        that:
+          - groups['lab'] | length > 0
+          - hostvars[groups['lab'][0]].lab_domain == 'lab.test'
+
+    - name: Lab | production hosts.yml must not be committed
+      ansible.builtin.stat:
+        path: "{{ prod_hosts }}"
+      register: prod_hosts_stat
+
+    - name: Lab | assert production inventory is absent from working tree
+      ansible.builtin.assert:
+        that:
+          - not prod_hosts_stat.stat.exists
+        fail_msg: >-
+          inventories/production/hosts.yml must remain gitignored.
+          Use inventories/production/hosts.yml.example as the template.
+
+    - name: Lab | production example template exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/inventories/production/hosts.yml.example"
+      register: prod_example_stat
+
+    - name: Lab | assert production example template is present
+      ansible.builtin.assert:
+        that:
+          - prod_example_stat.stat.exists
+
+- name: Structural — production safety scripts
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    prod_run: "{{ repo_root }}/scripts/prod-run.sh"
+  tasks:
+    - name: Safety | prod-run.sh requires confirmation flag
+      ansible.builtin.command:
+        cmd: grep -q -- --confirm-production "{{ prod_run }}"
+      changed_when: false

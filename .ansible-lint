@@ -1,0 +1,14 @@
+---
+profile: basic
+
+exclude_paths:
+  - .git/
+  - .venv/
+  - .lab/
+  - molecule/
+
+warn_list:
+  - yaml[line-length]
+
+skip_list:
+  - var-naming[no-role-prefix]
