@@ -1,0 +1,39 @@
+---
+# Structural tests for domain_join role layout.
+
+- name: Structural — domain join layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    join_tasks: "{{ repo_root }}/roles/domain_join/tasks/join.yml"
+    domain_join_playbook: "{{ repo_root }}/playbooks/domain-join.yml"
+    sssd_template: "{{ repo_root }}/roles/domain_join/templates/sssd.conf.j2"
+  tasks:
+    - name: Domain join | assert join task excludes DC hosts
+      ansible.builtin.shell: |
+        grep -q "groups.get('dc'" "{{ join_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert sssd.conf disables ldap_id_mapping
+      ansible.builtin.shell: |
+        grep -q 'ldap_id_mapping' "{{ sssd_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert sssd.conf enables short names
+      ansible.builtin.shell: |
+        grep -q 'use_fully_qualified_names' "{{ sssd_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert playbook targets linux excluding dc
+      ansible.builtin.shell: |
+        grep -q 'linux:!dc' "{{ domain_join_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

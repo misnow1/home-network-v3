@@ -1,0 +1,44 @@
+---
+- name: Domain join | Assert host is not a DC
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname not in groups.get('dc', [])
+    fail_msg: >-
+      domain_join role must not run on DC hosts. Use samba_dc instead.
+  tags: [always]
+
+- name: Domain join | Configure resolver for AD DNS
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # Domain join — use lab AD DNS
+      {% for ns in domain_join_dns_servers %}
+      nameserver {{ ns }}
+      {% endfor %}
+      search {{ domain_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [domain_join]
+
+- name: Domain join | Check current realm membership
+  ansible.builtin.command: realm list
+  register: realm_list_output
+  changed_when: false
+  check_mode: false
+  tags: [domain_join]
+
+- name: Domain join | Join AD domain (skipped if already member)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    printf '%s\n' "${JOIN_PASSWORD}" | realm join -U "${JOIN_USER}" "${DOMAIN_NAME}"
+  args:
+    executable: /bin/bash
+  environment:
+    JOIN_USER: "{{ vault_ad_join_user }}"
+    JOIN_PASSWORD: "{{ vault_ad_join_password }}"
+    DOMAIN_NAME: "{{ domain_name }}"
+  when: domain_name | lower not in realm_list_output.stdout | lower
+  no_log: true
+  notify: restart sssd
+  tags: [domain_join]

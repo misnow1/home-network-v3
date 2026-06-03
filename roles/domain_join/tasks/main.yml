@@ -1,0 +1,12 @@
+---
+- name: Install domain join packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [domain_packages]
+
+- name: Join AD domain
+  ansible.builtin.include_tasks: join.yml
+  tags: [domain_join]
+
+- name: Configure SSSD and PAM homedir
+  ansible.builtin.include_tasks: configure.yml
+  tags: [domain_configure]

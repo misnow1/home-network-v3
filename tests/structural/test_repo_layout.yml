@@ -14,6 +14,9 @@
       - roles/samba_dc/tasks/bootstrap.yml
       - docs/dc-runbook.md
       - docs/dns-architecture.md
+      - docs/domain-join-runbook.md
+      - playbooks/domain-join.yml
+      - roles/domain_join/tasks/join.yml
       - playbooks
       - roles
       - inventories/lab

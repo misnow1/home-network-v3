@@ -1,0 +1,14 @@
+---
+# Ubuntu 24.04 LTS (Slice 3).
+domain_join_packages:
+  - realmd
+  - sssd
+  - sssd-ad
+  - sssd-tools
+  - adcli
+  - krb5-user
+  - libpam-sss
+  - libnss-sss
+  - oddjob
+  - oddjob-mkhomedir
+  - samba-common-bin

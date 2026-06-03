@@ -1,0 +1,23 @@
+---
+# Create lab AD users on the DC for domain-join integration tests.
+
+- name: Integration — lab AD test users
+  hosts: dc
+  become: true
+  tasks:
+    - name: Check whether lab test user exists
+      ansible.builtin.command: samba-tool user show {{ lab_test_user }}
+      register: lab_test_user_show
+      changed_when: false
+      failed_when: false
+
+    - name: Create lab test user with RFC2307 POSIX IDs
+      ansible.builtin.command: >-
+        samba-tool user create {{ lab_test_user }} {{ vault_test_user_password }}
+        --uid-number={{ lab_test_user_uid }}
+        --gid-number={{ lab_test_user_gid }}
+        --given-name=Lab
+        --surname=Test
+        --login-shell=/bin/bash
+      when: lab_test_user_show.rc != 0
+      no_log: true

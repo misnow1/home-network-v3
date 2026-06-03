@@ -1,0 +1,14 @@
+---
+# Lowest-precedence defaults. Lab inventory overrides in group_vars/linux/vars.yml.
+
+domain_name: lab.test
+domain_join_dns_servers: []
+domain_member_allow_groups: []
+
+sssd_ldap_id_mapping: false
+sssd_use_fully_qualified_names: false
+sssd_fall_back_homedir: /home/%u
+
+lab_test_user: labtest
+lab_test_user_uid: 10001
+lab_test_user_gid: 10001

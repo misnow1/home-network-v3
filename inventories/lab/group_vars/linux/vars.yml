@@ -1,0 +1,10 @@
+---
+domain_name: lab.test
+domain_join_dns_servers:
+  - 192.168.100.10
+domain_member_allow_groups:
+  - Domain Users
+
+lab_test_user: labtest
+lab_test_user_uid: 10001
+lab_test_user_gid: 10001

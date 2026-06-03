@@ -1,0 +1,49 @@
+---
+# Post-converge checks for Slice 3 integration tests (member01.lab.test).
+
+- name: Integration — domain join convergence
+  hosts: all
+  gather_facts: false
+  vars:
+    lab_test_principal: "{{ lab_test_user }}@{{ lab_realm | upper }}"
+  tasks:
+    - name: Assert realm list shows lab domain
+      ansible.builtin.command: realm list
+      register: realm_list
+      changed_when: false
+      failed_when: lab_domain not in realm_list.stdout
+
+    - name: Assert getent returns lab AD user by short name
+      ansible.builtin.command: getent passwd {{ lab_test_user }}
+      register: getent_user
+      changed_when: false
+      failed_when: getent_user.rc != 0
+
+    - name: Assert POSIX uid comes from RFC2307 uidNumber
+      ansible.builtin.assert:
+        that:
+          - "getent_user.stdout.split(':')[2] | int == lab_test_user_uid | int"
+        fail_msg: >-
+          Expected uid {{ lab_test_user_uid }} for {{ lab_test_user }},
+          got {{ getent_user.stdout }}
+
+    - name: Assert passwd entry uses short name (no @domain)
+      ansible.builtin.assert:
+        that:
+          - "'@' not in getent_user.stdout.split(':')[0]"
+        fail_msg: "Expected short username, got {{ getent_user.stdout.split(':')[0] }}"
+
+    - name: Obtain Kerberos ticket for lab AD user
+      ansible.builtin.shell: |
+        set -euo pipefail
+        printf '%s\n' "${KRB5_PASSWORD}" | kinit "${KRB5_PRINCIPAL}"
+        klist
+      args:
+        executable: /bin/bash
+      environment:
+        KRB5_PASSWORD: "{{ vault_test_user_password }}"
+        KRB5_PRINCIPAL: "{{ lab_test_principal }}"
+      register: kinit_result
+      changed_when: false
+      no_log: true
+      failed_when: kinit_result.rc != 0

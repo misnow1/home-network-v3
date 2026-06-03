@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# SSSD for AD domain members — realmd + sssd (no winbind).
+[sssd]
+domains = {{ domain_name }}
+config_file_version = 2
+services = nss, pam
+
+[domain/{{ domain_name }}]
+id_provider = ad
+auth_provider = ad
+access_provider = simple
+ad_domain = {{ domain_name }}
+krb5_realm = {{ domain_name | upper }}
+
+ldap_id_mapping = {{ sssd_ldap_id_mapping | string | lower }}
+use_fully_qualified_names = {{ sssd_use_fully_qualified_names | ternary('True', 'False') }}
+
+override_homedir = {{ sssd_fall_back_homedir }}
+fallback_homedir = {{ sssd_fall_back_homedir }}
+default_shell = /bin/bash
+
+cache_credentials = true
+krb5_store_password_if_offline = true
+
+{% if domain_member_allow_groups | length > 0 %}
+simple_allow_groups = {{ domain_member_allow_groups | join(', ') }}
+{% endif %}

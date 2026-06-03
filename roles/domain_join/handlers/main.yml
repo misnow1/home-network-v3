@@ -1,0 +1,7 @@
+---
+- name: Restart sssd
+  ansible.builtin.service:
+    name: sssd
+    state: restarted
+  listen: restart sssd
+  when: not ansible_check_mode
