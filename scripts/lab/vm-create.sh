@@ -72,6 +72,11 @@ main() {
   local vm_name vm_ip base_image disk_path seed_iso
   vm_name="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_name")"
   vm_ip="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_ip")"
+  local host_memory
+  host_memory="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_memory_mb" 2>/dev/null || true)"
+  if [[ -n "${host_memory}" ]]; then
+    MEMORY_MB="${host_memory}"
+  fi
   base_image="$(lab_cloud_image_path)"
   disk_path="$(lab_vms_dir)/${vm_name}.qcow2"
 

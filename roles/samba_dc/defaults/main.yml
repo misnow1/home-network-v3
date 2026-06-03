@@ -1,0 +1,18 @@
+---
+# Override in inventories/lab/group_vars/dc/vars.yml (non-secret).
+# vault_samba_admin_password lives in inventories/lab/group_vars/all/vault.yml.
+
+dc_domain_name: lab.test
+dc_realm: LAB.TEST
+dc_dns_forwarders:
+  - 8.8.8.8
+  - 8.8.4.4
+dc_ntp_allow_cidr: 192.168.100.0/24
+samba_dc_chrony_group: _chrony
+
+samba_packages:
+  - samba-ad-dc
+  - krb5-user
+  - bind9
+  - bind9utils
+  - ldap-utils

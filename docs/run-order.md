@@ -6,6 +6,8 @@ All integration work uses the lab inventory:
 
 ```bash
 ansible-playbook -i inventories/lab playbooks/baseline.yml
+ansible-playbook -i inventories/lab playbooks/dc-bootstrap.yml --limit dc01.lab.test
+ansible-playbook -i inventories/lab playbooks/dc-converge.yml --limit dc01.lab.test
 ./scripts/test-quick.sh
 ./scripts/test-integration.sh
 ```

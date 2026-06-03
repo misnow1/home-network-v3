@@ -1,0 +1,21 @@
+{# BIND9 options for Samba AD DC with BIND9_DLZ backend. #}
+options {
+    directory "/var/cache/bind";
+
+    tkey-gssapi-keytab "/var/lib/samba/bind-dns/dns.keytab";
+
+    minimal-responses yes;
+
+    forwarders {
+{% for forwarder in dc_dns_forwarders %}
+        {{ forwarder }};
+{% endfor %}
+    };
+
+    forward only;
+
+    dnssec-validation no;
+
+    listen-on { any; };
+    allow-recursion { any; };
+};

@@ -1,0 +1,60 @@
+---
+# Ongoing idempotent Samba AD DC configuration. Imported only by dc-converge.yml.
+
+- name: DC converge | Ensure resolver uses local BIND
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # DC uses local BIND for {{ dc_domain_name }} AD DNS
+      nameserver 127.0.0.1
+      search {{ dc_domain_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [samba_converge]
+
+- name: DC converge | Ensure samba-ad-dc is started and enabled
+  ansible.builtin.service:
+    name: samba-ad-dc
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [samba_converge]
+
+- name: DC converge | Ensure named is started and enabled
+  ansible.builtin.service:
+    name: named
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [samba_converge]
+
+- name: DC converge | Refresh /etc/krb5.conf from Samba-generated copy
+  ansible.builtin.copy:
+    src: /var/lib/samba/private/krb5.conf
+    dest: /etc/krb5.conf
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: true
+  tags: [samba_converge]
+
+- name: DC converge | Extend chrony for MS-SNTP signing to domain members
+  ansible.builtin.blockinfile:
+    path: /etc/chrony/chrony.conf
+    block: |
+      allow {{ dc_ntp_allow_cidr }}
+      ntpsigndsocket /var/lib/samba/ntp_signd
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-ntp"
+  notify: restart chrony
+  tags: [samba_converge]
+
+- name: DC converge | Set ntp_signd socket permissions for chrony
+  ansible.builtin.file:
+    path: /var/lib/samba/ntp_signd
+    owner: root
+    group: "{{ samba_dc_chrony_group }}"
+    mode: "0750"
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [samba_converge]

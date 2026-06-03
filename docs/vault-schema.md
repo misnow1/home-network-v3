@@ -7,7 +7,7 @@ lab vault if the password is lost.
 
 | File | Encrypted | Used by |
 |---|---|---|
-| `inventories/lab/group_vars/vault.yml` | Yes (committed) | Lab integration tests and development |
+| `inventories/lab/group_vars/all/vault.yml` | Yes (committed) | Lab integration tests and development |
 | `inventories/production/group_vars/vault.yml` | Yes (gitignored) | Production runs via `scripts/prod-run.sh` |
 
 ## Password files (never commit)
@@ -40,7 +40,7 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 printf '%s' 'your-new-password' > .vault_pass_lab
 chmod 600 .vault_pass_lab
 
-ansible-vault create inventories/lab/group_vars/vault.yml --vault-password-file .vault_pass_lab
+ansible-vault create inventories/lab/group_vars/all/vault.yml --vault-password-file .vault_pass_lab
 ```
 
 Or encrypt individual strings:

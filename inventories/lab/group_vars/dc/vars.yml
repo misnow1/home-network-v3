@@ -1,0 +1,10 @@
+---
+# Non-secret Samba AD DC settings for lab domain controllers.
+
+dc_domain_name: "{{ lab_domain }}"
+dc_realm: "{{ lab_realm }}"
+dc_dns_forwarders:
+  - 8.8.8.8
+  - 8.8.4.4
+dc_ntp_allow_cidr: "{{ lab_subnet }}"
+samba_dc_chrony_group: _chrony

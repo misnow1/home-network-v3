@@ -8,7 +8,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 |---|---|---|---|
 | 0 | Test harness | **done** | CI, lab scripts, structural tests, integration VM cycle |
 | 1 | Ubuntu baseline | **done** | `linux_baseline` role, `baseline.yml`, idempotency test |
-| 2 | Samba AD DC + BIND DLZ | planned | `dc01.lab.test`, bootstrap/converge split |
+| 2 | Samba AD DC + BIND DLZ | **done** | `dc01.lab.test`, bootstrap/converge split |
 | 3 | Domain join (realmd + sssd) | planned | `member01.lab.test`, RFC2307 IDs, short names |
 | 4 | Hypervisor (nested virt) | planned | `hv01.lab.test`, libvirt + Docker |
 | 5 | Samba file server | planned | `nas01.lab.test`, winbind, `idmap_ad`, SMB test share |

@@ -8,7 +8,12 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     required_paths:
       - playbooks/baseline.yml
+      - playbooks/dc-bootstrap.yml
+      - playbooks/dc-converge.yml
       - roles/linux_baseline/tasks/main.yml
+      - roles/samba_dc/tasks/bootstrap.yml
+      - docs/dc-runbook.md
+      - docs/dns-architecture.md
       - playbooks
       - roles
       - inventories/lab

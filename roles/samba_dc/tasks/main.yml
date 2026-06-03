@@ -1,0 +1,4 @@
+---
+# Samba AD DC role entry point — intentionally empty.
+# Playbooks import bootstrap.yml or converge.yml explicitly.
+# Do NOT auto-include either task file here.

@@ -8,8 +8,33 @@ source "${ROOT}/scripts/lib/common.sh"
 # shellcheck source=lib/ansible.sh
 source "${ROOT}/scripts/lib/ansible.sh"
 
-LAB_HOST="${LAB_HOST:-member01.lab.test}"
+LAB_HOST="${LAB_HOST:-dc01.lab.test}"
 SKIP_VM_TESTS="${SKIP_VM_TESTS:-0}"
+
+run_baseline_integration() {
+  log_info "Converging baseline on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Running baseline convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_baseline_converged.yml --limit "${LAB_HOST}"
+}
+
+run_dc_integration() {
+  log_info "Bootstrapping Samba AD DC on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/dc-bootstrap.yml --limit "${LAB_HOST}"
+
+  log_info "Converging Samba AD DC on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/dc-converge.yml --limit "${LAB_HOST}"
+
+  log_info "Converging Samba AD DC on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/dc-converge.yml --limit "${LAB_HOST}"
+
+  log_info "Running Samba AD DC convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_dc_converged.yml --limit "${LAB_HOST}"
+}
 
 main() {
   if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
@@ -37,21 +62,27 @@ main() {
   log_info "Ensuring Ubuntu cloud image"
   "${ROOT}/scripts/lab/image-ensure.sh"
 
-  log_info "Integration VM lifecycle for ${LAB_HOST}"
+  local lab_slice
+  lab_slice="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${LAB_HOST}" "lab_slice")"
+
+  log_info "Integration VM lifecycle for ${LAB_HOST} (slice=${lab_slice})"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
   "${ROOT}/scripts/lab/vm-create.sh" "${LAB_HOST}"
 
   log_info "Waiting for SSH on ${LAB_HOST}"
   "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
 
-  log_info "Converging baseline on ${LAB_HOST} (first run)"
-  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
-
-  log_info "Converging baseline on ${LAB_HOST} (idempotency check)"
-  assert_ansible_playbook_idempotent "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
-
-  log_info "Running baseline convergence assertions"
-  run_ansible_playbook "${ROOT}" tests/integration/test_baseline_converged.yml --limit "${LAB_HOST}"
+  case "${lab_slice}" in
+    baseline)
+      run_baseline_integration
+      ;;
+    dc)
+      run_dc_integration
+      ;;
+    *)
+      die "Unsupported lab_slice '${lab_slice}' for ${LAB_HOST}"
+      ;;
+  esac
 
   log_info "Destroying integration test VM ${LAB_HOST}"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"

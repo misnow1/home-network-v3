@@ -1,0 +1,64 @@
+---
+# Structural tests for Samba AD DC bootstrap/converge separation.
+
+- name: Structural — Samba DC layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    bootstrap_tasks: "{{ repo_root }}/roles/samba_dc/tasks/bootstrap.yml"
+    main_tasks: "{{ repo_root }}/roles/samba_dc/tasks/main.yml"
+    dc_bootstrap_playbook: "{{ repo_root }}/playbooks/dc-bootstrap.yml"
+    dc_converge_playbook: "{{ repo_root }}/playbooks/dc-converge.yml"
+  tasks:
+    - name: Samba DC | bootstrap tasks exist
+      ansible.builtin.stat:
+        path: "{{ bootstrap_tasks }}"
+      register: bootstrap_stat
+
+    - name: Samba DC | assert bootstrap tasks present
+      ansible.builtin.assert:
+        that:
+          - bootstrap_stat.stat.exists
+
+    - name: Samba DC | assert main.yml does not auto-include bootstrap or converge
+      ansible.builtin.shell: |
+        ! grep -qE '(include_tasks|import_tasks).*bootstrap|(include_tasks|import_tasks).*converge|tasks_from: (bootstrap|converge)' "{{ main_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert bootstrap has sam.ldb creates guard
+      ansible.builtin.shell: |
+        grep -q 'creates: /var/lib/samba/private/sam.ldb' "{{ bootstrap_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert bootstrap does not template smb.conf
+      ansible.builtin.shell: |
+        ! grep -qE 'template:.*smb\.conf|src:.*smb\.conf' "{{ bootstrap_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert dc-bootstrap.yml imports bootstrap tasks
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: bootstrap' "{{ dc_bootstrap_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert dc-converge.yml imports converge tasks
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: converge' "{{ dc_converge_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert dc-bootstrap refuses production without opt-in
+      ansible.builtin.shell: |
+        grep -q 'allow_production' "{{ dc_bootstrap_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
