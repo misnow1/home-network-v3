@@ -1,0 +1,13 @@
+{# Client-only chrony config — no allow/serve directives (required before AD/Kerberos). #}
+{% for server in chrony_ntp_servers %}
+pool {{ server }} iburst
+{% endfor %}
+
+driftfile /var/lib/chrony/drift
+
+makestep 1.0 3
+
+rtcsync
+
+logdir /var/log/chrony
+log tracking measurements statistics

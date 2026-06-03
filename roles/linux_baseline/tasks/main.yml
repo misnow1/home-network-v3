@@ -1,0 +1,12 @@
+---
+- name: Apply baseline packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [packages]
+
+- name: Apply hostname from inventory
+  ansible.builtin.include_tasks: hostname.yml
+  tags: [hostname]
+
+- name: Apply chrony time sync
+  ansible.builtin.include_tasks: chrony.yml
+  tags: [chrony]

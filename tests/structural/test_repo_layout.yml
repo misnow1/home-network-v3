@@ -7,6 +7,8 @@
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     required_paths:
+      - playbooks/baseline.yml
+      - roles/linux_baseline/tasks/main.yml
       - playbooks
       - roles
       - inventories/lab

@@ -1,0 +1,9 @@
+---
+# Converge minimal Ubuntu baseline: packages, hostname, chrony.
+# Lab integration: scripts/test-integration.sh (member01.lab.test).
+
+- name: Linux baseline
+  hosts: linux
+  become: true
+  roles:
+    - role: linux_baseline

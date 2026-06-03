@@ -1,0 +1,27 @@
+---
+# Post-converge checks for Slice 1 integration tests.
+
+- name: Integration — baseline convergence
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert FQDN matches inventory
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['fqdn'] == inventory_hostname
+        fail_msg: "Expected FQDN {{ inventory_hostname }}, got {{ ansible_facts['fqdn'] }}"
+
+    - name: Assert chrony is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['chrony.service'].state == 'running'
+        fail_msg: chrony is not running
+
+    - name: Assert openssh-server is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['ssh.service'].state == 'running'
+        fail_msg: ssh is not running

@@ -1,0 +1,10 @@
+---
+# Ubuntu 24.04 LTS (Slice 1). Rocky/RHEL vars deferred to a later slice.
+linux_baseline_packages:
+  - python3
+  - python3-apt
+  - openssh-server
+  - chrony
+
+chrony_service_name: chrony
+chrony_config_path: /etc/chrony/chrony.conf

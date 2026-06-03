@@ -8,7 +8,7 @@ source "${ROOT}/scripts/lib/common.sh"
 
 LAB_NIC="${LAB_NIC:-enp1s0}"
 NET_NAME="${LAB_NET_NAME:-home-dc-lab}"
-MEMORY_MB="${LAB_VM_MEMORY_MB:-2048}"
+MEMORY_MB="${LAB_VM_MEMORY_MB:-3072}"
 VCPUS="${LAB_VM_VCPUS:-2}"
 
 usage() {

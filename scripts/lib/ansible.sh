@@ -44,3 +44,18 @@ run_ansible_syntax_check() {
       --syntax-check "${playbook}"
   done
 }
+
+assert_ansible_playbook_idempotent() {
+  local root="$1"
+  shift
+  local output recap
+  output="$(run_ansible_playbook "${root}" "$@" 2>&1)"
+  printf '%s\n' "${output}" >&2
+  recap="$(printf '%s\n' "${output}" | awk '/^PLAY RECAP/,0')"
+  if printf '%s\n' "${recap}" | grep -qE 'failed=[1-9]'; then
+    die "Playbook reported failures"
+  fi
+  if ! printf '%s\n' "${recap}" | grep -qE 'changed=0'; then
+    die "Expected idempotent run (changed=0)"
+  fi
+}

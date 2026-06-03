@@ -5,7 +5,7 @@
 All integration work uses the lab inventory:
 
 ```bash
-ansible-playbook -i inventories/lab playbooks/smoke.yml
+ansible-playbook -i inventories/lab playbooks/baseline.yml
 ./scripts/test-quick.sh
 ./scripts/test-integration.sh
 ```

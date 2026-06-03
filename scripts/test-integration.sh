@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/common.sh
 source "${ROOT}/scripts/lib/common.sh"
+# shellcheck source=lib/ansible.sh
+source "${ROOT}/scripts/lib/ansible.sh"
 
 LAB_HOST="${LAB_HOST:-member01.lab.test}"
 SKIP_VM_TESTS="${SKIP_VM_TESTS:-0}"
@@ -41,6 +43,15 @@ main() {
 
   log_info "Waiting for SSH on ${LAB_HOST}"
   "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Running baseline convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_baseline_converged.yml --limit "${LAB_HOST}"
 
   log_info "Destroying integration test VM ${LAB_HOST}"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"

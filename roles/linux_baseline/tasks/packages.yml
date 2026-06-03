@@ -1,0 +1,16 @@
+---
+- name: Refresh apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name: "{{ linux_baseline_packages }}"
+    state: present
+
+- name: Enable and start openssh-server
+  ansible.builtin.service:
+    name: ssh
+    state: started
+    enabled: true
