@@ -72,11 +72,12 @@ main() {
   local vm_name vm_ip base_image disk_path seed_iso
   vm_name="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_name")"
   vm_ip="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_ip")"
-  local host_memory
+  local host_memory host_disk_gb
   host_memory="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_memory_mb" 2>/dev/null || true)"
   if [[ -n "${host_memory}" ]]; then
     MEMORY_MB="${host_memory}"
   fi
+  host_disk_gb="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_disk_gb" 2>/dev/null || true)"
   base_image="$(lab_cloud_image_path)"
   disk_path="$(lab_vms_dir)/${vm_name}.qcow2"
 
@@ -86,7 +87,11 @@ main() {
 
   mkdir -p "$(lab_vms_dir)"
   if [[ ! -f "${disk_path}" ]]; then
-    qemu-img create -f qcow2 -F qcow2 -b "${base_image}" "${disk_path}"
+    if [[ -n "${host_disk_gb}" ]]; then
+      qemu-img create -f qcow2 -F qcow2 -b "${base_image}" "${disk_path}" "${host_disk_gb}G"
+    else
+      qemu-img create -f qcow2 -F qcow2 -b "${base_image}" "${disk_path}"
+    fi
     chmod 660 "${disk_path}" 2>/dev/null || true
   fi
 

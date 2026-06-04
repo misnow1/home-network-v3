@@ -1,0 +1,5 @@
+---
+# Lab hypervisor defaults for hv01 and future production hypervisors.
+
+hypervisor_libvirt_image_dir: /var/lib/libvirt/images
+hypervisor_libvirt_pool_name: default

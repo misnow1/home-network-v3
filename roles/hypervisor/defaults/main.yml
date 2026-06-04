@@ -1,0 +1,19 @@
+---
+hypervisor_libvirt_service: libvirtd
+hypervisor_libvirt_image_dir: /var/lib/libvirt/images
+hypervisor_libvirt_pool_name: default
+
+hypervisor_libvirt_packages:
+  - qemu-kvm
+  - libvirt-daemon-system
+  - libvirt-clients
+  - virtinst
+  - bridge-utils
+  - python3-libvirt
+
+hypervisor_docker_packages:
+  - docker.io
+  - docker-compose-v2
+
+hypervisor_docker_users:
+  - ansible

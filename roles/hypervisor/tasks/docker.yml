@@ -1,0 +1,22 @@
+---
+- name: Docker | Install packages
+  ansible.builtin.apt:
+    name: "{{ hypervisor_docker_packages }}"
+    state: present
+  tags: [docker]
+
+- name: Docker | Enable and start docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [docker]
+
+- name: Docker | Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ hypervisor_docker_users }}"
+  tags: [docker]

@@ -15,7 +15,9 @@
       - docs/dc-runbook.md
       - docs/dns-architecture.md
       - docs/domain-join-runbook.md
-      - playbooks/domain-join.yml
+      - docs/hypervisor-runbook.md
+      - playbooks/hypervisor.yml
+      - roles/hypervisor/tasks/libvirt.yml
       - roles/domain_join/tasks/join.yml
       - playbooks
       - roles

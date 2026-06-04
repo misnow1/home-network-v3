@@ -1,0 +1,66 @@
+---
+# Post-converge checks for Slice 4 integration tests (hv01.lab.test).
+
+- name: Integration — hypervisor convergence
+  hosts: hypervisors
+  gather_facts: false
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert libvirtd is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['libvirtd.service'].state == 'running'
+        fail_msg: libvirtd is not running
+
+    - name: Assert docker is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['docker.service'].state == 'running'
+        fail_msg: docker is not running
+
+    - name: Assert nested KVM device is available
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: kvm_device
+
+    - name: Assert /dev/kvm exists for nested virtualization
+      ansible.builtin.assert:
+        that:
+          - kvm_device.stat.exists
+          - kvm_device.stat.ischr
+        fail_msg: /dev/kvm is missing — nested virtualization may be unavailable
+
+    - name: Assert virsh can talk to the system libvirt instance
+      ansible.builtin.command: virsh -c qemu:///system list --all
+      register: virsh_list
+      become: true
+      changed_when: false
+      failed_when: virsh_list.rc != 0
+
+    - name: Assert default libvirt pool is active
+      ansible.builtin.command: virsh pool-info {{ hypervisor_libvirt_pool_name }}
+      register: pool_info
+      become: true
+      changed_when: false
+      failed_when: pool_info.rc != 0
+
+    - name: Assert ansible user is in libvirt group
+      ansible.builtin.command: id -nG ansible
+      register: ansible_groups
+      changed_when: false
+      failed_when: "'libvirt' not in ansible_groups.stdout.split()"
+
+    - name: Assert ansible user is in docker group
+      ansible.builtin.command: id -nG ansible
+      register: ansible_groups
+      changed_when: false
+      failed_when: "'docker' not in ansible_groups.stdout.split()"
+
+    - name: Run hello-world container
+      ansible.builtin.command: docker run --rm hello-world
+      register: docker_hello
+      become: true
+      changed_when: false
+      failed_when: docker_hello.rc != 0

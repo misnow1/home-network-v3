@@ -10,7 +10,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 1 | Ubuntu baseline | **done** | `linux_baseline` role, `baseline.yml`, idempotency test |
 | 2 | Samba AD DC + BIND DLZ | **done** | `dc01.lab.test`, bootstrap/converge split |
 | 3 | Domain join (realmd + sssd) | **done** | `member01.lab.test`, RFC2307 IDs, short names |
-| 4 | Hypervisor (nested virt) | planned | `hv01.lab.test`, libvirt + Docker |
+| 4 | Hypervisor (nested virt) | **done** | `hv01.lab.test`, libvirt + Docker, 32GB lab disk |
 | 5 | Samba file server | planned | `nas01.lab.test`, winbind, `idmap_ad`, SMB test share |
 | 6 | DDNS / nsupdate automation | planned | GSS-TSIG updates against BIND on DC |
 | 7 | Backups + restore drills | planned | Scope manifests, automated restore drill |

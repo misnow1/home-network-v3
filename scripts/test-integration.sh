@@ -8,7 +8,7 @@ source "${ROOT}/scripts/lib/common.sh"
 # shellcheck source=lib/ansible.sh
 source "${ROOT}/scripts/lib/ansible.sh"
 
-LAB_HOST="${LAB_HOST:-member01.lab.test}"
+LAB_HOST="${LAB_HOST:-hv01.lab.test}"
 LAB_DC_HOST="${LAB_DC_HOST:-dc01.lab.test}"
 SKIP_VM_TESTS="${SKIP_VM_TESTS:-0}"
 
@@ -73,6 +73,28 @@ run_domain_join_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
+run_hypervisor_integration() {
+  log_info "Integration VM lifecycle for ${LAB_HOST} (slice=hypervisor)"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Converging hypervisor on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/hypervisor.yml --limit "${LAB_HOST}"
+
+  log_info "Converging hypervisor on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/hypervisor.yml --limit "${LAB_HOST}"
+
+  log_info "Running hypervisor convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_hypervisor_converged.yml --limit "${LAB_HOST}"
+
+  log_info "Destroying integration test VM ${LAB_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
+}
+
 main() {
   if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
     export PATH="${ROOT}/.venv/bin:${PATH}"
@@ -121,6 +143,9 @@ main() {
       ;;
     domain_join)
       run_domain_join_integration
+      ;;
+    hypervisor)
+      run_hypervisor_integration
       ;;
     *)
       die "Unsupported lab_slice '${lab_slice}' for ${LAB_HOST}"

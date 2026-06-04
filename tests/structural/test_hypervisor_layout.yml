@@ -1,0 +1,31 @@
+---
+# Structural tests for hypervisor role layout.
+
+- name: Structural — hypervisor layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    libvirt_defaults: "{{ repo_root }}/roles/hypervisor/defaults/main.yml"
+    hypervisor_playbook: "{{ repo_root }}/playbooks/hypervisor.yml"
+  tasks:
+    - name: Hypervisor | assert libvirt packages include python3-libvirt
+      ansible.builtin.shell: |
+        grep -q python3-libvirt "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert playbook uses serial 1
+      ansible.builtin.shell: |
+        grep -q 'serial: 1' "{{ hypervisor_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert playbook targets hypervisors group
+      ansible.builtin.shell: |
+        grep -q 'hosts: hypervisors' "{{ hypervisor_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

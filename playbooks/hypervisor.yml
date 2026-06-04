@@ -1,0 +1,12 @@
+---
+# Converge libvirt/KVM and Docker on hypervisor-class hosts.
+# Lab integration: scripts/test-integration.sh (hv01.lab.test, nested virt).
+#
+# Run baseline.yml first. Uses serial: 1 for libvirt safety on shared hosts.
+
+- name: Configure hypervisor hosts
+  hosts: hypervisors
+  become: true
+  serial: 1
+  roles:
+    - role: hypervisor

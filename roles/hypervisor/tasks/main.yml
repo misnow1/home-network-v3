@@ -1,0 +1,8 @@
+---
+- name: Install and configure libvirt
+  ansible.builtin.include_tasks: libvirt.yml
+  tags: [libvirt]
+
+- name: Install and configure Docker
+  ansible.builtin.include_tasks: docker.yml
+  tags: [docker]

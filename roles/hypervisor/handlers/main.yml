@@ -1,0 +1,14 @@
+---
+- name: Restart libvirtd
+  ansible.builtin.service:
+    name: "{{ hypervisor_libvirt_service }}"
+    state: restarted
+  listen: restart libvirtd
+  when: not ansible_check_mode
+
+- name: Restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  listen: restart docker
+  when: not ansible_check_mode

@@ -8,7 +8,7 @@ All integration work uses the lab inventory:
 ansible-playbook -i inventories/lab playbooks/baseline.yml
 ansible-playbook -i inventories/lab playbooks/dc-bootstrap.yml --limit dc01.lab.test
 ansible-playbook -i inventories/lab playbooks/dc-converge.yml --limit dc01.lab.test
-ansible-playbook -i inventories/lab playbooks/domain-join.yml --limit member01.lab.test
+ansible-playbook -i inventories/lab playbooks/hypervisor.yml --limit hv01.lab.test
 ./scripts/test-quick.sh
 ./scripts/test-integration.sh
 ```
