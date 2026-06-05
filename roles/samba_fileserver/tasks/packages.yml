@@ -1,0 +1,12 @@
+---
+- name: File server | Refresh apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [fileserver_packages]
+
+- name: File server | Install packages
+  ansible.builtin.apt:
+    name: "{{ fileserver_packages }}"
+    state: present
+  tags: [fileserver_packages]

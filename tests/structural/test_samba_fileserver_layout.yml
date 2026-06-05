@@ -1,0 +1,54 @@
+---
+# Structural tests for samba_fileserver role layout.
+
+- name: Structural — samba fileserver layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    join_tasks: "{{ repo_root }}/roles/samba_fileserver/tasks/join.yml"
+    smb_template: "{{ repo_root }}/roles/samba_fileserver/templates/smb.conf.j2"
+    fileserver_playbook: "{{ repo_root }}/playbooks/fileserver.yml"
+  tasks:
+    - name: File server | assert join task excludes DC hosts
+      ansible.builtin.shell: |
+        grep -q "groups.get('dc'" "{{ join_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert smb.conf uses idmap_ad with RFC2307
+      ansible.builtin.shell: |
+        grep -q 'backend = ad' "{{ smb_template }}"
+        grep -q 'schema_mode = rfc2307' "{{ smb_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert smb.conf uses ADS security
+      ansible.builtin.shell: |
+        grep -q 'security = ads' "{{ smb_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert playbook targets fileservers group
+      ansible.builtin.shell: |
+        grep -q 'hosts: fileservers' "{{ fileserver_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert smb.conf enables rfc2307 nss info
+      ansible.builtin.shell: |
+        grep -q 'winbind nss info = rfc2307' "{{ smb_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert configure enables pam_winbind
+      ansible.builtin.shell: |
+        grep -q 'pam_winbind.so' "{{ repo_root }}/roles/samba_fileserver/tasks/configure.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false

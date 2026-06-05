@@ -1,10 +1,23 @@
 ---
-# Create lab AD users on the DC for domain-join integration tests.
+# Create lab AD users on the DC for domain-join and file-server integration tests.
 
 - name: Integration — lab AD test users
   hosts: dc
   become: true
   tasks:
+    - name: Check whether lab test group exists
+      ansible.builtin.command: samba-tool group show {{ lab_test_group }}
+      register: lab_test_group_show
+      changed_when: false
+      failed_when: false
+
+    - name: Create lab test group with RFC2307 gidNumber
+      ansible.builtin.command: >-
+        samba-tool group add {{ lab_test_group }}
+        --gid-number={{ lab_test_user_gid }}
+        --nis-domain={{ lab_nis_domain }}
+      when: lab_test_group_show.rc != 0
+
     - name: Check whether lab test user exists
       ansible.builtin.command: samba-tool user show {{ lab_test_user }}
       register: lab_test_user_show
@@ -21,3 +34,19 @@
         --login-shell=/bin/bash
       when: lab_test_user_show.rc != 0
       no_log: true
+
+    - name: Ensure lab test user is in lab test group
+      ansible.builtin.command: >-
+        samba-tool group addmembers {{ lab_test_group }} {{ lab_test_user }}
+      register: lab_test_group_addmember
+      changed_when: "'Added members' in lab_test_group_addmember.stdout"
+      failed_when: >-
+        lab_test_group_addmember.rc != 0 and
+        'Already a member' not in (lab_test_group_addmember.stderr | default(''))
+
+    - name: Set lab test user primary group for RFC2307 idmap_ad
+      ansible.builtin.command: >-
+        samba-tool user setprimarygroup {{ lab_test_user }} {{ lab_test_group }}
+      register: lab_test_primary_group
+      changed_when: "'Updated primary group' in lab_test_primary_group.stdout"
+      failed_when: lab_test_primary_group.rc != 0

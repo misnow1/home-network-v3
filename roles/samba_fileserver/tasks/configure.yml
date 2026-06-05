@@ -1,0 +1,85 @@
+---
+- name: File server | Enable and start Samba services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: "{{ fileserver_services }}"
+  when: not ansible_check_mode
+  tags: [fileserver_configure]
+
+- name: File server | Ensure winbind is listed in nsswitch passwd
+  ansible.builtin.lineinfile:
+    path: /etc/nsswitch.conf
+    regexp: '^passwd:'
+    line: 'passwd:         files winbind'
+    backrefs: false
+  tags: [fileserver_configure]
+
+- name: File server | Ensure winbind is listed in nsswitch group
+  ansible.builtin.lineinfile:
+    path: /etc/nsswitch.conf
+    regexp: '^group:'
+    line: 'group:          files winbind'
+    backrefs: false
+  tags: [fileserver_configure]
+
+- name: File server | Ensure winbind is listed in nsswitch shadow
+  ansible.builtin.lineinfile:
+    path: /etc/nsswitch.conf
+    regexp: '^shadow:'
+    line: 'shadow:         files winbind'
+    backrefs: false
+  tags: [fileserver_configure]
+
+- name: File server | Wait for domain group to resolve via winbind NSS
+  ansible.builtin.command: getent group {{ fileserver_valid_users_group }}
+  register: fileserver_group_lookup
+  until: fileserver_group_lookup.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  tags: [fileserver_configure]
+
+- name: File server | Ensure share directory exists with domain group ownership
+  ansible.builtin.file:
+    path: "{{ fileserver_share_path }}"
+    state: directory
+    owner: root
+    group: "{{ fileserver_valid_users_group }}"
+    mode: "2775"
+  tags: [fileserver_configure]
+
+- name: File server | Check whether pam_winbind is enabled
+  ansible.builtin.shell: |
+    grep -q 'pam_winbind.so' /etc/pam.d/common-auth
+  args:
+    executable: /bin/bash
+  register: fileserver_pam_winbind_enabled
+  changed_when: false
+  failed_when: false
+  tags: [fileserver_configure]
+
+- name: File server | Enable winbind for PAM authentication
+  ansible.builtin.command: pam-auth-update --enable winbind --force
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  when: fileserver_pam_winbind_enabled.rc != 0
+  tags: [fileserver_configure]
+
+- name: File server | Check whether pam_mkhomedir is enabled
+  ansible.builtin.shell: |
+    grep -q 'pam_mkhomedir.so' /etc/pam.d/common-session
+  args:
+    executable: /bin/bash
+  register: fileserver_pam_mkhomedir_enabled
+  changed_when: false
+  failed_when: false
+  tags: [fileserver_configure]
+
+- name: File server | Enable pam_mkhomedir for domain user homedirs
+  ansible.builtin.command: pam-auth-update --enable mkhomedir --force
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  when: fileserver_pam_mkhomedir_enabled.rc != 0
+  tags: [fileserver_configure]

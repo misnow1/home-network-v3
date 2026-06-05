@@ -6,5 +6,7 @@ domain_member_allow_groups:
   - Domain Users
 
 lab_test_user: labtest
+lab_test_group: labusers
+lab_nis_domain: lab
 lab_test_user_uid: 10001
 lab_test_user_gid: 10001

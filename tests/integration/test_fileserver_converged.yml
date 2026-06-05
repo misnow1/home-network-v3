@@ -1,0 +1,76 @@
+---
+# Post-converge checks for Slice 5 integration tests (nas01.lab.test).
+
+- name: Integration — file server convergence
+  hosts: fileservers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert smbd is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['smbd.service'].state == 'running'
+        fail_msg: smbd is not running
+
+    - name: Assert winbind is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['winbind.service'].state == 'running'
+        fail_msg: winbind is not running
+
+    - name: Assert domain is joined
+      ansible.builtin.command: net ads testjoin
+      register: ads_testjoin
+      changed_when: false
+      failed_when: ads_testjoin.rc != 0
+
+    - name: Assert lab AD user resolves via winbind NSS
+      ansible.builtin.command: getent passwd {{ lab_test_user }}
+      register: getent_user
+      changed_when: false
+      failed_when: getent_user.rc != 0
+
+    - name: Assert POSIX uid comes from RFC2307 uidNumber
+      ansible.builtin.assert:
+        that:
+          - "getent_user.stdout.split(':')[2] | int == lab_test_user_uid | int"
+        fail_msg: >-
+          Expected uid {{ lab_test_user_uid }} for {{ lab_test_user }},
+          got {{ getent_user.stdout }}
+
+    - name: Assert domain user can authenticate for shell access
+      ansible.builtin.shell: |
+        set -euo pipefail
+        printf '%s\n' "${LOGIN_PASSWORD}" | su - "${LOGIN_USER}" -c 'whoami'
+      args:
+        executable: /bin/bash
+      environment:
+        LOGIN_USER: "{{ lab_test_user }}"
+        LOGIN_PASSWORD: "{{ vault_test_user_password }}"
+      register: su_login
+      changed_when: false
+      no_log: true
+      failed_when: su_login.stdout.strip() != lab_test_user
+
+    - name: Write and read test file via smbclient
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tmpfile="$(mktemp)"
+        printf '%s\n' "slice5-integration" > "${tmpfile}"
+        smbclient "//localhost/{{ fileserver_share_name }}" \
+          -U "${SMB_USER}%${SMB_PASSWORD}" \
+          -c "put ${tmpfile} integration-test.txt"
+        smbclient "//localhost/{{ fileserver_share_name }}" \
+          -U "${SMB_USER}%${SMB_PASSWORD}" \
+          -c 'get integration-test.txt -' | grep -q 'slice5-integration'
+        rm -f "${tmpfile}"
+      args:
+        executable: /bin/bash
+      environment:
+        SMB_USER: "{{ lab_test_user }}"
+        SMB_PASSWORD: "{{ vault_test_user_password }}"
+      changed_when: false
+      no_log: true

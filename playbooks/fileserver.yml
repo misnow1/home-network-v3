@@ -1,0 +1,9 @@
+---
+# Converge Samba AD member file servers (winbind + idmap_ad).
+# Run baseline.yml first. Lab integration: scripts/test-integration.sh (nas01.lab.test + dc01).
+
+- name: Configure Samba file servers
+  hosts: fileservers
+  become: true
+  roles:
+    - role: samba_fileserver

@@ -95,6 +95,31 @@ run_hypervisor_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
 }
 
+run_fileserver_integration() {
+  provision_lab_dc
+
+  log_info "Integration VM lifecycle for ${LAB_HOST} (slice=fileserver)"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Converging file server on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/fileserver.yml --limit "${LAB_HOST}"
+
+  log_info "Converging file server on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/fileserver.yml --limit "${LAB_HOST}"
+
+  log_info "Running file server convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_fileserver_converged.yml --limit "${LAB_HOST}"
+
+  log_info "Destroying integration test VMs"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
+}
+
 main() {
   if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
     export PATH="${ROOT}/.venv/bin:${PATH}"
@@ -146,6 +171,9 @@ main() {
       ;;
     hypervisor)
       run_hypervisor_integration
+      ;;
+    fileserver)
+      run_fileserver_integration
       ;;
     *)
       die "Unsupported lab_slice '${lab_slice}' for ${LAB_HOST}"

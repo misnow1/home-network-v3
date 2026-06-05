@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+# Samba member server — winbind + idmap_ad (RFC2307).
+
+[global]
+   workgroup = {{ samba_workgroup }}
+   realm = {{ samba_realm }}
+   security = ads
+
+   idmap config {{ samba_workgroup }} : backend = ad
+   idmap config {{ samba_workgroup }} : schema_mode = rfc2307
+   idmap config {{ samba_workgroup }} : range = {{ fileserver_idmap_ad_range }}
+   idmap config {{ samba_workgroup }} : unix_nss_info = yes
+   idmap config {{ samba_workgroup }} : unix_primary_group = yes
+
+   idmap config * : backend = tdb
+   idmap config * : range = {{ fileserver_idmap_tdb_range }}
+
+   winbind use default domain = yes
+   winbind refresh tickets = yes
+   winbind nss info = rfc2307
+   winbind enum users = yes
+   winbind enum groups = yes
+
+   template homedir = {{ fileserver_template_homedir }}
+   template shell = {{ fileserver_template_shell }}
+
+   kerberos method = secrets and keytab
+
+   logging = file
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+
+[{{ fileserver_share_name }}]
+   path = {{ fileserver_share_path }}
+   browseable = yes
+   read only = no
+   guest ok = no
+   valid users = @{{ fileserver_valid_users_group }}
+   force group = {{ fileserver_valid_users_group }}
+   create mask = 0664
+   directory mask = 0775

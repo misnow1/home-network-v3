@@ -9,6 +9,7 @@ ansible-playbook -i inventories/lab playbooks/baseline.yml
 ansible-playbook -i inventories/lab playbooks/dc-bootstrap.yml --limit dc01.lab.test
 ansible-playbook -i inventories/lab playbooks/dc-converge.yml --limit dc01.lab.test
 ansible-playbook -i inventories/lab playbooks/hypervisor.yml --limit hv01.lab.test
+ansible-playbook -i inventories/lab playbooks/fileserver.yml --limit nas01.lab.test
 ./scripts/test-quick.sh
 ./scripts/test-integration.sh
 ```

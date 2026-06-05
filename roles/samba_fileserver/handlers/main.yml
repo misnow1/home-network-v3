@@ -1,0 +1,8 @@
+---
+- name: Restart Samba file server services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ fileserver_services }}"
+  listen: restart samba fileserver
+  when: not ansible_check_mode

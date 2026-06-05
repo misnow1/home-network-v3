@@ -1,0 +1,16 @@
+---
+- name: Install Samba file server packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [fileserver_packages]
+
+- name: Join AD domain for Samba file server
+  ansible.builtin.include_tasks: join.yml
+  tags: [fileserver_join]
+
+- name: File server | Apply Samba service restarts before NSS/PAM setup
+  ansible.builtin.meta: flush_handlers
+  tags: [fileserver_configure, fileserver_join]
+
+- name: Configure winbind NSS/PAM and Samba services
+  ansible.builtin.include_tasks: configure.yml
+  tags: [fileserver_configure]

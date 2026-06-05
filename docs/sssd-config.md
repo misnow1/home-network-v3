@@ -17,5 +17,5 @@ Lab defaults live in `inventories/lab/group_vars/all/vars.yml` and are applied b
 
 ## File server note
 
-Samba file servers (`nas01`) use **winbind** for Windows client access — not sssd.
-See Slice 5 in [ROADMAP.md](ROADMAP.md).
+Samba file servers (`nas01`) use **winbind** for NSS, PAM, and SMB — not sssd.
+See [fileserver-runbook.md](fileserver-runbook.md) (Slice 5).

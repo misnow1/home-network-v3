@@ -1,0 +1,8 @@
+---
+# Lab Samba file server defaults for nas01 and future production fileservers.
+
+fileserver_dns_servers:
+  - 192.168.100.10
+
+fileserver_share_name: labshare
+fileserver_share_path: /srv/samba/labshare

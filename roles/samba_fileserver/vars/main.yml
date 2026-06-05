@@ -1,0 +1,14 @@
+---
+# Ubuntu 24.04 LTS (Slice 5).
+fileserver_packages:
+  - samba
+  - winbind
+  - libnss-winbind
+  - libpam-winbind
+  - krb5-user
+  - smbclient
+
+fileserver_services:
+  - smbd
+  - nmbd
+  - winbind

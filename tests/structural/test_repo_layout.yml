@@ -16,8 +16,11 @@
       - docs/dns-architecture.md
       - docs/domain-join-runbook.md
       - docs/hypervisor-runbook.md
+      - docs/fileserver-runbook.md
       - playbooks/hypervisor.yml
+      - playbooks/fileserver.yml
       - roles/hypervisor/tasks/libvirt.yml
+      - roles/samba_fileserver/tasks/join.yml
       - roles/domain_join/tasks/join.yml
       - playbooks
       - roles

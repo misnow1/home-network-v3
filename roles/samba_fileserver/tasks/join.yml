@@ -1,0 +1,54 @@
+---
+- name: File server | Assert host is not a DC
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname not in groups.get('dc', [])
+    fail_msg: >-
+      samba_fileserver role must not run on DC hosts. Use samba_dc instead.
+  tags: [always]
+
+- name: File server | Configure resolver for AD DNS
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # Samba file server — use lab AD DNS
+      {% for ns in fileserver_dns_servers %}
+      nameserver {{ ns }}
+      {% endfor %}
+      search {{ domain_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [fileserver_join]
+
+- name: File server | Deploy smb.conf before domain join
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: testparm -s %s
+  notify: restart samba fileserver
+  tags: [fileserver_join]
+
+- name: File server | Check current AD join status
+  ansible.builtin.command: net ads testjoin
+  register: fileserver_ads_testjoin
+  changed_when: false
+  failed_when: false
+  tags: [fileserver_join]
+
+- name: File server | Join AD domain (skipped if already joined)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    net ads join -U "${JOIN_USER}%${JOIN_PASSWORD}"
+  args:
+    executable: /bin/bash
+  environment:
+    JOIN_USER: "{{ vault_ad_join_user }}"
+    JOIN_PASSWORD: "{{ vault_ad_join_password }}"
+  when: fileserver_ads_testjoin.rc != 0
+  no_log: true
+  notify: restart samba fileserver
+  tags: [fileserver_join]
