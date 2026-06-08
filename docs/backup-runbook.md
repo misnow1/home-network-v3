@@ -57,7 +57,8 @@ LAB_HOST=hv01.lab.test ./scripts/test-integration.sh
 Provisions `hv01`, converges hypervisor + backup, seeds a docker volume, runs backup,
 restores the latest snapshot, and verifies file integrity via sha256.
 
-## Production notes (Slice 8+)
+## Production notes
 
-Lab uses a **local** restic repository. Production will likely use SFTP to a NAS target
-and systemd timers — deferred until production convergence.
+Lab uses a **local** restic repository. Production inventory templates and apply order
+are documented in `docs/production-runbook.md`. SFTP/NAS repositories and systemd
+timers remain a future enhancement.

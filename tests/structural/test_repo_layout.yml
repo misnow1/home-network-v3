@@ -19,6 +19,7 @@
       - docs/fileserver-runbook.md
       - docs/ddns-runbook.md
       - docs/backup-runbook.md
+      - docs/production-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml
@@ -34,6 +35,7 @@
       - inventories/production
       - scripts/lib
       - scripts/lab
+      - scripts/test-prod-safety.sh
       - tests/structural
       - docs/ROADMAP.md
       - docs/vault-schema.md

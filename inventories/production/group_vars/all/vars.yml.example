@@ -1,0 +1,14 @@
+---
+# Production-wide non-secret variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/all/vars.yml.example \
+#      inventories/production/group_vars/all/vars.yml
+
+# SSSD (domain_join role)
+sssd_ldap_id_mapping: false
+sssd_use_fully_qualified_names: false
+sssd_fall_back_homedir: /home/%u
+
+# Samba member defaults (fileservers)
+samba_workgroup: HOME
+samba_realm: HOME.EXAMPLE

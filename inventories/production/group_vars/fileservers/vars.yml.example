@@ -1,0 +1,8 @@
+---
+# File server group variables — copy to vars.yml and customize.
+
+domain_name: home.example
+fileserver_dns_servers:
+  - 203.0.113.10
+fileserver_share_name: data
+fileserver_share_path: /srv/samba/data

@@ -60,4 +60,4 @@ Never run destructive playbooks against production directly. Use:
 ./scripts/prod-run.sh --confirm-production -- playbooks/baseline.yml --limit example.host
 ```
 
-See [docs/run-order.md](docs/run-order.md).
+See [docs/run-order.md](docs/run-order.md) and [docs/production-runbook.md](docs/production-runbook.md).

@@ -1,0 +1,18 @@
+---
+# DC host group variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/dc/vars.yml.example \
+#      inventories/production/group_vars/dc/vars.yml
+
+domain_name: home.example
+dc_realm: HOME.EXAMPLE
+dc_domain_name: home.example
+dc_dns_forwarders:
+  - 1.1.1.1
+  - 8.8.8.8
+dc_ntp_allow_cidr: 192.168.1.0/24
+samba_dc_chrony_group: _chrony
+
+samba_dc_dnsupdater_enabled: true
+samba_dc_reverse_zones:
+  - 1.168.192.in-addr.arpa

@@ -14,7 +14,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 5 | Samba file server | **done** | `nas01.lab.test`, winbind, shell login + SMB share |
 | 6 | DDNS / nsupdate automation | **done** | GSS-TSIG updates against BIND on DC |
 | 7 | Backups + restore drills | **done** | Scope manifests, local restic, restore drill |
-| 8 | Production convergence | planned | Runbooks, prod wrapper, explicit opt-in |
+| 8 | Production convergence | **done** | Runbooks, prod wrapper, inventory examples, safety tests |
 
 ## Deferred (not forgotten)
 

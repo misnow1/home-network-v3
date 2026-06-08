@@ -1,0 +1,89 @@
+---
+# Structural tests for production convergence (Slice 8).
+
+- name: Structural — production runbook and templates
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    production_runbook: "{{ repo_root }}/docs/production-runbook.md"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+    prod_run: "{{ repo_root }}/scripts/prod-run.sh"
+    prod_safety: "{{ repo_root }}/scripts/test-prod-safety.sh"
+    dc_bootstrap: "{{ repo_root }}/playbooks/dc-bootstrap.yml"
+  tasks:
+    - name: Production | assert production runbook exists
+      ansible.builtin.stat:
+        path: "{{ production_runbook }}"
+      register: production_runbook_stat
+
+    - name: Production | assert production runbook present
+      ansible.builtin.assert:
+        that:
+          - production_runbook_stat.stat.exists
+
+    - name: Production | assert runbook documents apply order
+      ansible.builtin.shell: |
+        grep -q 'dc-bootstrap.yml' "{{ production_runbook }}"
+        grep -q 'prod-run.sh' "{{ production_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Production | assert hosts example uses dc group name
+      ansible.builtin.shell: |
+        grep -q '^    dc:' "{{ prod_hosts_example }}"
+        ! grep -q 'domain_controllers' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Production | assert prod-run requires confirmation flag
+      ansible.builtin.shell: |
+        grep -q -- '--confirm-production' "{{ prod_run }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Production | assert prod-run refuses lab vault fallback
+      ansible.builtin.shell: |
+        grep -q 'Refusing to fall back to the lab vault' "{{ prod_run }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Production | assert dc-bootstrap has allow_production guard
+      ansible.builtin.shell: |
+        grep -q 'allow_production' "{{ dc_bootstrap }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Production | assert production group_vars examples exist
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/{{ item }}"
+      register: prod_example_stats
+      loop:
+        - inventories/production/group_vars/all/vars.yml.example
+        - inventories/production/group_vars/dc/vars.yml.example
+        - inventories/production/group_vars/linux/vars.yml.example
+
+    - name: Production | assert group_vars examples present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing {{ item.item }}"
+      loop: "{{ prod_example_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Production | assert prod safety script exists
+      ansible.builtin.stat:
+        path: "{{ prod_safety }}"
+      register: prod_safety_stat
+
+    - name: Production | assert prod safety script is executable
+      ansible.builtin.assert:
+        that:
+          - prod_safety_stat.stat.exists
+          - prod_safety_stat.stat.executable

@@ -10,6 +10,10 @@ lab vault if the password is lost.
 | `inventories/lab/group_vars/all/vault.yml` | Yes (committed) | Lab integration tests and development |
 | `inventories/production/group_vars/vault.yml` | Yes (gitignored) | Production runs via `scripts/prod-run.sh` |
 
+Non-secret production variables use committed `*.example` templates under
+`inventories/production/group_vars/` — copy to `vars.yml` locally (see
+`docs/production-runbook.md`).
+
 ## Password files (never commit)
 
 | File | Purpose |

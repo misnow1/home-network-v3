@@ -28,6 +28,9 @@ main() {
   log_info "Tier 1 — ansible-playbook --syntax-check"
   run_ansible_syntax_check "${ROOT}"
 
+  log_info "Tier 2 — production safety script"
+  "${ROOT}/scripts/test-prod-safety.sh"
+
   log_info "Tier 2 — structural tests"
   for test_playbook in "${ROOT}"/tests/structural/*.yml; do
     [[ -f "${test_playbook}" ]] || continue

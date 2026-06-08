@@ -1,0 +1,8 @@
+---
+# Linux member defaults — copy to vars.yml and customize.
+
+domain_name: home.example
+domain_join_dns_servers:
+  - 203.0.113.10
+domain_member_allow_groups:
+  - Domain Users
