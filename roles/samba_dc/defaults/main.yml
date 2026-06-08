@@ -10,6 +10,12 @@ dc_dns_forwarders:
 dc_ntp_allow_cidr: 192.168.100.0/24
 samba_dc_chrony_group: _chrony
 
+# Networks permitted to query/recurse against BIND on the DC. Keep this scoped
+# to trusted subnets so the DC is never an open recursive resolver. Defaults to
+# the same trusted CIDR used for NTP signing.
+samba_dc_dns_allowed_networks:
+  - "{{ dc_ntp_allow_cidr }}"
+
 samba_dc_dnsupdater_enabled: false
 samba_dc_dnsupdater_name: dnsupdater
 samba_dc_dnsupdater_groups:

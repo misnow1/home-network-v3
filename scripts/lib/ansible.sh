@@ -52,10 +52,13 @@ assert_ansible_playbook_idempotent() {
   output="$(run_ansible_playbook "${root}" "$@" 2>&1)"
   printf '%s\n' "${output}" >&2
   recap="$(printf '%s\n' "${output}" | awk '/^PLAY RECAP/,0')"
-  if printf '%s\n' "${recap}" | grep -qE 'failed=[1-9]'; then
-    die "Playbook reported failures"
+  if printf '%s\n' "${recap}" | grep -qE 'failed=[1-9]|unreachable=[1-9]'; then
+    die "Playbook reported failures or unreachable hosts"
   fi
-  if ! printf '%s\n' "${recap}" | grep -qE 'changed=0'; then
+  # Idempotent means no host reports any change. Checking for changed=[1-9]
+  # correctly catches a changed host even in multi-host recaps (the previous
+  # 'grep changed=0' passed as long as any one host was unchanged).
+  if printf '%s\n' "${recap}" | grep -qE 'changed=[1-9]'; then
     die "Expected idempotent run (changed=0)"
   fi
 }

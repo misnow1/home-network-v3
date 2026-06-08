@@ -26,8 +26,10 @@ main() {
     else
       die "Neither qemu nor libvirt group found"
     fi
-    # Owner = invoking admin's target user if SUDO_USER set, else root -> misnow1 typical
-    local owner="${SUDO_USER:-${LAB_DIR_OWNER:-misnow1}}"
+    # Owner = the invoking admin (SUDO_USER when run via sudo) or an explicit
+    # LAB_DIR_OWNER override. Avoid a hardcoded username so this is portable.
+    local owner="${SUDO_USER:-${LAB_DIR_OWNER:-}}"
+    [[ -n "${owner}" ]] || die "Cannot determine target owner. Run via sudo, or set LAB_DIR_OWNER=<user>."
     chown "${owner}:${qemu_group}" "${data_dir}" "${images_dir}" "${vms_dir}" "${seeds_dir}"
     chmod 775 "${data_dir}" "${images_dir}" "${vms_dir}" "${seeds_dir}"
     log_info "Created ${data_dir} (owner ${owner}:${qemu_group}, mode 775)"

@@ -67,12 +67,20 @@ main() {
   }
   ansible_env
 
-  if [[ -f "${ROOT}/.vault_pass" ]]; then
-    ansible-playbook -i "${PROD_INVENTORY}" --vault-password-file "${ROOT}/.vault_pass" "${args[@]}" \
-      2>&1 | tee -a "${log_file}"
-  else
-    ansible-playbook -i "${PROD_INVENTORY}" "${args[@]}" 2>&1 | tee -a "${log_file}"
+  # Production must use its own vault password. ansible.cfg defaults
+  # vault_password_file to .vault_pass_lab, so without this guard a production
+  # run would silently decrypt with the LAB password. Require .vault_pass (or
+  # VAULT_PASS) and override the lab default explicitly.
+  local prod_vault="${ROOT}/.vault_pass"
+  if [[ ! -f "${prod_vault}" && -n "${VAULT_PASS:-}" ]]; then
+    printf '%s' "${VAULT_PASS}" > "${prod_vault}"
+    chmod 600 "${prod_vault}"
   fi
+  [[ -f "${prod_vault}" ]] || die "Missing ${prod_vault} (production vault password). Refusing to fall back to the lab vault — see docs/vault-schema.md"
+  export ANSIBLE_VAULT_PASSWORD_FILE="${prod_vault}"
+
+  ansible-playbook -i "${PROD_INVENTORY}" --vault-password-file "${prod_vault}" "${args[@]}" \
+    2>&1 | tee -a "${log_file}"
 }
 
 main "$@"

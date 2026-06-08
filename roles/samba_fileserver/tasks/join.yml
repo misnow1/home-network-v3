@@ -8,8 +8,12 @@
   tags: [always]
 
 - name: File server | Configure resolver for AD DNS
+  # follow: false replaces the systemd-resolved stub symlink with a static
+  # file so AD DNS persists across reboots. Full resolved/netplan-managed DNS
+  # is deferred to the production-convergence slice.
   ansible.builtin.copy:
     dest: /etc/resolv.conf
+    follow: false
     content: |
       # Samba file server — use lab AD DNS
       {% for ns in fileserver_dns_servers %}
@@ -42,12 +46,14 @@
 - name: File server | Join AD domain (skipped if already joined)
   ansible.builtin.shell: |
     set -euo pipefail
-    net ads join -U "${JOIN_USER}%${JOIN_PASSWORD}"
+    # Pass the password via the Samba PASSWD env var instead of user%password
+    # in argv, which would be visible in the target process table.
+    net ads join -U "${JOIN_USER}"
   args:
     executable: /bin/bash
   environment:
     JOIN_USER: "{{ vault_ad_join_user }}"
-    JOIN_PASSWORD: "{{ vault_ad_join_password }}"
+    PASSWD: "{{ vault_ad_join_password }}"
   when: fileserver_ads_testjoin.rc != 0
   no_log: true
   notify: restart samba fileserver

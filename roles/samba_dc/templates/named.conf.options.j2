@@ -14,8 +14,24 @@ options {
 
     forward only;
 
+    // DNSSEC validation is disabled: AD forwarders and internal-only zones
+    // make end-to-end validation impractical for the AD domain.
     dnssec-validation no;
 
+    // Answer on every interface so members can reach the DC by its LAN IP,
+    // but only recurse/answer for trusted networks to avoid being an open
+    // resolver (DNS amplification / cache-poisoning exposure).
     listen-on { any; };
-    allow-recursion { any; };
+    allow-query {
+        localhost;
+{% for net in samba_dc_dns_allowed_networks %}
+        {{ net }};
+{% endfor %}
+    };
+    allow-recursion {
+        localhost;
+{% for net in samba_dc_dns_allowed_networks %}
+        {{ net }};
+{% endfor %}
+    };
 };

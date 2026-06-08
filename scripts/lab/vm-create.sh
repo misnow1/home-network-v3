@@ -112,7 +112,9 @@ main() {
     --noautoconsole
   )
 
-  if [[ "$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_nested_virt" 2>/dev/null || true)" == "True" ]]; then
+  local nested_virt
+  nested_virt="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_nested_virt" 2>/dev/null || true)"
+  if [[ "${nested_virt,,}" == "true" ]]; then
     virt_args+=(--cpu host-passthrough)
   fi
 

@@ -8,8 +8,13 @@
   tags: [always]
 
 - name: Domain join | Configure resolver for AD DNS
+  # follow: false replaces the systemd-resolved stub symlink with a static
+  # file so AD DNS persists across reboots (resolved leaves a real
+  # /etc/resolv.conf untouched). Full resolved/netplan-managed DNS is deferred
+  # to the production-convergence slice.
   ansible.builtin.copy:
     dest: /etc/resolv.conf
+    follow: false
     content: |
       # Domain join — use lab AD DNS
       {% for ns in domain_join_dns_servers %}

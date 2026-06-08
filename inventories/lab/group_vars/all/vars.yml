@@ -1,12 +1,9 @@
 ---
 # Non-secret lab variables.
-lab_dns_forwarders:
-  - 192.168.100.10
 
 # SSSD defaults applied by domain_join role (Slice 3).
 sssd_ldap_id_mapping: false
 sssd_use_fully_qualified_names: false
-sssd_fully_qualified_names: false
 sssd_fall_back_homedir: /home/%u
 
 # Samba file server defaults (Slice 5).

@@ -22,6 +22,9 @@ default_shell = /bin/bash
 cache_credentials = true
 krb5_store_password_if_offline = true
 
+{# NOTE: with access_provider = simple and no simple_allow_groups, SSSD's
+   simple provider grants access to ALL domain users. Set
+   domain_member_allow_groups (group_vars) to restrict login to named groups. #}
 {% if domain_member_allow_groups | length > 0 %}
 simple_allow_groups = {{ domain_member_allow_groups | join(', ') }}
 {% endif %}

@@ -51,6 +51,10 @@
   tags: [samba_provision]
 
 - name: DC bootstrap | Provision Samba AD domain (BIND9_DLZ, RFC2307)
+  # samba-tool domain provision only accepts the new admin password via
+  # --adminpass (no env/stdin equivalent). This runs once on a fresh host and
+  # no_log keeps it out of Ansible output; the argv exposure window is the
+  # initial provision only.
   ansible.builtin.command:
     cmd: >-
       samba-tool domain provision

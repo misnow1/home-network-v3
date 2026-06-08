@@ -13,5 +13,13 @@ rules:
   truthy:
     allowed-values: ['true', 'false', 'yes', 'no']
     level: error
+  # Aligned with ansible-lint's embedded yamllint config to avoid the
+  # "incompatible custom yamllint configuration" warning.
   comments:
-    min-spaces-from-content: 2
+    min-spaces-from-content: 1
+  comments-indentation: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true

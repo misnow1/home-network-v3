@@ -32,6 +32,9 @@
 - name: DC dnsupdater | Create DNS updater user
   ansible.builtin.shell: |
     set -euo pipefail
+    # samba-tool user create runs locally against sam.ldb (no -U auth needed).
+    # The account password is set once here; clients authenticate via keytab,
+    # so this value is otherwise unused after creation.
     samba-tool user create "{{ samba_dc_dnsupdater_name }}" "${DNSUPDATER_PASSWORD}" \
       --given-name=DNS \
       --surname=Updater
@@ -50,9 +53,10 @@
 - name: DC dnsupdater | Add DNS updater user to DnsAdmins
   ansible.builtin.shell: |
     set -euo pipefail
+    # Authenticate via the Samba PASSWD env var to keep the secret out of argv.
     for g in {% for g in samba_dc_dnsupdater_groups %}{{ g | quote }} {% endfor %}; do
       if out=$(samba-tool group addmembers "$g" "{{ samba_dc_dnsupdater_name }}" \
-          -UAdministrator --password="${SAMBA_ADMIN_PASSWORD}" 2>&1); then
+          -UAdministrator 2>&1); then
         echo "added:$g"
       elif echo "$out" | grep -qiE 'already|member'; then
         echo "present:$g"
@@ -64,7 +68,7 @@
   args:
     executable: /bin/bash
   environment:
-    SAMBA_ADMIN_PASSWORD: "{{ vault_samba_admin_password }}"
+    PASSWD: "{{ vault_samba_admin_password }}"
   register: samba_dc_dnsup_groups
   changed_when: "'added:' in samba_dc_dnsup_groups.stdout"
   when:
@@ -77,7 +81,9 @@
 - name: DC dnsupdater | Disable password expiry for DNS updater user
   ansible.builtin.command: >-
     samba-tool user setexpiry {{ samba_dc_dnsupdater_name }} --noexpiry
-    -UAdministrator --password={{ vault_samba_admin_password }}
+    -UAdministrator
+  environment:
+    PASSWD: "{{ vault_samba_admin_password }}"
   changed_when: false
   when:
     - samba_dc_dnsupdater_enabled | bool
@@ -98,7 +104,9 @@
   ansible.builtin.command: >-
     samba-tool domain exportkeytab {{ samba_dc_dnsupdater_keytab_path }}
     --principal={{ samba_dc_dnsupdater_name }}@{{ dc_realm | upper }}
-    -UAdministrator --password={{ vault_samba_admin_password }}
+    -UAdministrator
+  environment:
+    PASSWD: "{{ vault_samba_admin_password }}"
   when:
     - samba_dc_dnsupdater_enabled | bool
     - samba_sam_ldb.stat.exists

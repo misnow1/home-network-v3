@@ -17,7 +17,7 @@ host_var() {
   ANSIBLE_CONFIG="${ROOT}/ansible.cfg" ansible-inventory \
     -i "${ROOT}/inventories/lab" \
     --host "${fqdn}" \
-    | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('${key}', ''))"
+    | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get(sys.argv[1], ''))" "${key}"
 }
 
 main() {

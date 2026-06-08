@@ -10,7 +10,9 @@ all:
     ansible_python_interpreter: /usr/bin/python3
 
   children:
-    domain_controllers:
+    # Group name MUST be 'dc' — roles and safety asserts key off groups['dc']
+    # (DC exclusion in domain_join/samba_fileserver, ddns_client DC lookup).
+    dc:
       hosts:
         dc.example.home:
           ansible_host: 203.0.113.10
@@ -27,6 +29,6 @@ all:
 
     linux:
       children:
-        domain_controllers:
+        dc:
         hypervisors:
         fileservers:

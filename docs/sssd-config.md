@@ -8,7 +8,13 @@ Member Linux hosts use **realmd + sssd** for system authentication against `lab.
    - `ldap_id_mapping = false`
 2. **Short names** — users appear as `user`, not `user@lab.test`:
    - `use_fully_qualified_names = False`
-   - `fully_qualified_names = False`
+
+## Access control
+
+`access_provider = simple` is used. With **no** `simple_allow_groups`, SSSD's
+simple provider grants login to **all** domain users. Set
+`domain_member_allow_groups` in `group_vars` to restrict access to named groups
+(the lab uses `Domain Users`).
 
 ## Defaults
 

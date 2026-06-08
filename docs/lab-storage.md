@@ -29,7 +29,8 @@ cd ~/workspace/home-network-v3
 sudo ./scripts/lab/dirs-ensure.sh
 ```
 
-This creates directories owned by `misnow1:qemu` (or `SUDO_USER:qemu`) with mode `775`.
+This creates directories owned by `SUDO_USER:qemu` with mode `775`. When not run
+via sudo, set `LAB_DIR_OWNER=<user>` so ownership is explicit (no hardcoded user).
 
 ### Without sudo (temporary / dev)
 
