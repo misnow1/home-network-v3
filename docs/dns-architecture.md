@@ -1,7 +1,7 @@
 # DNS architecture (lab)
 
 Slice 2 establishes BIND9 as the authoritative DNS backend for the Samba AD domain
-via DLZ (Dynamically Loadable Zones).
+via DLZ (Dynamically Loadable Zones). Slice 6 adds GSS-TSIG dynamic updates.
 
 ## Lab domain
 
@@ -19,6 +19,7 @@ via DLZ (Dynamically Loadable Zones).
 | **samba-ad-dc** | Active Directory (LDAP/Kerberos), generates DLZ zone data |
 | **named (BIND9)** | Authoritative DNS for `lab.test`, loads Samba zone via DLZ |
 | **chrony** | Time sync; converge extends with MS-SNTP signing for domain members |
+| **dnsupdater** | AD service account in DnsAdmins for GSS-TSIG nsupdate clients |
 
 Samba's internal DNS server is **not** used. `samba-tool domain provision` is called with
 `--dns-backend=BIND9_DLZ`.
@@ -30,24 +31,27 @@ Samba's internal DNS server is **not** used. `samba-tool domain provision` is ca
 | `/etc/bind/named.conf.options` | `named.conf.options.j2` | Forwarders, GSS-TSIG keytab path |
 | `/etc/bind/named.conf.local` | blockinfile | Includes `/var/lib/samba/bind-dns/named.conf` |
 | `/var/lib/samba/bind-dns/named.conf` | samba-tool | **Never template** — Samba-generated |
+| `/var/lib/samba/private/dnsupdater.keytab` | `dnsupdater.yml` | Client update credentials (Slice 6) |
+| `/etc/krb5.keytab.dnsupdater` | `ddns_client` role | Member copy of dnsupdater keytab |
 
 ## Integration test proof
 
-Automated tests verify:
+**Slice 2 (static DNS):**
 
 - `samba-ad-dc` and `named` running
 - LDAP root DSE responds
 - `_ldap._tcp.lab.test` SRV record resolves via BIND on the DC
 - Kerberos ticket for `Administrator@LAB.TEST`
 
-## Deferred (Slice 6+)
+**Slice 6 (dynamic DNS):**
 
-The following are intentionally **out of scope** for Slice 2:
+- Reverse zone `100.168.192.in-addr.arpa` present
+- `nsupdate -g` adds A + PTR records from a domain member
+- `dig @dc01` confirms forward and reverse records
 
-- GSS-TSIG keytab generation for update clients
-- `nsupdate` / DDNS client automation
+## Deferred (later slices)
+
 - dhcp-dns hooks
-- Automated dynamic record add/delete tests
+- Automated lease-driven updates from dnsmasq/Docker API
 
-Slice 2 proves BIND serves AD DNS correctly via DLZ. Dynamic updates land once domain
-members exist to act as update clients.
+See `docs/ddns-runbook.md` for converge order and manual nsupdate examples.

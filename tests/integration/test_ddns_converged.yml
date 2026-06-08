@@ -1,0 +1,125 @@
+---
+# Post-converge checks for Slice 6 integration tests (member01.lab.test).
+
+- name: Integration — DDNS convergence
+  hosts: ddns_clients
+  become: true
+  gather_facts: false
+  vars:
+    ddns_dc_ip: "{{ hostvars[groups['dc'][0]].ansible_host }}"
+    ddns_reverse_zone: "{{ hostvars[groups['dc'][0]].samba_dc_reverse_zones[0] }}"
+    ddns_reverse_ptr: "{{ ddns_test_ip.split('.') | reverse | join('.') }}.in-addr.arpa"
+  tasks:
+    - name: Assert realm list shows lab domain
+      ansible.builtin.command: realm list
+      register: realm_list
+      changed_when: false
+      failed_when: lab_domain not in realm_list.stdout
+
+    - name: Assert DNS updater keytab is present
+      ansible.builtin.stat:
+        path: "{{ ddns_client_keytab_path }}"
+      register: ddns_keytab_stat
+
+    - name: Assert DNS updater keytab permissions
+      ansible.builtin.assert:
+        that:
+          - ddns_keytab_stat.stat.exists
+          - ddns_keytab_stat.stat.mode == '0600'
+        fail_msg: DNS updater keytab missing or wrong mode at {{ ddns_client_keytab_path }}
+
+    - name: Remove prior integration DDNS records if present
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kinit -kt "${KEYTAB}" "${PRINCIPAL}"
+        nsupdate -g <<EOF || true
+        server ${DC_IP}
+        zone ${ZONE}
+        update delete ${FQDN} A
+        send
+        server ${DC_IP}
+        zone ${REVERSE_ZONE}
+        update delete ${PTR} PTR
+        send
+        EOF
+      args:
+        executable: /bin/bash
+      environment:
+        KEYTAB: "{{ ddns_client_keytab_path }}"
+        PRINCIPAL: "{{ ddns_updater_principal }}"
+        DC_IP: "{{ ddns_dc_ip }}"
+        ZONE: "{{ domain_name }}"
+        FQDN: "{{ ddns_test_fqdn }}"
+        REVERSE_ZONE: "{{ ddns_reverse_zone }}"
+        PTR: "{{ ddns_reverse_ptr }}"
+      changed_when: false
+
+    - name: Add forward and reverse records via GSS-TSIG nsupdate
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kinit -kt "${KEYTAB}" "${PRINCIPAL}"
+        nsupdate -g <<EOF
+        server ${DC_IP}
+        zone ${ZONE}
+        update add ${FQDN} ${TTL} A ${IP}
+        send
+        server ${DC_IP}
+        zone ${REVERSE_ZONE}
+        update add ${PTR} ${TTL} PTR ${FQDN}
+        send
+        EOF
+      args:
+        executable: /bin/bash
+      environment:
+        KEYTAB: "{{ ddns_client_keytab_path }}"
+        PRINCIPAL: "{{ ddns_updater_principal }}"
+        DC_IP: "{{ ddns_dc_ip }}"
+        ZONE: "{{ domain_name }}"
+        FQDN: "{{ ddns_test_fqdn }}"
+        IP: "{{ ddns_test_ip }}"
+        TTL: "{{ ddns_test_ttl }}"
+        REVERSE_ZONE: "{{ ddns_reverse_zone }}"
+        PTR: "{{ ddns_reverse_ptr }}"
+      register: ddns_nsupdate
+      changed_when: false
+      failed_when: ddns_nsupdate.rc != 0
+
+    - name: Verify forward A record via BIND on DC
+      ansible.builtin.command: >-
+        dig @{{ ddns_dc_ip }} {{ ddns_test_fqdn }} A +short
+      register: ddns_dig_a
+      changed_when: false
+      failed_when: ddns_test_ip not in ddns_dig_a.stdout
+
+    - name: Verify reverse PTR record via BIND on DC
+      ansible.builtin.command: >-
+        dig @{{ ddns_dc_ip }} -x {{ ddns_test_ip }} PTR +short
+      register: ddns_dig_ptr
+      changed_when: false
+      failed_when: (ddns_test_fqdn ~ '.') not in ddns_dig_ptr.stdout
+
+    - name: Remove integration DDNS records
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kinit -kt "${KEYTAB}" "${PRINCIPAL}"
+        nsupdate -g <<EOF
+        server ${DC_IP}
+        zone ${ZONE}
+        update delete ${FQDN} A
+        send
+        server ${DC_IP}
+        zone ${REVERSE_ZONE}
+        update delete ${PTR} PTR
+        send
+        EOF
+      args:
+        executable: /bin/bash
+      environment:
+        KEYTAB: "{{ ddns_client_keytab_path }}"
+        PRINCIPAL: "{{ ddns_updater_principal }}"
+        DC_IP: "{{ ddns_dc_ip }}"
+        ZONE: "{{ domain_name }}"
+        FQDN: "{{ ddns_test_fqdn }}"
+        REVERSE_ZONE: "{{ ddns_reverse_zone }}"
+        PTR: "{{ ddns_reverse_ptr }}"
+      changed_when: false

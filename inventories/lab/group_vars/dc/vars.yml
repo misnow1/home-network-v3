@@ -8,3 +8,7 @@ dc_dns_forwarders:
   - 8.8.4.4
 dc_ntp_allow_cidr: "{{ lab_subnet }}"
 samba_dc_chrony_group: _chrony
+
+samba_dc_dnsupdater_enabled: true
+samba_dc_reverse_zones:
+  - 100.168.192.in-addr.arpa

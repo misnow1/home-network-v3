@@ -1,0 +1,3 @@
+---
+ddns_client_packages:
+  - bind9-dnsutils

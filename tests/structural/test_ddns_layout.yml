@@ -1,0 +1,34 @@
+---
+# Structural tests for ddns_client role layout.
+
+- name: Structural — DDNS client layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    ddns_client_tasks: "{{ repo_root }}/roles/ddns_client/tasks/client.yml"
+    ddns_playbook: "{{ repo_root }}/playbooks/ddns-client.yml"
+    dnsupdater_tasks: "{{ repo_root }}/roles/samba_dc/tasks/dnsupdater.yml"
+  tasks:
+    - name: DDNS | assert client fetches keytab from DC via slurp
+      ansible.builtin.shell: |
+        grep -q 'ansible.builtin.slurp' "{{ ddns_client_tasks }}"
+        grep -q 'delegate_to:' "{{ ddns_client_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: DDNS | assert playbook targets ddns_clients group
+      ansible.builtin.shell: |
+        grep -q 'ddns_clients' "{{ ddns_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: DDNS | assert DC role creates dnsupdater keytab
+      ansible.builtin.shell: |
+        grep -q 'exportkeytab' "{{ dnsupdater_tasks }}"
+        grep -q 'DnsAdmins' "{{ dnsupdater_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

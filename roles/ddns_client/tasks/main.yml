@@ -1,0 +1,8 @@
+---
+- name: Install DDNS client packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [ddns_packages]
+
+- name: Deploy DNS updater keytab from DC
+  ansible.builtin.include_tasks: client.yml
+  tags: [ddns_client]

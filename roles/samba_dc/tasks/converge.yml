@@ -58,3 +58,11 @@
   failed_when: false
   when: not ansible_check_mode
   tags: [samba_converge]
+
+- name: DC converge | Ensure lab reverse DNS zones exist
+  ansible.builtin.import_tasks: reverse_zones.yml
+  tags: [samba_converge]
+
+- name: DC converge | Configure DNS updater service account
+  ansible.builtin.import_tasks: dnsupdater.yml
+  tags: [samba_converge]

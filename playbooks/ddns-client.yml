@@ -1,0 +1,9 @@
+---
+# Deploy GSS-TSIG nsupdate client keytab on domain-joined Linux members.
+# Run baseline.yml and domain-join.yml first. Lab: scripts/test-integration.sh (member01 + dc01).
+
+- name: Configure DDNS clients
+  hosts: ddns_clients
+  become: true
+  roles:
+    - role: ddns_client

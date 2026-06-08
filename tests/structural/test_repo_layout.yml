@@ -17,10 +17,13 @@
       - docs/domain-join-runbook.md
       - docs/hypervisor-runbook.md
       - docs/fileserver-runbook.md
+      - docs/ddns-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
+      - playbooks/ddns-client.yml
       - roles/hypervisor/tasks/libvirt.yml
       - roles/samba_fileserver/tasks/join.yml
+      - roles/ddns_client/tasks/client.yml
       - roles/domain_join/tasks/join.yml
       - playbooks
       - roles

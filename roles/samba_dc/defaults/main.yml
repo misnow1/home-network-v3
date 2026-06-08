@@ -10,6 +10,14 @@ dc_dns_forwarders:
 dc_ntp_allow_cidr: 192.168.100.0/24
 samba_dc_chrony_group: _chrony
 
+samba_dc_dnsupdater_enabled: false
+samba_dc_dnsupdater_name: dnsupdater
+samba_dc_dnsupdater_groups:
+  - DnsAdmins
+samba_dc_dnsupdater_keytab_path: /var/lib/samba/private/dnsupdater.keytab
+
+samba_dc_reverse_zones: []
+
 samba_packages:
   - samba-ad-dc
   - krb5-user

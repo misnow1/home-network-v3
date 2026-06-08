@@ -1,0 +1,7 @@
+---
+- name: DDNS client | Install nsupdate and dig
+  ansible.builtin.apt:
+    name: "{{ ddns_client_packages }}"
+    state: present
+    update_cache: true
+  tags: [ddns_packages]

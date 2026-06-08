@@ -1,0 +1,8 @@
+---
+# DDNS client settings shared by playbooks and integration tests.
+ddns_client_keytab_path: /etc/krb5.keytab.dnsupdater
+ddns_updater_principal: "dnsupdater@{{ lab_realm }}"
+ddns_test_hostname: ddnslab
+ddns_test_fqdn: "{{ ddns_test_hostname }}.{{ domain_name }}"
+ddns_test_ip: 192.168.100.99
+ddns_test_ttl: 300

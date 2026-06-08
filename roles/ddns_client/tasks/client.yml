@@ -1,0 +1,26 @@
+---
+- name: DDNS client | Require DC host for keytab fetch
+  ansible.builtin.assert:
+    that:
+      - ddns_dc_host is defined
+      - ddns_dc_host | length > 0
+      - groups['dc'] | length > 0
+    fail_msg: Inventory must define at least one host in the dc group.
+  tags: [ddns_client]
+
+- name: DDNS client | Read DNS updater keytab from DC
+  ansible.builtin.slurp:
+    src: "{{ ddns_dc_keytab_path }}"
+  delegate_to: "{{ ddns_dc_host }}"
+  become: true
+  register: ddns_client_keytab_slurp
+  tags: [ddns_client]
+
+- name: DDNS client | Install DNS updater keytab
+  ansible.builtin.copy:
+    content: "{{ ddns_client_keytab_slurp.content | b64decode }}"
+    dest: "{{ ddns_client_keytab_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [ddns_client]

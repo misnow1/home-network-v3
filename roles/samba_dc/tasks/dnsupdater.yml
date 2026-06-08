@@ -1,0 +1,124 @@
+---
+# Dedicated DnsAdmins account + keytab for GSS-TSIG nsupdate clients (Slice 6).
+
+- name: DC dnsupdater | Check if domain is provisioned
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_sam_ldb
+  changed_when: false
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Require vault DNS updater password when enabled
+  ansible.builtin.assert:
+    that:
+      - vault_dnsupdater_password is defined
+      - vault_dnsupdater_password | length > 0
+    fail_msg: Set vault_dnsupdater_password in lab vault when samba_dc_dnsupdater_enabled is true.
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Check whether DNS updater user exists
+  ansible.builtin.command: samba-tool user show {{ samba_dc_dnsupdater_name }}
+  register: samba_dc_dnsup_stat
+  changed_when: false
+  failed_when: false
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Create DNS updater user
+  ansible.builtin.shell: |
+    set -euo pipefail
+    samba-tool user create "{{ samba_dc_dnsupdater_name }}" "${DNSUPDATER_PASSWORD}" \
+      --given-name=DNS \
+      --surname=Updater
+  args:
+    executable: /bin/bash
+  environment:
+    DNSUPDATER_PASSWORD: "{{ vault_dnsupdater_password }}"
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - samba_dc_dnsup_stat.rc | default(1) != 0
+  register: samba_dc_dnsup_create
+  no_log: true
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Add DNS updater user to DnsAdmins
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for g in {% for g in samba_dc_dnsupdater_groups %}{{ g | quote }} {% endfor %}; do
+      if out=$(samba-tool group addmembers "$g" "{{ samba_dc_dnsupdater_name }}" \
+          -UAdministrator --password="${SAMBA_ADMIN_PASSWORD}" 2>&1); then
+        echo "added:$g"
+      elif echo "$out" | grep -qiE 'already|member'; then
+        echo "present:$g"
+      else
+        echo "$out" >&2
+        exit 1
+      fi
+    done
+  args:
+    executable: /bin/bash
+  environment:
+    SAMBA_ADMIN_PASSWORD: "{{ vault_samba_admin_password }}"
+  register: samba_dc_dnsup_groups
+  changed_when: "'added:' in samba_dc_dnsup_groups.stdout"
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - samba_dc_dnsupdater_groups | length > 0
+  no_log: true
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Disable password expiry for DNS updater user
+  ansible.builtin.command: >-
+    samba-tool user setexpiry {{ samba_dc_dnsupdater_name }} --noexpiry
+    -UAdministrator --password={{ vault_samba_admin_password }}
+  changed_when: false
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+  no_log: true
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Stat DNS updater keytab before export
+  ansible.builtin.stat:
+    path: "{{ samba_dc_dnsupdater_keytab_path }}"
+  register: samba_dc_dnsup_keytab_stat
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Export Kerberos keytab for DNS updater user
+  ansible.builtin.command: >-
+    samba-tool domain exportkeytab {{ samba_dc_dnsupdater_keytab_path }}
+    --principal={{ samba_dc_dnsupdater_name }}@{{ dc_realm | upper }}
+    -UAdministrator --password={{ vault_samba_admin_password }}
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - samba_dc_dnsup_keytab_stat is defined
+    - >-
+      (not samba_dc_dnsup_keytab_stat.stat.exists | default(false))
+      or (samba_dc_dnsup_create is defined and samba_dc_dnsup_create is changed)
+  no_log: true
+  tags: [samba_dns, samba_converge]
+
+- name: DC dnsupdater | Ensure DNS updater keytab permissions
+  ansible.builtin.file:
+    path: "{{ samba_dc_dnsupdater_keytab_path }}"
+    state: file
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - samba_dc_dnsupdater_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - samba_dc_dnsup_keytab_stat is defined
+    - samba_dc_dnsup_keytab_stat.stat.exists | default(false)
+  tags: [samba_dns, samba_converge]

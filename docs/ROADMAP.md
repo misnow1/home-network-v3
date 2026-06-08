@@ -12,7 +12,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 3 | Domain join (realmd + sssd) | **done** | `member01.lab.test`, RFC2307 IDs, short names |
 | 4 | Hypervisor (nested virt) | **done** | `hv01.lab.test`, libvirt + Docker, 32GB lab disk |
 | 5 | Samba file server | **done** | `nas01.lab.test`, winbind, shell login + SMB share |
-| 6 | DDNS / nsupdate automation | planned | GSS-TSIG updates against BIND on DC |
+| 6 | DDNS / nsupdate automation | **done** | GSS-TSIG updates against BIND on DC |
 | 7 | Backups + restore drills | planned | Scope manifests, automated restore drill |
 | 8 | Production convergence | planned | Runbooks, prod wrapper, explicit opt-in |
 
