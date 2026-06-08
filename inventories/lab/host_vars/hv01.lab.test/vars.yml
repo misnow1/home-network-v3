@@ -1,0 +1,10 @@
+---
+backup_docker_volumes:
+  - name: lab_backup_test
+    backup_class: crash_consistent
+    notes: "Slice 7 integration restore drill volume"
+
+backup_test_dataset: lab_backup_test
+backup_test_volume_path: /var/lib/docker/volumes/lab_backup_test/_data
+backup_test_file: integration-test.txt
+backup_test_content: slice7-integration

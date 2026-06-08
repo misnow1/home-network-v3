@@ -1,0 +1,115 @@
+---
+# Post-converge checks for Slice 7 integration tests (hv01.lab.test).
+
+- name: Integration — backup and restore drill
+  hosts: hypervisors
+  become: true
+  gather_facts: false
+  vars:
+    restic_env:
+      RESTIC_REPOSITORY: "{{ backup_restic_repository }}"
+      RESTIC_PASSWORD_FILE: "{{ backup_restic_password_file }}"
+  tasks:
+    - name: Assert backup scope manifest exists
+      ansible.builtin.stat:
+        path: "{{ backup_scope_path }}"
+      register: backup_scope_stat
+
+    - name: Assert backup scope manifest permissions
+      ansible.builtin.assert:
+        that:
+          - backup_scope_stat.stat.exists
+          - backup_scope_stat.stat.mode == '0640'
+        fail_msg: Backup scope manifest missing or wrong mode at {{ backup_scope_path }}
+
+    - name: Assert scope manifest declares integration docker volume
+      ansible.builtin.command: grep -F '{{ backup_test_dataset }}' {{ backup_scope_path }}
+      changed_when: false
+
+    - name: Assert docker backup script is installed
+      ansible.builtin.stat:
+        path: "{{ backup_docker_script_path }}"
+      register: backup_script_stat
+
+    - name: Assert docker backup script is executable
+      ansible.builtin.assert:
+        that:
+          - backup_script_stat.stat.exists
+          - backup_script_stat.stat.executable
+        fail_msg: Docker backup script missing or not executable
+
+    - name: Create integration docker volume with seed data
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker volume inspect "{{ backup_test_dataset }}" >/dev/null 2>&1 \
+          || docker volume create "{{ backup_test_dataset }}"
+        docker run --rm \
+          -v "{{ backup_test_dataset }}:/data" \
+          alpine:3.20 sh -c \
+          "printf '%s\n' '${TEST_CONTENT}' > '/data/${TEST_FILE}'"
+      args:
+        executable: /bin/bash
+      environment:
+        TEST_CONTENT: "{{ backup_test_content }}"
+        TEST_FILE: "{{ backup_test_file }}"
+      changed_when: false
+
+    - name: Run docker volume backup script
+      ansible.builtin.command: "{{ backup_docker_script_path }}"
+      environment: "{{ restic_env }}"
+      register: backup_run
+      changed_when: false
+      failed_when: backup_run.rc != 0
+
+    - name: List restic snapshots for integration dataset
+      ansible.builtin.command: >-
+        restic snapshots --json --tag docker --tag {{ backup_test_dataset }}
+      environment: "{{ restic_env }}"
+      register: backup_snapshots
+      changed_when: false
+
+    - name: Assert backup created at least one snapshot
+      ansible.builtin.assert:
+        that:
+          - (backup_snapshots.stdout | from_json | length) > 0
+        fail_msg: No restic snapshots found for {{ backup_test_dataset }}
+
+    - name: Restore latest snapshot to staging directory
+      ansible.builtin.shell: |
+        set -euo pipefail
+        restore_dir="$(mktemp -d /tmp/restore-drill-XXXXXX)"
+        restic restore latest \
+          --tag docker \
+          --tag "${DATASET}" \
+          --target "${restore_dir}" \
+          --verify >/dev/null
+        printf '%s' "${restore_dir}"
+      args:
+        executable: /bin/bash
+      environment: "{{ restic_env | combine({'DATASET': backup_test_dataset}) }}"
+      register: backup_restore
+      changed_when: false
+
+    - name: Verify restored file matches source
+      ansible.builtin.shell: |
+        set -euo pipefail
+        source_file="${VOL_PATH}/${TEST_FILE}"
+        restored_file="${RESTORE_DIR}${source_file}"
+        src_hash="$(sha256sum "${source_file}" | awk '{print $1}')"
+        rst_hash="$(sha256sum "${restored_file}" | awk '{print $1}')"
+        [[ "${src_hash}" == "${rst_hash}" ]]
+        grep -q "${TEST_CONTENT}" "${restored_file}"
+      args:
+        executable: /bin/bash
+      environment:
+        RESTORE_DIR: "{{ backup_restore.stdout }}"
+        VOL_PATH: "{{ backup_test_volume_path }}"
+        TEST_FILE: "{{ backup_test_file }}"
+        TEST_CONTENT: "{{ backup_test_content }}"
+      changed_when: false
+
+    - name: Remove restore staging directory
+      ansible.builtin.file:
+        path: "{{ backup_restore.stdout }}"
+        state: absent
+      changed_when: false

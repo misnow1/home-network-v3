@@ -51,5 +51,6 @@ Domain join is optional for hypervisors and is not part of Slice 4 integration.
 
 ## Production
 
-Hypervisor hosts use the `hypervisors` inventory group. Per-host VM/disk declarations
-for backups land in Slice 7.
+Hypervisor hosts use the `hypervisors` inventory group. Per-host backup scope is declared
+in `host_vars/{hostname}/vars.yml` and rendered by `playbooks/backup.yml` (Slice 7).
+See `docs/backup-runbook.md`.

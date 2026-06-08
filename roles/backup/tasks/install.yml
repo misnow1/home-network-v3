@@ -1,0 +1,8 @@
+---
+- name: Backup | Install restic package
+  ansible.builtin.apt:
+    name: "{{ backup_restic_package }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [backup_install]

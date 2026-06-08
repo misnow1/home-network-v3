@@ -1,0 +1,9 @@
+---
+- name: Backup | Deploy docker volume backup script
+  ansible.builtin.template:
+    src: backup-docker.sh.j2
+    dest: "{{ backup_docker_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_scripts]

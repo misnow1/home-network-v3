@@ -18,12 +18,15 @@
       - docs/hypervisor-runbook.md
       - docs/fileserver-runbook.md
       - docs/ddns-runbook.md
+      - docs/backup-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml
+      - playbooks/backup.yml
       - roles/hypervisor/tasks/libvirt.yml
       - roles/samba_fileserver/tasks/join.yml
       - roles/ddns_client/tasks/client.yml
+      - roles/backup/tasks/scope.yml
       - roles/domain_join/tasks/join.yml
       - playbooks
       - roles

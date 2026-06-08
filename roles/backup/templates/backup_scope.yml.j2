@@ -1,0 +1,31 @@
+{# Backup scope manifest — consumed by backup scripts and operators #}
+---
+generated_by: ansible
+hypervisor: "{{ inventory_hostname }}"
+schema_version: "1"
+
+vms:
+{% if backup_libvirt_vms | length > 0 %}
+{% for vm in backup_libvirt_vms %}
+  - name: "{{ vm.name }}"
+    disks:
+{% for disk in vm.disks %}
+      - path: "{{ disk.path }}"
+        size_gb: {{ disk.size_gb }}
+        backup_policy: "{{ disk.backup_policy }}"
+{% endfor %}
+{% endfor %}
+{% else %}
+  []
+{% endif %}
+
+docker_volumes:
+{% if backup_docker_volumes | length > 0 %}
+{% for vol in backup_docker_volumes %}
+  - name: "{{ vol.name }}"
+    backup_class: "{{ vol.backup_class }}"
+    notes: "{{ vol.notes | default('') }}"
+{% endfor %}
+{% else %}
+  []
+{% endif %}

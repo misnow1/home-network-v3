@@ -1,0 +1,20 @@
+---
+- name: Install restic backup client
+  ansible.builtin.include_tasks: install.yml
+  tags: [backup_install]
+
+- name: Deploy backup credentials
+  ansible.builtin.include_tasks: credentials.yml
+  tags: [backup_credentials]
+
+- name: Initialize local restic repository
+  ansible.builtin.include_tasks: init_repo.yml
+  tags: [backup_init]
+
+- name: Render backup scope manifest
+  ansible.builtin.include_tasks: scope.yml
+  tags: [backup_scope]
+
+- name: Deploy backup scripts
+  ansible.builtin.include_tasks: scripts.yml
+  tags: [backup_scripts]

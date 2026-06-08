@@ -1,0 +1,33 @@
+---
+# Structural tests for backup role layout.
+
+- name: Structural — backup layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    scope_tasks: "{{ repo_root }}/roles/backup/tasks/scope.yml"
+    backup_playbook: "{{ repo_root }}/playbooks/backup.yml"
+    docker_script: "{{ repo_root }}/roles/backup/templates/backup-docker.sh.j2"
+  tasks:
+    - name: Backup | assert scope task validates backup_class
+      ansible.builtin.shell: |
+        grep -q 'backup_valid_backup_classes' "{{ scope_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert playbook targets hypervisors group
+      ansible.builtin.shell: |
+        grep -q 'hosts: hypervisors' "{{ backup_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert docker backup script uses local restic repository
+      ansible.builtin.shell: |
+        grep -q 'RESTIC_REPOSITORY=' "{{ docker_script }}"
+        grep -q 'backup_restic_repository' "{{ docker_script }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

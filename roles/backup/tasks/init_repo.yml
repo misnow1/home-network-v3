@@ -1,0 +1,40 @@
+---
+- name: Backup | Ensure local restic repository directory exists
+  ansible.builtin.file:
+    path: "{{ backup_restic_repository }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_init]
+
+- name: Backup | Check whether restic repository is initialized
+  ansible.builtin.command: restic cat config
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_restic_repository }}"
+    RESTIC_PASSWORD_FILE: "{{ backup_restic_password_file }}"
+  register: backup_restic_cat_config
+  changed_when: false
+  failed_when: false
+  tags: [backup_init]
+
+- name: Backup | Fail for unexpected restic repository check errors
+  ansible.builtin.fail:
+    msg: >-
+      Unexpected error while checking restic repository state (rc={{ backup_restic_cat_config.rc }}):
+      {{ backup_restic_cat_config.stderr | default('') }}
+  when:
+    - backup_restic_cat_config.rc != 0
+    - backup_restic_cat_config.rc != 10
+    - "'unable to open config file' not in (backup_restic_cat_config.stderr | default('') | lower)"
+  tags: [backup_init]
+
+- name: Backup | Initialize restic repository when missing
+  ansible.builtin.command: restic init
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_restic_repository }}"
+    RESTIC_PASSWORD_FILE: "{{ backup_restic_password_file }}"
+  when:
+    - backup_restic_cat_config.rc == 10
+      or 'unable to open config file' in (backup_restic_cat_config.stderr | default('') | lower)
+  tags: [backup_init]

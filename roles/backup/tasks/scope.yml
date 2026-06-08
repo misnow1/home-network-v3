@@ -1,0 +1,39 @@
+---
+- name: Backup scope | Ensure managed config directory exists
+  ansible.builtin.file:
+    path: "{{ backup_scope_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [backup_scope]
+
+- name: Backup scope | Validate backup_policy values in libvirt VMs
+  ansible.builtin.assert:
+    that:
+      - item.1.backup_policy in backup_valid_backup_policies
+    fail_msg: >-
+      Invalid backup_policy '{{ item.1.backup_policy }}' on disk '{{ item.1.path }}'
+      in VM '{{ item.0.name }}'.
+  loop: "{{ backup_libvirt_vms | subelements('disks', skip_missing=True) }}"
+  when: backup_libvirt_vms | length > 0
+  tags: [backup_scope]
+
+- name: Backup scope | Validate backup_class values in docker volumes
+  ansible.builtin.assert:
+    that:
+      - item.backup_class in backup_valid_backup_classes
+    fail_msg: >-
+      Invalid backup_class '{{ item.backup_class }}' on volume '{{ item.name }}'.
+  loop: "{{ backup_docker_volumes }}"
+  when: backup_docker_volumes | length > 0
+  tags: [backup_scope]
+
+- name: Backup scope | Render manifest on hypervisor
+  ansible.builtin.template:
+    src: backup_scope.yml.j2
+    dest: "{{ backup_scope_path }}"
+    owner: root
+    group: root
+    mode: "0640"
+  tags: [backup_scope]

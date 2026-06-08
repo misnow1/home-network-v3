@@ -148,6 +148,31 @@ run_ddns_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
+run_backup_integration() {
+  log_info "Integration VM lifecycle for ${LAB_HOST} (slice=backup)"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Converging hypervisor on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/hypervisor.yml --limit "${LAB_HOST}"
+
+  log_info "Converging backup on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/backup.yml --limit "${LAB_HOST}"
+
+  log_info "Converging backup on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/backup.yml --limit "${LAB_HOST}"
+
+  log_info "Running backup restore drill assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_backup_converged.yml --limit "${LAB_HOST}"
+
+  log_info "Destroying integration test VM ${LAB_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
+}
+
 main() {
   if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
     export PATH="${ROOT}/.venv/bin:${PATH}"
@@ -205,6 +230,9 @@ main() {
       ;;
     ddns)
       run_ddns_integration
+      ;;
+    backup)
+      run_backup_integration
       ;;
     *)
       die "Unsupported lab_slice '${lab_slice}' for ${LAB_HOST}"

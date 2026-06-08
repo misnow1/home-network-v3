@@ -1,0 +1,10 @@
+---
+# Configure restic backups and scope manifests on hypervisors.
+# Run hypervisor.yml first. Lab: scripts/test-integration.sh (hv01.lab.test).
+
+- name: Configure hypervisor backups
+  hosts: hypervisors
+  become: true
+  serial: 1
+  roles:
+    - role: backup

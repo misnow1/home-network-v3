@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Docker volume backup script — crash_consistent volumes from backup scope manifest.
+set -uo pipefail
+
+export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+
+REQUIRE_EXISTING_PATHS="{{ backup_docker_require_existing_paths | lower }}"
+DECLARED_VOLUME_COUNT={{ backup_docker_volumes | length }}
+
+{% if backup_docker_volumes | length == 0 %}
+echo "No Docker volumes declared in backup scope — skipping"
+exit 0
+{% endif %}
+
+success_count=0
+skip_count=0
+failure_count=0
+
+docker_stop_volume_containers() {
+  local vol_name="$1"
+  local cid
+  local rc=0
+  while IFS= read -r cid; do
+    [ -z "$cid" ] && continue
+    if ! docker stop "$cid"; then
+      rc=1
+    fi
+  done <<< "$(docker ps -q --filter volume="${vol_name}")"
+  return "$rc"
+}
+
+docker_start_containers() {
+  local rc=0
+  local cid
+  while IFS= read -r cid; do
+    [ -z "$cid" ] && continue
+    if ! docker start "$cid"; then
+      rc=1
+    fi
+  done <<< "$1"
+  return "$rc"
+}
+
+{% for vol in backup_docker_volumes %}
+echo "$(date -Iseconds) | {{ vol.name }} | {{ vol.backup_class }} backup starting"
+
+VOL_PATH=""
+if ! VOL_PATH="$(docker volume inspect -f '{{ '{{' }} .Mountpoint {{ '}}' }}' "{{ vol.name }}" 2>/dev/null)"; then
+  VOL_PATH=""
+fi
+
+if [ -z "$VOL_PATH" ] || [ ! -d "$VOL_PATH" ]; then
+  if [ "$REQUIRE_EXISTING_PATHS" = "true" ]; then
+    echo "$(date -Iseconds) | {{ vol.name }} | ERROR: declared volume missing or path not found (strict mode): {{ vol.name }}" >&2
+    failure_count=$((failure_count + 1))
+  else
+    echo "$(date -Iseconds) | {{ vol.name }} | WARNING: declared volume missing or path not found, skipping: {{ vol.name }}" >&2
+    skip_count=$((skip_count + 1))
+  fi
+else
+{% if vol.backup_class == 'crash_consistent' %}
+  CONTAINER_ID=$(docker ps -q --filter volume="{{ vol.name }}")
+  if [ -n "$CONTAINER_ID" ] && ! docker_stop_volume_containers "{{ vol.name }}"; then
+    failure_count=$((failure_count + 1))
+    echo "$(date -Iseconds) | {{ vol.name }} | ERROR: failed to stop containers using volume" >&2
+  elif restic backup "$VOL_PATH" --tag docker --tag "{{ vol.name }}" --verbose; then
+    success_count=$((success_count + 1))
+    echo "$(date -Iseconds) | {{ vol.name }} | backup complete"
+    if [ -n "$CONTAINER_ID" ] && ! docker_start_containers "$CONTAINER_ID"; then
+      failure_count=$((failure_count + 1))
+      echo "$(date -Iseconds) | {{ vol.name }} | ERROR: failed to restart containers after backup" >&2
+    fi
+  else
+    failure_count=$((failure_count + 1))
+    echo "$(date -Iseconds) | {{ vol.name }} | ERROR: restic backup failed" >&2
+    if [ -n "$CONTAINER_ID" ] && ! docker_start_containers "$CONTAINER_ID"; then
+      failure_count=$((failure_count + 1))
+      echo "$(date -Iseconds) | {{ vol.name }} | ERROR: failed to restart containers after backup failure" >&2
+    fi
+  fi
+{% else %}
+  echo "$(date -Iseconds) | {{ vol.name }} | ERROR: app_consistent volumes require hook_cmd (not implemented in lab script)" >&2
+  failure_count=$((failure_count + 1))
+{% endif %}
+fi
+
+{% endfor %}
+
+echo "$(date -Iseconds) | summary | success=${success_count} skip=${skip_count} failure=${failure_count}"
+if [ "$failure_count" -gt 0 ]; then
+  exit 1
+fi
+if [ "$success_count" -eq 0 ] && [ "$DECLARED_VOLUME_COUNT" -gt 0 ]; then
+  echo "$(date -Iseconds) | summary | ERROR: no volumes backed up despite ${DECLARED_VOLUME_COUNT} declared" >&2
+  exit 1
+fi
+exit 0
