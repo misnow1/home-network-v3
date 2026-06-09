@@ -12,6 +12,9 @@ inventories/production/hosts.yml
 inventories/production/host_vars/
 inventories/production/group_vars/vault.yml
 
+# CKA inventory (DHCP IPs are local)
+inventories/cka/hosts.yml
+
 # Lab runtime artifacts
 .lab/
 

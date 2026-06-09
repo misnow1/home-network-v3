@@ -4,5 +4,6 @@
   tags: [libvirt]
 
 - name: Install and configure Docker
-  ansible.builtin.include_tasks: docker.yml
+  ansible.builtin.include_role:
+    name: docker_engine
   tags: [docker]

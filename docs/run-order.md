@@ -16,6 +16,17 @@ ansible-playbook -i inventories/lab playbooks/fileserver.yml --limit nas01.lab.t
 
 `ansible.cfg` defaults to `inventories/lab`.
 
+## CKA practice VMs
+
+CKA nodes on vlan3 use a separate inventory and converge playbook — not part of lab
+integration tests or production apply order. See **[cka-runbook.md](cka-runbook.md)**.
+
+```bash
+cp inventories/cka/hosts.yml.example inventories/cka/hosts.yml
+./scripts/cka/inventory-set-host.sh --name cka-cp1 --discover
+ansible-playbook -i inventories/cka playbooks/cka-converge.yml --limit cka-cp1
+```
+
 ## Production runs
 
 See **[production-runbook.md](production-runbook.md)** for the full apply order and examples.
@@ -52,5 +63,6 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 4. File servers — `fileserver.yml`
 5. Domain members — `domain-join.yml` on `linux:!dc`
 6. DDNS clients — `ddns-client.yml` (optional)
+7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
 
 See [production-runbook.md](production-runbook.md) for command examples and slice runbooks.

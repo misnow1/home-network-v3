@@ -1,0 +1,26 @@
+---
+# Converge DHCP-triggered DDNS API on domain controllers (Docker + nsupdate).
+# Requires dc-converge.yml first (dnsupdater keytab + reverse zones).
+#
+# Safety: refuses production inventory unless -e allow_production=true.
+
+- name: Converge DDNS API on domain controllers
+  hosts: dc
+  become: true
+  pre_tasks:
+    - name: DDNS API | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing ddns-api against non-lab inventory without allow_production=true.
+          See docs/ddns-runbook.md.
+      tags: [always]
+
+  roles:
+    - role: docker_engine
+      tags: [docker_engine]
+    - role: ddns_nsupdate
+      tags: [ddns_nsupdate]

@@ -41,9 +41,11 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the slice plan and deferred work.
 | Path | Purpose |
 |---|---|
 | `inventories/lab/` | Default inventory for development and integration tests |
+| `inventories/cka/` | CKA practice VMs on vlan3 (see [docs/cka-runbook.md](docs/cka-runbook.md)) |
 | `inventories/production/` | Gitignored production hosts (`hosts.yml.example` is the template) |
 | `scripts/test-*.sh` | Test entrypoints |
 | `scripts/lab/` | Libvirt network, cloud-init, VM lifecycle |
+| `docs/cka-runbook.md` | Ad-hoc CKA practice VMs on host bridge (vlan3) |
 | `scripts/prod-run.sh` | Production playbook wrapper |
 | `tests/structural/` | Tier 2 assert playbooks |
 

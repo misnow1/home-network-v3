@@ -23,7 +23,15 @@
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml
+      - playbooks/ddns-api.yml
       - playbooks/backup.yml
+      - playbooks/cka-converge.yml
+      - roles/cka_node/tasks/main.yml
+      - docs/cka-runbook.md
+      - roles/docker_engine/tasks/main.yml
+      - roles/ddns_nsupdate/tasks/main.yml
+      - docker/ddns-nsupdate/app.py
+      - scripts/dhcp-ddns-hook.sh
       - roles/hypervisor/tasks/libvirt.yml
       - roles/samba_fileserver/tasks/join.yml
       - roles/ddns_client/tasks/client.yml
@@ -32,11 +40,13 @@
       - playbooks
       - roles
       - inventories/lab
+      - inventories/cka
       - inventories/production
       - scripts/lib
       - scripts/lab
       - scripts/test-prod-safety.sh
       - tests/structural
+      - CONTEXT.md
       - docs/ROADMAP.md
       - docs/vault-schema.md
       - docs/run-order.md

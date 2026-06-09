@@ -1,0 +1,67 @@
+---
+# Structural tests for CKA node layout.
+
+- name: Structural — CKA layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    cka_playbook: "{{ repo_root }}/playbooks/cka-converge.yml"
+    cka_role_defaults: "{{ repo_root }}/roles/cka_node/defaults/main.yml"
+    cka_role_tasks: "{{ repo_root }}/roles/cka_node/tasks/main.yml"
+    cka_inventory_example: "{{ repo_root }}/inventories/cka/hosts.yml.example"
+    cka_inventory_script: "{{ repo_root }}/scripts/cka/inventory-set-host.sh"
+  tasks:
+    - name: CKA | assert required paths exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: cka_paths
+      loop:
+        - "{{ cka_playbook }}"
+        - "{{ cka_role_defaults }}"
+        - "{{ cka_role_tasks }}"
+        - "{{ cka_inventory_example }}"
+        - "{{ cka_inventory_script }}"
+        - "{{ repo_root }}/inventories/cka/group_vars/cka/vars.yml"
+        - "{{ repo_root }}/inventories/cka/group_vars/cka/ansible.yml"
+
+    - name: CKA | assert paths present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ cka_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: CKA | assert playbook includes baseline and cka_node roles
+      ansible.builtin.shell: |
+        grep -q 'linux_baseline' "{{ cka_playbook }}"
+        grep -q 'cka_node' "{{ cka_playbook }}"
+        grep -q 'hosts: cka' "{{ cka_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: CKA | assert role defaults define local user and packages
+      ansible.builtin.shell: |
+        grep -q 'cka_local_user:' "{{ cka_role_defaults }}"
+        grep -q 'cka_local_user_ssh_keys:' "{{ cka_role_defaults }}"
+        grep -q 'cka_node_packages:' "{{ cka_role_defaults }}"
+        grep -q 'zsh' "{{ cka_role_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: CKA | assert CKA hosts.yml is gitignored (not committed)
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/inventories/cka/hosts.yml"
+      register: cka_hosts_stat
+
+    - name: CKA | assert hosts.yml absent from working tree
+      ansible.builtin.assert:
+        that:
+          - not cka_hosts_stat.stat.exists
+        fail_msg: >-
+          inventories/cka/hosts.yml must remain gitignored.
+          Use inventories/cka/hosts.yml.example as the template.

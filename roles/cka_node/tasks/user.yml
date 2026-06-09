@@ -1,0 +1,41 @@
+---
+- name: Assert local username is set
+  ansible.builtin.assert:
+    that:
+      - cka_local_user | length > 0
+    fail_msg: >-
+      cka_local_user is empty — set USER in the environment or pass
+      -e cka_local_user=yourname
+
+- name: Assert SSH public keys are configured
+  ansible.builtin.assert:
+    that:
+      - cka_local_user_ssh_keys | length > 0
+    fail_msg: >-
+      cka_local_user_ssh_keys is empty — add your public key to
+      inventories/cka/group_vars/cka/vars.yml
+
+- name: Create local CKA user
+  ansible.builtin.user:
+    name: "{{ cka_local_user }}"
+    shell: "{{ cka_local_user_shell }}"
+    create_home: true
+    groups: sudo
+    append: true
+
+- name: Install SSH authorized keys for local CKA user
+  ansible.builtin.authorized_key:
+    user: "{{ cka_local_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ cka_local_user_ssh_keys }}"
+
+- name: Grant passwordless sudo to local CKA user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ cka_local_user }}"
+    content: "{{ cka_local_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  when: cka_local_user_sudo | bool

@@ -1,0 +1,17 @@
+---
+# Local interactive user — defaults to the username running ansible-playbook.
+cka_local_user: "{{ lookup('env', 'USER') }}"
+cka_local_user_shell: /bin/zsh
+cka_local_user_sudo: true
+cka_local_user_ssh_keys: []
+
+cka_node_packages:
+  - zsh
+  - fzf
+  - htop
+  - vim
+  - curl
+  - git
+  - jq
+  - tree
+  - unzip

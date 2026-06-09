@@ -1,0 +1,19 @@
+---
+# CKA practice VM inventory — copy to hosts.yml and set ansible_host after VM creation.
+#
+#   cp inventories/cka/hosts.yml.example inventories/cka/hosts.yml
+#   ./scripts/cka/inventory-set-host.sh --name cka-cp1 --discover
+#
+# hosts.yml is gitignored (DHCP IPs are local).
+
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  children:
+    cka:
+      hosts:
+        cka-cp1:
+          ansible_host: 192.168.x.x
+        cka-worker1:
+          ansible_host: 192.168.x.x

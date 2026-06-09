@@ -1,0 +1,36 @@
+---
+# Post-converge checks for Slice 9 DHCP-driven DDNS integration tests.
+
+- name: Integration — DHCP DDNS API convergence
+  hosts: dc
+  gather_facts: false
+  vars:
+    ddns_api_url: "http://{{ ansible_host }}:8765/ddns/v1/health"
+  tasks:
+    - name: DDNS API | health endpoint responds
+      ansible.builtin.uri:
+        url: "{{ ddns_api_url }}"
+        return_content: true
+        status_code: 200
+      register: ddns_health
+      retries: 12
+      delay: 5
+      until: ddns_health.status == 200
+
+    - name: DDNS API | assert health body
+      ansible.builtin.assert:
+        that:
+          - ddns_health.content is search('ok')
+        fail_msg: "Unexpected health response from {{ ddns_api_url }}"
+
+    - name: DDNS API | ddns-nsupdate container is running
+      ansible.builtin.command: docker ps --filter name=ddns-nsupdate --format '{{ "{{" }}.Names{{ "}}" }}'
+      register: ddns_container
+      changed_when: false
+      become: true
+
+    - name: DDNS API | assert container present
+      ansible.builtin.assert:
+        that:
+          - ddns_container.stdout | length > 0
+        fail_msg: ddns-nsupdate container is not running on {{ inventory_hostname }}

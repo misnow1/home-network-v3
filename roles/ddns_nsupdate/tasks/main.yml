@@ -1,0 +1,80 @@
+---
+- name: DDNS nsupdate | Require Docker when enabled
+  ansible.builtin.assert:
+    that:
+      - docker_engine_enabled | default(false) | bool
+    fail_msg: >-
+      Enable docker_engine_enabled with ddns_nsupdate_enabled so the DC can run docker compose.
+  when: ddns_nsupdate_enabled | bool
+
+- name: DDNS nsupdate | Verify docker CLI is available
+  ansible.builtin.command:
+    cmd: docker --version
+  register: ddns_nsupdate_docker_check
+  changed_when: false
+  when: ddns_nsupdate_enabled | bool
+
+- name: DDNS nsupdate | Require shared secret when enabled
+  ansible.builtin.assert:
+    that:
+      - ddns_nsupdate_shared_secret | length > 0
+    fail_msg: >-
+      Set vault_ddns_shared_secret in vault when ddns_nsupdate_enabled is true.
+  when: ddns_nsupdate_enabled | bool
+  no_log: true
+
+- name: DDNS nsupdate | Ensure install root exists
+  ansible.builtin.file:
+    path: "{{ ddns_nsupdate_install_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: ddns_nsupdate_enabled | bool
+
+- name: DDNS nsupdate | Sync project from repository to DC
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../docker/ddns-nsupdate/"
+    dest: "{{ ddns_nsupdate_install_root }}/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
+  when: ddns_nsupdate_enabled | bool
+  notify: DDNS nsupdate recreate containers
+
+- name: DDNS nsupdate | Deploy .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ ddns_nsupdate_install_root }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when: ddns_nsupdate_enabled | bool
+  notify: DDNS nsupdate recreate containers
+  no_log: true
+
+- name: DDNS nsupdate | Allow API port from trusted CIDRs (UFW)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ddns_nsupdate_ufw_port }}"
+    proto: tcp
+    src: "{{ item }}"
+    comment: home-network-v3 ddns-nsupdate
+  loop: "{{ ddns_nsupdate_ufw_allow_cidrs }}"
+  when:
+    - ddns_nsupdate_enabled | bool
+    - ddns_nsupdate_manage_ufw | bool
+    - ddns_nsupdate_ufw_allow_cidrs | length > 0
+
+- name: DDNS nsupdate | Build and start stack # noqa: no-changed-when
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --build
+    chdir: "{{ ddns_nsupdate_install_root }}"
+  when: ddns_nsupdate_enabled | bool
+  changed_when: false

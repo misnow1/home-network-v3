@@ -52,11 +52,12 @@ playbooks idempotently after initial bootstrap.
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
 | 2 | `dc` | `dc-bootstrap.yml` | **Once** — destructive first run; break-glass |
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
-| 4 | `hypervisors` | `hypervisor.yml` | libvirt + Docker |
-| 5 | `hypervisors` | `backup.yml` | restic client + scope manifest |
-| 6 | `fileservers` | `fileserver.yml` | Samba member + winbind |
-| 7 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
-| 8 | `ddns_clients` | `ddns-client.yml` | Optional GSS-TSIG update clients |
+| 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
+| 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker |
+| 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
+| 7 | `fileservers` | `fileserver.yml` | Samba member + winbind |
+| 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
+| 9 | `ddns_clients` | `ddns-client.yml` | Optional GSS-TSIG update clients |
 
 Example sequence after inventory is ready:
 

@@ -1,0 +1,8 @@
+---
+- name: Install CKA node packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [packages]
+
+- name: Configure local CKA user
+  ansible.builtin.include_tasks: user.yml
+  tags: [user]

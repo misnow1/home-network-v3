@@ -1,7 +1,8 @@
 # DNS architecture (lab)
 
 Slice 2 establishes BIND9 as the authoritative DNS backend for the Samba AD domain
-via DLZ (Dynamically Loadable Zones). Slice 6 adds GSS-TSIG dynamic updates.
+via DLZ (Dynamically Loadable Zones). Slice 6 adds GSS-TSIG dynamic updates from
+domain members. Slice 9 adds lease-driven updates from dnsmasq.
 
 ## Lab domain
 
@@ -20,9 +21,21 @@ via DLZ (Dynamically Loadable Zones). Slice 6 adds GSS-TSIG dynamic updates.
 | **named (BIND9)** | Authoritative DNS for `lab.test`, loads Samba zone via DLZ |
 | **chrony** | Time sync; converge extends with MS-SNTP signing for domain members |
 | **dnsupdater** | AD service account in DnsAdmins for GSS-TSIG nsupdate clients |
+| **ddns-nsupdate (Docker)** | HTTP API on DC; runs `kinit` + `nsupdate -g` for dhcp-script callers |
+| **dhcp-ddns-hook** | Thin dnsmasq `dhcp-script` on DHCP server; POSTs lease events to DDNS API |
 
 Samba's internal DNS server is **not** used. `samba-tool domain provision` is called with
 `--dns-backend=BIND9_DLZ`.
+
+## Lease-driven path (Slice 9)
+
+```
+dnsmasq (router/kvm01) --dhcp-script--> dhcp-ddns-hook.sh --HTTP POST-->
+  ddns-nsupdate container on DC --GSS-TSIG nsupdate--> BIND on DC
+```
+
+Production routers are configured manually (see `docs/ddns-runbook.md`). Lab libvirt
+dnsmasq uses the same hook via `scripts/lab/libvirt/lab-network.xml`.
 
 ## Configuration (Ansible-managed)
 
@@ -33,6 +46,7 @@ Samba's internal DNS server is **not** used. `samba-tool domain provision` is ca
 | `/var/lib/samba/bind-dns/named.conf` | samba-tool | **Never template** — Samba-generated |
 | `/var/lib/samba/private/dnsupdater.keytab` | `dnsupdater.yml` | Client update credentials (Slice 6) |
 | `/etc/krb5.keytab.dnsupdater` | `ddns_client` role | Member copy of dnsupdater keytab |
+| `/opt/ddns-nsupdate/` | `ddns_nsupdate` role | Docker compose project (Slice 9) |
 
 ## Integration test proof
 
@@ -43,15 +57,16 @@ Samba's internal DNS server is **not** used. `samba-tool domain provision` is ca
 - `_ldap._tcp.lab.test` SRV record resolves via BIND on the DC
 - Kerberos ticket for `Administrator@LAB.TEST`
 
-**Slice 6 (dynamic DNS):**
+**Slice 6 (dynamic DNS — client nsupdate):**
 
 - Reverse zone `100.168.192.in-addr.arpa` present
 - `nsupdate -g` adds A + PTR records from a domain member
 - `dig @dc01` confirms forward and reverse records
 
-## Deferred (later slices)
+**Slice 9 (dynamic DNS — DHCP lease):**
 
-- dhcp-dns hooks
-- Automated lease-driven updates from dnsmasq/Docker API
+- DDNS API health check on `:8765`
+- DHCP probe VM receives lease; hook registers `dhcpprobe.lab.test`
+- `dig @dc01` confirms A + PTR
 
-See `docs/ddns-runbook.md` for converge order and manual nsupdate examples.
+See `docs/ddns-runbook.md` for converge order and manual examples.

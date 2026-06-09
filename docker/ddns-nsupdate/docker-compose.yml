@@ -1,0 +1,33 @@
+---
+# DDNS nsupdate API for dnsmasq dhcp-script. Run on Samba AD DCs (Docker).
+#
+# App uses host networking so NSUPDATE_SERVER=127.0.0.1 reaches host BIND.
+#
+# TLS front end (optional): docker compose --profile tls up -d
+# Requires Let's Encrypt material under /etc/letsencrypt (default Certbot paths).
+
+services:
+  ddns-nsupdate:
+    build: .
+    network_mode: host
+    env_file: .env
+    volumes:
+      - /var/lib/samba/private/dnsupdater.keytab:/keytab/dnsupdater.keytab:ro
+      # krb5.conf from the DC usually has `includedir /etc/krb5.conf.d/` — mount both or kinit fails.
+      - /etc/krb5.conf:/etc/krb5.conf:ro
+      - /etc/krb5.conf.d:/etc/krb5.conf.d:ro
+    restart: unless-stopped
+
+  ddns-nginx:
+    image: nginx:1.25-alpine
+    profiles: [tls]
+    network_mode: host
+    depends_on:
+      - ddns-nsupdate
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    environment:
+      LETSENCRYPT_FULLCHAIN: ${LETSENCRYPT_FULLCHAIN}
+      LETSENCRYPT_PRIVKEY: ${LETSENCRYPT_PRIVKEY}
+    restart: unless-stopped

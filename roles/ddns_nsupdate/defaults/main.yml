@@ -1,0 +1,14 @@
+---
+ddns_nsupdate_enabled: false
+ddns_nsupdate_install_root: /opt/ddns-nsupdate
+ddns_nsupdate_shared_secret: "{{ vault_ddns_shared_secret | default('') }}"
+ddns_nsupdate_nginx_tls: false
+ddns_nsupdate_manage_ufw: false
+ddns_nsupdate_ufw_allow_cidrs: []
+ddns_nsupdate_ufw_port: "{{ '443' if (ddns_nsupdate_nginx_tls | bool) else '8765' }}"
+ddns_nsupdate_http_listen_addr: 0.0.0.0
+ddns_nsupdate_dns_zone: "{{ dc_domain_name | default(lab_domain) }}"
+ddns_nsupdate_dnsupdater_name: dnsupdater
+ddns_nsupdate_krb_principal: "{{ ddns_nsupdate_dnsupdater_name }}@{{ (dc_realm | default(lab_realm)) | upper }}"
+ddns_nsupdate_krb_realm: "{{ (dc_realm | default(lab_realm)) | upper }}"
+ddns_nsupdate_record_ttl: "3600"

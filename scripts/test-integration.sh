@@ -148,6 +148,53 @@ run_ddns_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
+run_dhcp_ddns_integration() {
+  local probe_vm="dhcpprobe-lab-test"
+  local probe_fqdn="dhcpprobe.lab.test"
+  local dc_ip="192.168.100.10"
+  local leased_ip=""
+  local attempt dig_a dig_ptr
+
+  require_cmd curl
+  require_cmd dig
+
+  provision_lab_dc
+
+  log_info "Converging DDNS API on ${LAB_DC_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/ddns-api.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Converging DDNS API on ${LAB_DC_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/ddns-api.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Running DDNS API convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_dhcp_ddns_converged.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Creating DHCP probe VM ${probe_vm}"
+  "${ROOT}/scripts/lab/vm-destroy-dhcp.sh" "${probe_vm}" || true
+  "${ROOT}/scripts/lab/vm-create-dhcp.sh" "${probe_vm}" "${probe_fqdn}"
+
+  log_info "Waiting for DHCP lease and DDNS registration for ${probe_fqdn}"
+  for attempt in $(seq 1 24); do
+    leased_ip="$(dig @"${dc_ip}" "${probe_fqdn}" A +short 2>/dev/null | head -1 || true)"
+    if [[ -n "${leased_ip}" ]]; then
+      log_info "Resolved ${probe_fqdn} -> ${leased_ip} (attempt ${attempt})"
+      break
+    fi
+    sleep 5
+  done
+  [[ -n "${leased_ip}" ]] || die "Timed out waiting for A record for ${probe_fqdn}"
+
+  dig_ptr="$(dig @"${dc_ip}" -x "${leased_ip}" PTR +short 2>/dev/null | head -1 || true)"
+  [[ "${dig_ptr}" == *"${probe_fqdn}"* ]] \
+    || die "Expected PTR for ${leased_ip} to reference ${probe_fqdn}, got: ${dig_ptr:-empty}"
+
+  log_info "Destroying DHCP probe VM ${probe_vm}"
+  "${ROOT}/scripts/lab/vm-destroy-dhcp.sh" "${probe_vm}"
+
+  log_info "Destroying lab DC ${LAB_DC_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
+}
+
 run_backup_integration() {
   log_info "Integration VM lifecycle for ${LAB_HOST} (slice=backup)"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
@@ -184,6 +231,11 @@ main() {
   log_info "Ensuring lab storage directories (local disk, not NFS home)"
   "${ROOT}/scripts/lab/dirs-ensure.sh"
 
+  if [[ "${INTEGRATION_SLICE:-}" == "dhcp_ddns" ]]; then
+    log_info "Ensuring dhcp-ddns hook before libvirt network (dhcp-script dependency)"
+    "${ROOT}/scripts/lab/ddns-hook-ensure.sh"
+  fi
+
   log_info "Ensuring lab libvirt network"
   "${ROOT}/scripts/lab/network-ensure.sh"
 
@@ -200,7 +252,11 @@ main() {
   "${ROOT}/scripts/lab/image-ensure.sh"
 
   local lab_slice
-  lab_slice="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${LAB_HOST}" "lab_slice")"
+  if [[ -n "${INTEGRATION_SLICE:-}" ]]; then
+    lab_slice="${INTEGRATION_SLICE}"
+  else
+    lab_slice="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${LAB_HOST}" "lab_slice")"
+  fi
 
   case "${lab_slice}" in
     baseline)
@@ -230,6 +286,9 @@ main() {
       ;;
     ddns)
       run_ddns_integration
+      ;;
+    dhcp_ddns)
+      run_dhcp_ddns_integration
       ;;
     backup)
       run_backup_integration

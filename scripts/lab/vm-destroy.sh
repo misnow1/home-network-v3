@@ -5,37 +5,66 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../lib/common.sh
 source "${ROOT}/scripts/lib/common.sh"
+# shellcheck source=vm-lib.sh
+source "${ROOT}/scripts/lab/vm-lib.sh"
+
+VM_NAME=""
+INVENTORY_FQDN=""
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") <fqdn>
+Usage:
+  $(basename "$0") <fqdn>              Destroy VM by inventory FQDN
+  $(basename "$0") --name <vm-name>    Destroy VM by libvirt domain name
 
-Example:
+Examples:
   $(basename "$0") member01.lab.test
+  $(basename "$0") --name cka-cp1
 EOF
 }
 
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name)
+        VM_NAME="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      -*)
+        die "Unknown option: $1"
+        ;;
+      *)
+        [[ -z "${INVENTORY_FQDN}" ]] || die "Unexpected argument: $1"
+        INVENTORY_FQDN="$1"
+        shift
+        ;;
+    esac
+  done
+}
+
 main() {
-  local fqdn="${1:-}"
-  [[ -n "${fqdn}" ]] || { usage; exit 1; }
-  require_cmd virsh
+  parse_args "$@"
 
-  local vm_name disk_path seed_dir
-  vm_name="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${fqdn}" "lab_vm_name")"
-  disk_path="$(lab_vms_dir)/${vm_name}.qcow2"
-  seed_dir="$(lab_seeds_dir)/${vm_name}"
-
-  if virsh dominfo "${vm_name}" >/dev/null 2>&1; then
-    log_info "Destroying VM ${vm_name}"
-    virsh destroy "${vm_name}" 2>/dev/null || true
-    virsh undefine "${vm_name}" --remove-all-storage 2>/dev/null || virsh undefine "${vm_name}" || true
-  else
-    log_info "VM ${vm_name} not defined"
+  if [[ -n "${INVENTORY_FQDN}" && -n "${VM_NAME}" ]]; then
+    die "Use either --name or an inventory FQDN, not both"
   fi
 
-  rm -f "${disk_path}"
-  rm -rf "${seed_dir}"
-  log_info "Removed local artifacts for ${vm_name}"
+  if [[ -z "${INVENTORY_FQDN}" && -z "${VM_NAME}" ]]; then
+    usage
+    exit 1
+  fi
+
+  require_cmd virsh
+
+  if [[ -n "${INVENTORY_FQDN}" ]]; then
+    VM_NAME="$("${ROOT}/scripts/lab/inventory-host-var.sh" "${INVENTORY_FQDN}" "lab_vm_name")"
+  fi
+
+  vm_destroy_artifacts "${VM_NAME}"
 }
 
 main "$@"

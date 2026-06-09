@@ -1,0 +1,9 @@
+---
+# CKA node variables — replace the example key with your public key.
+
+cka_local_user_ssh_keys:
+  - "ssh-ed25519 AAAA...you@host"
+
+# Optional overrides:
+# cka_local_user: misnow1
+# cka_node_packages: []

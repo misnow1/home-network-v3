@@ -1,0 +1,59 @@
+---
+# Post-converge checks for CKA nodes (manual run on kvm01 — not in CI).
+
+- name: Integration — CKA node convergence
+  hosts: cka
+  gather_facts: true
+  vars:
+    cka_local_user_resolved: "{{ cka_local_user | default(lookup('env', 'USER')) }}"
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert chrony is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['chrony.service'].state == 'running'
+        fail_msg: chrony is not running
+
+    - name: Assert openssh-server is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['ssh.service'].state == 'running'
+        fail_msg: ssh is not running
+
+    - name: Assert CKA dev packages are installed
+      ansible.builtin.command: dpkg -s {{ item }}
+      register: cka_pkg_check
+      changed_when: false
+      failed_when: cka_pkg_check.rc != 0
+      loop:
+        - zsh
+        - fzf
+        - htop
+
+    - name: Look up local CKA user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ cka_local_user_resolved }}"
+      register: cka_user_ent
+
+    - name: Assert local CKA user exists with zsh shell
+      ansible.builtin.assert:
+        that:
+          - cka_user_ent.ansible_facts.getent_passwd[cka_local_user_resolved] is defined
+          - cka_user_ent.ansible_facts.getent_passwd[cka_local_user_resolved][5] == cka_local_user_shell | default('/bin/zsh')
+        fail_msg: >-
+          Expected user {{ cka_local_user_resolved }} with shell
+          {{ cka_local_user_shell | default('/bin/zsh') }}
+
+    - name: Assert SSH authorized keys exist for local CKA user
+      ansible.builtin.stat:
+        path: "/home/{{ cka_local_user_resolved }}/.ssh/authorized_keys"
+      register: cka_authkeys_stat
+
+    - name: Assert authorized_keys file is present
+      ansible.builtin.assert:
+        that:
+          - cka_authkeys_stat.stat.exists
+        fail_msg: "Missing authorized_keys for {{ cka_local_user_resolved }}"

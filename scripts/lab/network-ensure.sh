@@ -7,9 +7,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT}/scripts/lib/common.sh"
 
 NET_NAME="${LAB_NET_NAME:-home-dc-lab}"
-NET_XML="${ROOT}/scripts/lab/libvirt/lab-network.xml"
+NET_XML_TMPL="${ROOT}/scripts/lab/libvirt/lab-network.xml.tmpl"
+NET_XML="${ROOT}/.lab/lab-network.xml"
+LAB_DDNS_HOOK="${ROOT}/scripts/lab/dhcp-ddns-hook-lab.sh"
 EXPECTED_GATEWAY="192.168.100.1"
 START_RETRY_SECS="${LAB_NET_START_RETRY_SECS:-3}"
+
+render_network_xml() {
+  require_cmd envsubst
+  mkdir -p "${ROOT}/.lab"
+  export LAB_DDNS_HOOK
+  envsubst < "${NET_XML_TMPL}" > "${NET_XML}"
+}
 
 network_is_defined() {
   virsh net-info "${NET_NAME}" >/dev/null 2>&1
@@ -30,6 +39,15 @@ network_gateway() {
     | head -1
 }
 
+network_has_dhcp_script() {
+  local expected="${1:-}"
+  virsh net-dumpxml "${NET_NAME}" 2>/dev/null | grep -Fq "dhcp-script=${expected}"
+}
+
+expected_dhcp_script() {
+  printf '%s' "${LAB_DDNS_HOOK}"
+}
+
 undefine_network() {
   log_info "Removing libvirt network ${NET_NAME}"
   virsh net-destroy "${NET_NAME}" 2>/dev/null || true
@@ -37,8 +55,9 @@ undefine_network() {
 }
 
 define_network() {
+  render_network_xml
   virsh net-define "${NET_XML}"
-  log_info "Defined libvirt network ${NET_NAME} from ${NET_XML}"
+  log_info "Defined libvirt network ${NET_NAME} from ${NET_XML_TMPL}"
 }
 
 ensure_network_started() {
@@ -75,13 +94,20 @@ ensure_network_started() {
 
 main() {
   require_cmd virsh
-  [[ -f "${NET_XML}" ]] || die "Missing network XML: ${NET_XML}"
+  [[ -f "${NET_XML_TMPL}" ]] || die "Missing network template: ${NET_XML_TMPL}"
+  [[ -x "${LAB_DDNS_HOOK}" ]] || chmod +x "${LAB_DDNS_HOOK}"
+
+  render_network_xml
 
   if network_is_defined; then
-    local current_gateway
+    local current_gateway expected_script
     current_gateway="$(network_gateway || true)"
+    expected_script="$(expected_dhcp_script || true)"
     if [[ "${current_gateway}" != "${EXPECTED_GATEWAY}" ]]; then
       log_warn "Network ${NET_NAME} gateway is ${current_gateway:-unknown}; redefining for lab.test"
+      undefine_network
+    elif [[ -n "${expected_script}" ]] && ! network_has_dhcp_script "${expected_script}"; then
+      log_warn "Network ${NET_NAME} missing dhcp-script=${expected_script}; redefining"
       undefine_network
     else
       log_info "Libvirt network ${NET_NAME} already defined (gateway ${current_gateway})"

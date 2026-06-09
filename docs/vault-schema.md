@@ -37,6 +37,7 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_samba_admin_password` | 2 | Samba DC administrator password | `change-me-dc-admin` |
 | `vault_test_user_password` | 3 | Lab AD user for integration tests | `change-me-test-user` |
 | `vault_dnsupdater_password` | 6 | DnsAdmins service account for GSS-TSIG nsupdate | `change-me-dnsupdater` |
+| `vault_ddns_shared_secret` | 9 | Bearer token for DDNS API (dhcp-script → DC) | `change-me-ddns-api` |
 | `vault_backup_repository_key` | 7 | Backup target encryption key | `change-me-backup-key` |
 
 ## Recreate the lab vault

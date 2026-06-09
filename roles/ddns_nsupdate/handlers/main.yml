@@ -1,0 +1,10 @@
+---
+- name: DDNS nsupdate recreate containers
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd "{{ ddns_nsupdate_install_root }}"
+    docker compose up -d --build --force-recreate
+  args:
+    executable: /bin/bash
+  when: ddns_nsupdate_enabled | bool
+  changed_when: false

@@ -11,9 +11,7 @@ hypervisor_libvirt_packages:
   - bridge-utils
   - python3-libvirt
 
-hypervisor_docker_packages:
-  - docker.io
-  - docker-compose-v2
+docker_engine_enabled: true
 
-hypervisor_docker_users:
+docker_engine_users:
   - ansible

@@ -1,0 +1,13 @@
+---
+# Converge CKA practice nodes: baseline (packages, hostname, chrony) + dev tools and local user.
+# Requires inventories/cka/hosts.yml with ansible_host set after VM creation.
+#
+# Example:
+#   ansible-playbook -i inventories/cka playbooks/cka-converge.yml --limit cka-cp1
+
+- name: CKA node converge
+  hosts: cka
+  become: true
+  roles:
+    - role: linux_baseline
+    - role: cka_node

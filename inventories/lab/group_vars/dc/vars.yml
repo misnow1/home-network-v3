@@ -12,3 +12,6 @@ samba_dc_chrony_group: _chrony
 samba_dc_dnsupdater_enabled: true
 samba_dc_reverse_zones:
   - 100.168.192.in-addr.arpa
+
+docker_engine_enabled: true
+ddns_nsupdate_enabled: true

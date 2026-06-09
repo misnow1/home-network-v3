@@ -1,0 +1,8 @@
+---
+docker_engine_enabled: false
+
+docker_engine_packages:
+  - docker.io
+  - docker-compose-v2
+
+docker_engine_users: []

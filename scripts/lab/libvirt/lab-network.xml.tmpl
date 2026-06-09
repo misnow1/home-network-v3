@@ -2,7 +2,7 @@
   Isolated NAT network for home-network-v3 lab integration tests.
   Domain: lab.test | Subnet: 192.168.100.0/24
 
-  Install/start: scripts/lab/network-ensure.sh
+  Install/start: scripts/lab/network-ensure.sh (renders from this template)
   Requires libvirt 5.6+ for dnsmasq options namespace.
 -->
 <network xmlns:dnsmasq="http://libvirt.org/schemas/network/dnsmasq/1.0">
@@ -22,5 +22,6 @@
   <dnsmasq:options>
     <dnsmasq:option value="domain=lab.test"/>
     <dnsmasq:option value="dhcp-option=option:domain-search,lab.test"/>
+    <dnsmasq:option value="dhcp-script=${LAB_DDNS_HOOK}"/>
   </dnsmasq:options>
 </network>
