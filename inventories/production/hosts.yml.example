@@ -4,6 +4,7 @@
 #   cp inventories/production/hosts.yml.example inventories/production/hosts.yml
 #
 # Production runs MUST use scripts/prod-run.sh. See docs/production-runbook.md.
+# AD migration: docs/migration-runbook.md (dc1/dc2 naming, deferred CentOS hosts).
 
 all:
   vars:
@@ -14,27 +15,37 @@ all:
     # (DC exclusion in domain_join/samba_fileserver, ddns_client DC lookup).
     dc:
       hosts:
-        dc.example.home:
+        dc1.example.home:
           ansible_host: 203.0.113.10
+        # Phase 2 replica — uncomment when dc2 is provisioned:
+        # dc2.example.home:
+        #   ansible_host: 203.0.113.11
 
     hypervisors:
       hosts:
         kvm01.example.home:
           ansible_host: 203.0.113.20
+          ansible_managed: false   # CentOS/RHEL — defer until Rocky slice lands
 
     fileservers:
       hosts:
-        nas.example.home:
+        kif.example.home:
           ansible_host: 203.0.113.30
+          ansible_managed: false   # CentOS — defer; reprovision to Ubuntu for fileserver.yml
 
     ddns_clients:
       hosts:
-        workstation.example.home:
+        bastion.example.home:
           ansible_host: 203.0.113.40
 
     linux:
       children:
         dc:
-        hypervisors:
-        fileservers:
         ddns_clients:
+        # hypervisors/fileservers excluded while CentOS deferred (apt-only roles)
+
+    # Tracked for migration checklists — not targeted by default playbooks
+    deferred:
+      hosts:
+        kvm01.example.home:
+        kif.example.home:

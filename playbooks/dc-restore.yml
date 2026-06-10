@@ -1,0 +1,49 @@
+---
+# Samba AD DC migration restore — one-shot from samba-tool domain backup.
+# Use instead of dc-bootstrap.yml when migrating an existing domain (preserves SIDs).
+# See docs/migration-runbook.md and docs/dc-runbook.md.
+#
+# Safety: refuses production inventory unless -e allow_production=true.
+#
+# Example:
+#   ./scripts/prod-run.sh --confirm-production -- \
+#     playbooks/dc-restore.yml -e allow_production=true \
+#     -e samba_dc_backup_archive=backups/home-ad-backup.tar \
+#     --limit dc1.home.2123studios.com
+
+- name: Restore Samba AD Domain Controller from backup
+  hosts: dc
+  become: true
+  pre_tasks:
+    - name: DC restore | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing dc-restore against non-lab inventory.
+          Pass -e allow_production=true for break-glass production use.
+          See docs/migration-runbook.md.
+      tags: [always]
+
+    - name: DC restore | assert host is in lab group or break-glass is set
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in groups.get('lab', [])
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          {{ inventory_hostname }} is not in the lab inventory group.
+          Pass -e allow_production=true only after reading docs/migration-runbook.md.
+      tags: [always]
+
+  roles:
+    - role: linux_baseline
+      tags: [baseline]
+
+  tasks:
+    - name: Restore samba_dc from backup
+      ansible.builtin.import_role:
+        name: samba_dc
+        tasks_from: restore
+      tags: [samba_restore]

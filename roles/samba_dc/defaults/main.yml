@@ -30,3 +30,11 @@ samba_packages:
   - bind9
   - bind9utils
   - ldap-utils
+
+# Migration restore (playbooks/dc-restore.yml) — see docs/migration-runbook.md
+samba_dc_migration_host: false
+samba_dc_restore_enabled: false
+samba_dc_backup_archive: ""
+samba_dc_backup_staged_path: /var/lib/samba/backup-restore
+samba_dc_target_server_name: dc1
+samba_dc_restore_marker_path: /var/lib/samba/private/.ansible-restored-from-backup

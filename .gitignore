@@ -27,6 +27,9 @@ inventories/cka/hosts.yml
 # Production run logs
 logs/
 
+# Migration discovery exports (local AD dumps, fleet notes)
+.migration/
+
 # Python bytecode
 __pycache__/
 *.pyc

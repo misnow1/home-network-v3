@@ -1,5 +1,7 @@
 ---
 # File server group variables — copy to vars.yml and customize.
+#
+# Ubuntu file servers only (CentOS hosts deferred — see docs/migration-runbook.md).
 
 domain_name: home.example
 fileserver_dns_servers:

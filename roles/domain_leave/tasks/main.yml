@@ -1,0 +1,61 @@
+---
+# Leave AD domain before reprovisioning or rejoining. Optional when wiping disks.
+
+- name: Domain leave | Assert host is not a DC
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname not in groups.get('dc', [])
+    fail_msg: >-
+      domain_leave role must not run on DC hosts.
+  tags: [always]
+
+- name: Domain leave | Detect realm membership (sssd)
+  ansible.builtin.command: realm list
+  register: domain_leave_realm_list
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [domain_leave]
+
+- name: Domain leave | Leave realm (sssd hosts)
+  ansible.builtin.command: realm leave --remove-config {{ domain_name }}
+  when:
+    - domain_name | lower in domain_leave_realm_list.stdout | lower
+  register: domain_leave_realm_result
+  changed_when: domain_leave_realm_result.rc == 0
+  failed_when: false
+  tags: [domain_leave]
+
+- name: Domain leave | Detect winbind join status
+  ansible.builtin.command: net ads testjoin
+  register: domain_leave_ads_testjoin
+  changed_when: false
+  failed_when: false
+  tags: [domain_leave]
+
+- name: Domain leave | Leave AD domain (winbind hosts)
+  ansible.builtin.command: net ads leave -U "{{ vault_ad_join_user }}"
+  environment:
+    PASSWD: "{{ vault_ad_join_password }}"
+  when: domain_leave_ads_testjoin.rc == 0
+  no_log: true
+  register: domain_leave_ads_result
+  changed_when: domain_leave_ads_result.rc == 0
+  failed_when: false
+  tags: [domain_leave]
+
+- name: Domain leave | Stop and disable sssd if installed
+  ansible.builtin.systemd:
+    name: sssd
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [domain_leave]
+
+- name: Domain leave | Stop and disable winbind if installed
+  ansible.builtin.systemd:
+    name: winbind
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [domain_leave]

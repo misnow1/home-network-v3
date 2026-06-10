@@ -57,6 +57,8 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 
 ## Apply order (production)
 
+### Greenfield
+
 1. Time sync (chrony) — `baseline.yml` on all Linux hosts
 2. Domain controllers — `dc-bootstrap.yml` once, then `dc-converge.yml`
 3. Hypervisors — `hypervisor.yml`, then `backup.yml`
@@ -64,5 +66,19 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 5. Domain members — `domain-join.yml` on `linux:!dc`
 6. DDNS clients — `ddns-client.yml` (optional)
 7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
+
+### AD migration (existing Samba domain)
+
+See **[migration-runbook.md](migration-runbook.md)** for the full procedure.
+
+1. Pre-flight — `./scripts/migration/preflight-check.sh`
+2. Backup on old DC — manual `samba-tool domain backup` (Phase 0)
+3. **`dc-restore.yml`** on dc1 (replaces `dc-bootstrap.yml`)
+4. `dc-converge.yml` → `ddns-api.yml` on dc1
+5. Router/DHCP DNS cutover — manual
+6. CentOS deferred hosts — manual `/etc/resolv.conf` only
+7. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
+8. Optional — `domain-leave.yml` before in-place reprovision
+9. Decommission old pdc after validation
 
 See [production-runbook.md](production-runbook.md) for command examples and slice runbooks.

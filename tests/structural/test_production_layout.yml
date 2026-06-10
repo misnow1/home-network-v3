@@ -7,10 +7,12 @@
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     production_runbook: "{{ repo_root }}/docs/production-runbook.md"
+    migration_runbook: "{{ repo_root }}/docs/migration-runbook.md"
     prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
     prod_run: "{{ repo_root }}/scripts/prod-run.sh"
     prod_safety: "{{ repo_root }}/scripts/test-prod-safety.sh"
     dc_bootstrap: "{{ repo_root }}/playbooks/dc-bootstrap.yml"
+    dc_restore: "{{ repo_root }}/playbooks/dc-restore.yml"
   tasks:
     - name: Production | assert production runbook exists
       ansible.builtin.stat:
@@ -25,14 +27,37 @@
     - name: Production | assert runbook documents apply order
       ansible.builtin.shell: |
         grep -q 'dc-bootstrap.yml' "{{ production_runbook }}"
+        grep -q 'dc-restore.yml' "{{ production_runbook }}"
         grep -q 'prod-run.sh' "{{ production_runbook }}"
+        grep -q 'migration-runbook.md' "{{ production_runbook }}"
       args:
         executable: /bin/bash
       changed_when: false
 
+    - name: Production | assert migration runbook exists
+      ansible.builtin.stat:
+        path: "{{ migration_runbook }}"
+      register: migration_runbook_stat
+
+    - name: Production | assert migration runbook present
+      ansible.builtin.assert:
+        that:
+          - migration_runbook_stat.stat.exists
+
+    - name: Production | assert dc-restore playbook exists
+      ansible.builtin.stat:
+        path: "{{ dc_restore }}"
+      register: dc_restore_stat
+
+    - name: Production | assert dc-restore playbook present
+      ansible.builtin.assert:
+        that:
+          - dc_restore_stat.stat.exists
+
     - name: Production | assert hosts example uses dc group name
       ansible.builtin.shell: |
         grep -q '^    dc:' "{{ prod_hosts_example }}"
+        grep -q 'dc1.example.home' "{{ prod_hosts_example }}"
         ! grep -q 'domain_controllers' "{{ prod_hosts_example }}"
       args:
         executable: /bin/bash

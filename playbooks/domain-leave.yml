@@ -1,0 +1,10 @@
+---
+# Leave AD domain before reprovisioning or rejoining with a new computer account.
+# Optional when the host disk is wiped — not required for fresh installs.
+# Excludes DC hosts. See docs/migration-runbook.md.
+
+- name: Leave AD domain on Linux members
+  hosts: "linux:!dc"
+  become: true
+  roles:
+    - role: domain_leave

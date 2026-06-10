@@ -3,6 +3,9 @@
 #
 #   cp inventories/production/group_vars/all/vars.yml.example \
 #      inventories/production/group_vars/all/vars.yml
+#
+# For home.2123studios.com: samba_workgroup HOME and samba_realm HOME.2123STUDIOS.COM
+# match the first DNS label (uppercased) and Kerberos realm respectively.
 
 # SSSD (domain_join role)
 sssd_ldap_id_mapping: false
