@@ -1,0 +1,10 @@
+---
+# Production SSH settings — copy to ansible.yml (gitignored alongside hosts.yml).
+#
+#   cp inventories/production/group_vars/all/ansible.yml.example \
+#      inventories/production/group_vars/all/ansible.yml
+#
+# Matches scripts/vm/keys/prod_id_ed25519 (see scripts/vm/keys-ensure.sh -i production).
+
+ansible_user: ansible
+ansible_ssh_private_key_file: "{{ inventory_dir }}/../../scripts/vm/keys/prod_id_ed25519"

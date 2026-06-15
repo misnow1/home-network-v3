@@ -47,7 +47,9 @@ Manual checks:
 1. **Samba version** — on old pdc and dc1, run `samba -V`. Ubuntu 24.04 Samba must
    be **≥** Fedora pdc version or restore may fail.
 2. **Production inventory** — copy templates, fill real IPs/hostnames, create vault.
-3. **SSH** — `ansible` user can reach dc1 (`192.168.1.10`).
+3. **SSH** — copy `group_vars/all/ansible.yml.example` → `ansible.yml` (user
+   `ansible`, key `scripts/vm/keys/prod_id_ed25519`); verify with preflight or
+   `ssh -i scripts/vm/keys/prod_id_ed25519 ansible@192.168.1.10`.
 4. **Old pdc stays running** until dc1 is validated (rollback depends on this).
 5. **Backup path** — plan where the tarball lives on the control node for
    `-e samba_dc_backup_archive=...`.

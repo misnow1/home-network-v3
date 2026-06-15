@@ -1,0 +1,5 @@
+---
+# Linux host SSH settings for production VM provisioning and ansible runs.
+# Prefer group_vars/all/ansible.yml.example (applies to all production hosts including dc).
+
+ansible_ssh_private_key_file: "{{ inventory_dir }}/../../scripts/vm/keys/prod_id_ed25519"

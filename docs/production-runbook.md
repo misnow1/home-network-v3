@@ -17,6 +17,8 @@ CI or `./scripts/test-integration.sh` at production.
 
 ```bash
 cp inventories/production/hosts.yml.example inventories/production/hosts.yml
+cp inventories/production/group_vars/all/ansible.yml.example \
+   inventories/production/group_vars/all/ansible.yml
 # Copy and edit group_vars/*.example → group_vars/*/vars.yml as needed
 # Create inventories/production/group_vars/vault.yml with real secrets
 ```
