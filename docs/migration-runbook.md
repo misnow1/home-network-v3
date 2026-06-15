@@ -73,7 +73,7 @@ This blocks accidental `dc-bootstrap.yml` on the migration host.
 On the **existing** Fedora Samba DC (`pdc`, `192.168.1.2`):
 
 ```bash
-# Creates a .tar backup file inside --targetdir (Samba 4.10+ syntax).
+# Creates a samba-backup-*.tar.bz2 file inside --targetdir (Samba 4.10+ syntax).
 # Optional: stop samba-ad-dc first for extra safety during maintenance.
 sudo systemctl stop samba-ad-dc
 sudo samba-tool domain backup offline \
@@ -82,20 +82,25 @@ sudo samba-tool domain backup offline \
 sudo systemctl start samba-ad-dc
 ```
 
-List the tarball Samba wrote under the target directory:
+List the tarball Samba wrote under the target directory (name includes a UTC timestamp):
 
 ```bash
-ls -la /tmp/ad-backup-migration/
+ls -la /tmp/ad-backup-migration/samba-backup-*.tar.bz2
+sha256sum /tmp/ad-backup-migration/samba-backup-*.tar.bz2
 ```
 
-Copy the backup tarball to the Ansible control node, e.g.:
+Copy the **latest** backup to the Ansible control node, keeping the `.tar.bz2`
+extension (or rename consistently — restore accepts bzip2-compressed tarballs):
 
 ```bash
-scp pdc.home.2123studios.com:/tmp/ad-backup-migration/*.tar \
-  ./backups/home-ad-backup.tar
+mkdir -p backups
+scp 'pdc.home.2123studios.com:/tmp/ad-backup-migration/samba-backup-2026-06-15T19-05-44.266616.tar.bz2' \
+  ./backups/home-ad-backup.tar.bz2
+sha256sum ./backups/home-ad-backup.tar.bz2
+# expect: 4f3d1bbab1021ebbc0a48ecba2ea56260953783abbfbef15b3df77c7e17114d2
 ```
 
-Verify tarball size and checksum before proceeding.
+Verify tarball size (~9–10 MiB for this domain) and checksum before proceeding.
 
 ---
 
@@ -133,7 +138,7 @@ Host must have `vm_name`, `vm_ip`, and network defaults in production inventory
 
 ```bash
 ${PROD} playbooks/dc-restore.yml -e allow_production=true \
-  -e samba_dc_backup_archive=backups/home-ad-backup.tar \
+  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
   --limit dc1.home.2123studios.com
 ```
 

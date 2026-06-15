@@ -50,7 +50,7 @@ Re-run `dc-converge.yml` twice — second run must report `changed=0`.
 # AD migration — preserves existing domain DB
 ./scripts/prod-run.sh --confirm-production -- \
   playbooks/dc-restore.yml -e allow_production=true \
-  -e samba_dc_backup_archive=backups/home-ad-backup.tar \
+  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
   --limit dc1.home.2123studios.com
 ```
 

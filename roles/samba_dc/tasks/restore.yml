@@ -57,8 +57,9 @@
     that:
       - samba_dc_backup_archive | length > 0
     fail_msg: >-
-      Set samba_dc_backup_archive to the path of a samba-tool domain backup tarball
-      (control-node path for copy, or absolute path already on the DC).
+      Set samba_dc_backup_archive to the path of a samba-tool domain backup archive
+      (.tar.bz2 from `samba-tool domain backup offline`; control-node path for
+      copy, or absolute path already on the DC).
   tags: [samba_provision]
 
 - name: DC restore | Ensure backup staging directory exists

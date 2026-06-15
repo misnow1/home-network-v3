@@ -106,7 +106,7 @@ Migration DC sequence:
 PROD='./scripts/prod-run.sh --confirm-production --'
 
 ${PROD} playbooks/dc-restore.yml -e allow_production=true \
-  -e samba_dc_backup_archive=backups/home-ad-backup.tar \
+  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
   --limit dc1.home.2123studios.com
 ${PROD} playbooks/dc-converge.yml -e allow_production=true --limit dc1.home.2123studios.com
 ${PROD} playbooks/ddns-api.yml -e allow_production=true --limit dc1.home.2123studios.com
