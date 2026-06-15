@@ -73,11 +73,19 @@ This blocks accidental `dc-bootstrap.yml` on the migration host.
 On the **existing** Fedora Samba DC (`pdc`, `192.168.1.2`):
 
 ```bash
-# Preferred: offline backup during maintenance (stops writes briefly)
+# Creates a .tar backup file inside --targetdir (Samba 4.10+ syntax).
+# Optional: stop samba-ad-dc first for extra safety during maintenance.
 sudo systemctl stop samba-ad-dc
-sudo samba-tool domain backup offline /tmp/ad-backup-migration \
+sudo samba-tool domain backup offline \
+  --targetdir=/tmp/ad-backup-migration \
   --configfile=/etc/samba/smb.conf
 sudo systemctl start samba-ad-dc
+```
+
+List the tarball Samba wrote under the target directory:
+
+```bash
+ls -la /tmp/ad-backup-migration/
 ```
 
 Copy the backup tarball to the Ansible control node, e.g.:
