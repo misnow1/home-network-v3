@@ -53,6 +53,9 @@ Manual checks:
 4. **Old pdc stays running** until dc1 is validated (rollback depends on this).
 5. **Backup path** — plan where the tarball lives on the control node for
    `-e samba_dc_backup_archive=...`.
+6. **kvm01 VM storage** — on kvm01, ensure libvirt network `external-default` is
+   active, then run once: `./scripts/vm/keys-ensure.sh -i production` and
+   `sudo ./scripts/vm/dirs-ensure.sh -i production` (see [lab-storage.md](lab-storage.md)).
 
 Set in production `group_vars/dc/vars.yml`:
 
@@ -104,6 +107,19 @@ PROD='./scripts/prod-run.sh --confirm-production --'
 | 4 | Verify AD and DNS locally on dc1 |
 | 5 | Cut over router DHCP/DNS |
 | 6 | Manual DNS on CentOS hosts |
+
+### Provision dc1 VM (new Ubuntu guest on kvm01)
+
+If dc1 is not already running, create it on kvm01 against libvirt network
+`external-default` (static IP from inventory):
+
+```bash
+./scripts/vm/vm-create.sh -i production dc1.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production dc1.home.2123studios.com
+```
+
+Host must have `vm_name`, `vm_ip`, and network defaults in production inventory
+(see `hosts.yml.example` and [production-runbook.md](production-runbook.md)).
 
 ### Step 1 — Restore
 

@@ -34,8 +34,8 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 
 ## Nested virtualization
 
-`hv01.lab.test` is created with `lab_nested_virt: true` (CPU host-passthrough) and
-`lab_vm_disk_gb: 32` (libvirt + Docker need more space than the cloud image overlay).
+`hv01.lab.test` is created with `vm_nested_virt: true` (CPU host-passthrough) and
+`vm_disk_gb: 32` (libvirt + Docker need more space than the cloud image overlay).
 Integration tests assert `/dev/kvm` exists and `virsh -c qemu:///system list` succeeds.
 
 Group membership (`libvirt`, `docker`) takes effect after a new login. Integration tests

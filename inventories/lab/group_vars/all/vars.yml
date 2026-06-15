@@ -1,6 +1,14 @@
 ---
 # Non-secret lab variables.
 
+# VM provisioning (scripts/vm/vm-create.sh -i lab)
+vm_network: home-dc-lab
+vm_gateway: 192.168.100.1
+vm_subnet_prefix: 24
+vm_dns_servers:
+  - 192.168.100.1
+vm_dns_search: lab.test
+
 # SSSD defaults applied by domain_join role (Slice 3).
 sssd_ldap_id_mapping: false
 sssd_use_fully_qualified_names: false

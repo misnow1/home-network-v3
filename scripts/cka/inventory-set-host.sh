@@ -5,8 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../lib/common.sh
 source "${ROOT}/scripts/lib/common.sh"
-# shellcheck source=../lab/vm-lib.sh
-source "${ROOT}/scripts/lab/vm-lib.sh"
+# shellcheck source=../vm/vm-lib.sh
+source "${ROOT}/scripts/vm/vm-lib.sh"
 
 INVENTORY_DIR="${ROOT}/inventories/cka"
 HOSTS_FILE="${INVENTORY_DIR}/hosts.yml"
@@ -110,7 +110,7 @@ main() {
 
   if [[ "${DISCOVER}" -eq 1 ]]; then
     require_cmd virsh
-    VM_IP="$(vm_wait_for_ip "${VM_NAME}" "${LAB_IP_DISCOVERY_TIMEOUT_SECS:-300}" "${LAB_SSH_POLL_SECS:-5}")"
+    VM_IP="$(vm_wait_for_ip "${VM_NAME}" "${VM_IP_DISCOVERY_TIMEOUT_SECS:-300}" "${VM_SSH_POLL_SECS:-5}")"
     log_info "Discovered ${VM_NAME} at ${VM_IP}"
   fi
 

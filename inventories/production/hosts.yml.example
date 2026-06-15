@@ -5,6 +5,7 @@
 #
 # Production runs MUST use scripts/prod-run.sh. See docs/production-runbook.md.
 # AD migration: docs/migration-runbook.md (dc1/dc2 naming, deferred CentOS hosts).
+# VM provisioning: scripts/vm/vm-create.sh -i production <fqdn>
 
 all:
   vars:
@@ -17,9 +18,15 @@ all:
       hosts:
         dc1.example.home:
           ansible_host: 203.0.113.10
+          vm_name: dc1-example-home
+          vm_ip: 203.0.113.10
+          vm_memory_mb: 4096
+          vm_disk_gb: 24
         # Phase 2 replica — uncomment when dc2 is provisioned:
         # dc2.example.home:
         #   ansible_host: 203.0.113.11
+        #   vm_name: dc2-example-home
+        #   vm_ip: 203.0.113.11
 
     hypervisors:
       hosts:
@@ -37,6 +44,8 @@ all:
       hosts:
         bastion.example.home:
           ansible_host: 203.0.113.40
+          vm_name: bastion-example-home
+          vm_use_dhcp: true
 
     linux:
       children:

@@ -6,24 +6,80 @@ set -euo pipefail
 export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 
 # VM disks and cloud images must live on local disk — NFS home (rootsquash) breaks QEMU access.
+vm_data_base() {
+  printf '%s' "${VM_DATA_BASE:-/var/lib/libvirt/images/home-network-v3}"
+}
+
+vm_data_dir() {
+  local profile="${1:-lab}"
+  printf '%s/%s' "$(vm_data_base)" "${profile}"
+}
+
+vm_images_dir() {
+  printf '%s/images' "$(vm_data_base)"
+}
+
+vm_vms_dir() {
+  local profile="${1:-lab}"
+  printf '%s/vms' "$(vm_data_dir "${profile}")"
+}
+
+vm_seeds_dir() {
+  local profile="${1:-lab}"
+  printf '%s/seeds' "$(vm_data_dir "${profile}")"
+}
+
+vm_cloud_image_path() {
+  printf '%s/noble-server-cloudimg-amd64.img' "$(vm_images_dir)"
+}
+
+vm_profile_inventory_dir() {
+  local profile="${1:?profile required}"
+  local root
+  root="$(repo_root)"
+  printf '%s/inventories/%s' "${root}" "${profile}"
+}
+
+vm_profile_inventory() {
+  local profile="${1:?profile required}"
+  local dir hosts_file
+  dir="$(vm_profile_inventory_dir "${profile}")"
+  hosts_file="${dir}/hosts.yml"
+  if [[ -f "${hosts_file}" ]]; then
+    printf '%s' "${hosts_file}"
+    return 0
+  fi
+  die "Missing ${hosts_file} — copy from ${dir}/hosts.yml.example if needed"
+}
+
+vm_profile_key_basename() {
+  local profile="${1:-lab}"
+  if [[ "${profile}" == "production" ]]; then
+    printf 'prod_id_ed25519'
+  else
+    printf 'lab_id_ed25519'
+  fi
+}
+
+# Deprecated aliases — use vm_* functions with profile instead.
 lab_data_dir() {
-  printf '%s' "${LAB_DATA_DIR:-/var/lib/libvirt/images/home-network-v3}"
+  vm_data_dir lab
 }
 
 lab_images_dir() {
-  printf '%s/images' "$(lab_data_dir)"
+  vm_images_dir
 }
 
 lab_vms_dir() {
-  printf '%s/vms' "$(lab_data_dir)"
+  vm_vms_dir lab
 }
 
 lab_seeds_dir() {
-  printf '%s/seeds' "$(lab_data_dir)"
+  vm_seeds_dir lab
 }
 
 lab_cloud_image_path() {
-  printf '%s/noble-server-cloudimg-amd64.img' "$(lab_images_dir)"
+  vm_cloud_image_path
 }
 
 repo_root() {

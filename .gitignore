@@ -5,12 +5,22 @@
 .vault-pass-lab
 
 # Lab SSH private key (public key is committed)
+scripts/vm/keys/lab_id_ed25519
+
+# Production VM SSH private key (public key is committed)
+scripts/vm/keys/prod_id_ed25519
+
+# Legacy path (removed — keys live under scripts/vm/keys/)
 scripts/lab/keys/lab_id_ed25519
 
 # Production inventory (real IPs and hostnames)
 inventories/production/hosts.yml
 inventories/production/host_vars/
 inventories/production/group_vars/vault.yml
+inventories/production/group_vars/all/ansible.yml
+inventories/production/group_vars/**/vars.yaml
+inventories/production/group_vars/**/vars.yml
+!inventories/production/group_vars/**/*.example
 
 # CKA inventory (DHCP IPs are local)
 inventories/cka/hosts.yml

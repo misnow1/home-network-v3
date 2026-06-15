@@ -48,6 +48,7 @@
       - inventories/production
       - scripts/lib
       - scripts/lab
+      - scripts/vm
       - scripts/test-prod-safety.sh
       - tests/structural
       - CONTEXT.md

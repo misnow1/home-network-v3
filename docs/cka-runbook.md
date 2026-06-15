@@ -89,7 +89,7 @@ Or pass a known address:
 Connect manually:
 
 ```bash
-ssh -i scripts/lab/keys/lab_id_ed25519 ansible@<ip>
+ssh -i scripts/vm/keys/lab_id_ed25519 ansible@<ip>
 ```
 
 The `ansible` user has passwordless sudo (same key as lab integration VMs).

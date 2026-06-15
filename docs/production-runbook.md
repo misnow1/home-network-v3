@@ -142,6 +142,40 @@ Netplan-managed or resolved-aware DNS for production is a future enhancement;
 until then, declare DC IPs in group/host vars and keep DCs reachable before join
 playbooks.
 
+## VM provisioning on kvm01
+
+Production VMs are created on the hypervisor with generic scripts in `scripts/vm/`.
+They attach to the pre-existing libvirt network `external-default` (home LAN
+192.168.1.0/24). DC hosts use static IPs from inventory; other hosts use DHCP on
+that network (DHCP reservations are outside this repo).
+
+One-time on kvm01:
+
+```bash
+./scripts/vm/keys-ensure.sh -i production
+sudo ./scripts/vm/dirs-ensure.sh -i production
+```
+
+Provision a host defined in `inventories/production/hosts.yml` (copy from example):
+
+```bash
+./scripts/vm/vm-create.sh -i production dc1.example.home
+./scripts/vm/wait-ssh.sh -i production dc1.example.home
+```
+
+Then apply playbooks via `prod-run.sh` as below. Destroy when retiring a test VM:
+
+```bash
+./scripts/vm/vm-destroy.sh -i production dc1.example.home
+```
+
+Host entries need `vm_name` and either `vm_ip` (static) or `vm_use_dhcp: true`.
+Network defaults (`vm_gateway`, `vm_dns_servers`, etc.) live in
+`group_vars/all/vars.yml`. See [lab-storage.md](lab-storage.md).
+
+The libvirt network `external-default` must already exist on kvm01 — these scripts
+do not define it (unlike lab `home-dc-lab`).
+
 ## Inventory conventions
 
 | Group | Purpose |
