@@ -6,5 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../lib/common.sh
 source "${ROOT}/scripts/lib/common.sh"
 
-export DDNS_ENV_FILE="$(lab_data_dir)/home-ddns.env"
+DDNS_ENV_FILE="$(lab_data_dir)/home-ddns.env"
+export DDNS_ENV_FILE
 exec "${ROOT}/scripts/dhcp-ddns-hook.sh" "$@"

@@ -253,7 +253,7 @@ create_vm() {
     --os-variant ubuntu24.04
     --network "${network_arg}"
     --graphics none
-    --console pty,target.type=serial
+    --console "pty,target.type=serial"
     --import
     --noautoconsole
   )

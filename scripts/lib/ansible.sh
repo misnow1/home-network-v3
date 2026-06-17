@@ -36,7 +36,7 @@ run_ansible_syntax_check() {
   ansible_env "${root}"
   local vault_file
   vault_file="$(ensure_vault_password_file "${root}")"
-  local playbook inventory
+  local playbook
   for playbook in "${root}"/playbooks/*.yml; do
     [[ -f "${playbook}" ]] || continue
     log_info "syntax-check ${playbook}"

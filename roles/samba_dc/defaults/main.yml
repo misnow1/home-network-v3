@@ -58,8 +58,8 @@ samba_dc_join_nameservers: []
 samba_dc_join_site: FerryCrossing
 # Join credentials: vault_ad_join_user / vault_ad_join_password in group_vars/all/vault.yml
 # Domain Admin rights required (e.g. Administrator). Optional overrides:
-# samba_dc_join_user: "{{ vault_ad_join_user }}"
-# samba_dc_join_password: "{{ vault_ad_join_password }}"
+samba_dc_join_user: Administrator
+samba_dc_join_password: "{{ vault_samba_admin_password }}"
 
 # Upstream resolvers for apt/package installs before BIND is authoritative.
 samba_dc_upstream_nameservers: "{{ dc_dns_forwarders }}"

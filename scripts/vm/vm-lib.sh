@@ -87,7 +87,8 @@ vm_render_cloud_init() {
     template="${ROOT}/scripts/vm/cloud-init/user-data.tmpl"
     export VM_GATEWAY="${VM_GATEWAY:?VM_GATEWAY required for static cloud-init}"
     export VM_SUBNET_PREFIX="${VM_SUBNET_PREFIX:-24}"
-    export VM_DNS_SERVERS_YAML="$(vm_build_static_dns_yaml "${VM_DNS_SERVERS_JSON:-[]}" "${VM_DNS_SEARCH:-}")"
+    VM_DNS_SERVERS_YAML="$(vm_build_static_dns_yaml "${VM_DNS_SERVERS_JSON:-[]}" "${VM_DNS_SEARCH:-}")"
+    export VM_DNS_SERVERS_YAML
   fi
 
   user_data="${seed_dir}/user-data"
@@ -241,10 +242,14 @@ vm_inventory_lookup_optional() {
 load_inventory_network_exports() {
   local profile="$1"
   local fqdn="$2"
-  export VM_GATEWAY="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_gateway")"
-  export VM_SUBNET_PREFIX="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_subnet_prefix")"
-  export VM_DNS_SEARCH="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_dns_search")"
-  export VM_DNS_SERVERS_JSON="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_dns_servers")"
+  VM_GATEWAY="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_gateway")"
+  export VM_GATEWAY
+  VM_SUBNET_PREFIX="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_subnet_prefix")"
+  export VM_SUBNET_PREFIX
+  VM_DNS_SEARCH="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_dns_search")"
+  export VM_DNS_SEARCH
+  VM_DNS_SERVERS_JSON="$(vm_inventory_lookup "${profile}" "${fqdn}" "vm_dns_servers")"
+  export VM_DNS_SERVERS_JSON
 }
 
 vm_host_uses_dhcp() {
@@ -291,10 +296,14 @@ out = {k: data.get(k) for k in keys if data.get(k) is not None}
 print(json.dumps(out))
 PY
 )"
-  export VM_GATEWAY="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_gateway',''))" "${exports}")"
-  export VM_SUBNET_PREFIX="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_subnet_prefix',''))" "${exports}")"
-  export VM_DNS_SEARCH="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_dns_search',''))" "${exports}")"
-  export VM_DNS_SERVERS_JSON="$(python3 -c "import json,sys; print(json.dumps(json.loads(sys.argv[1]).get('vm_dns_servers',[])))" "${exports}")"
+  VM_GATEWAY="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_gateway',''))" "${exports}")"
+  export VM_GATEWAY
+  VM_SUBNET_PREFIX="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_subnet_prefix',''))" "${exports}")"
+  export VM_SUBNET_PREFIX
+  VM_DNS_SEARCH="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('vm_dns_search',''))" "${exports}")"
+  export VM_DNS_SEARCH
+  VM_DNS_SERVERS_JSON="$(python3 -c "import json,sys; print(json.dumps(json.loads(sys.argv[1]).get('vm_dns_servers',[])))" "${exports}")"
+  export VM_DNS_SERVERS_JSON
   [[ -n "${VM_GATEWAY}" ]] || die "Profile ${profile} missing vm_gateway in group_vars/all/vars.yml"
   [[ -n "${VM_SUBNET_PREFIX}" ]] || die "Profile ${profile} missing vm_subnet_prefix in group_vars/all/vars.yml"
   [[ "${VM_DNS_SERVERS_JSON}" != "[]" ]] || die "Profile ${profile} missing vm_dns_servers in group_vars/all/vars.yml"

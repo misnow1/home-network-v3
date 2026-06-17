@@ -29,7 +29,6 @@ JOIN_SITE="${JOIN_SITE:-FerryCrossing}"
 STALE_DC_NETBIOS="${STALE_DC_NETBIOS:-DC1}"
 SAMBA_LDB="${SAMBA_LDB:-/var/lib/samba/private/sam.ldb}"
 CONFIG_DN="CN=Configuration,DC=home,DC=2123studios,DC=com"
-DOMAIN_DN="DC=home,DC=2123studios,DC=com"
 
 usage() {
   grep '^#' "$0" | head -20 | sed 's/^# \{0,1\}//'
@@ -49,19 +48,13 @@ pass() { echo "PASS: $*"; }
 warn() { echo "WARN: $*" >&2; WARNINGS=$((WARNINGS + 1)); }
 fail() { echo "FAIL: $*" >&2; FAILURES=$((FAILURES + 1)); }
 
-samba_auth() {
-  if [[ -n "${AD_ADMIN_PASSWORD:-}" ]]; then
-    echo "-UAdministrator"
-  else
-    echo "--machine-pass"
-  fi
-}
-
 samba_tool() {
+  local -a auth_args=()
   if [[ -n "${AD_ADMIN_PASSWORD:-}" ]]; then
-    PASSWD="${AD_ADMIN_PASSWORD}" samba-tool "$@"
+    auth_args=(-UAdministrator)
+    PASSWD="${AD_ADMIN_PASSWORD}" samba-tool "${auth_args[@]}" "$@"
   else
-    samba-tool "$@"
+    samba-tool --machine-pass "$@"
   fi
 }
 
@@ -84,7 +77,7 @@ pdc_object_guid() {
 
 zone_apex_ns_count() {
   local zone="$1" out rc=0
-  out="$(samba_tool dns query localhost "${zone}" @ NS $(samba_auth) 2>/dev/null)" || rc=$?
+  out="$(samba_tool dns query localhost "${zone}" @ NS 2>/dev/null)" || rc=$?
   [[ "${rc}" -ne 0 ]] && { echo 0; return; }
   grep -cE '^[[:space:]]+NS:' <<<"${out}" || echo 0
 }
@@ -101,7 +94,7 @@ run_checks() {
   fi
 
   local stale
-  stale="$(samba_tool computer list $(samba_auth) 2>/dev/null | grep -i "${STALE_DC_NETBIOS}" || true)"
+  stale="$(samba_tool computer list 2>/dev/null | grep -i "${STALE_DC_NETBIOS}" || true)"
   if [[ -z "${stale}" ]]; then
     pass "No ${STALE_DC_NETBIOS} computer account (ready for rejoin)"
   else
@@ -110,7 +103,7 @@ run_checks() {
   fi
 
   local sites site
-  sites="$(samba_tool sites list $(samba_auth) 2>/dev/null || true)"
+  sites="$(samba_tool sites list 2>/dev/null || true)"
   for site in FerryCrossing Woodbine Swanhollow; do
     grep -qx "${site}" <<<"${sites}" && pass "Site: ${site}" || fail "Missing site: ${site}"
   done
@@ -144,7 +137,7 @@ run_checks() {
   fi
 
   local zonelist zone ns_count
-  zonelist="$(samba_tool dns zonelist localhost $(samba_auth) 2>/dev/null || true)"
+  zonelist="$(samba_tool dns zonelist localhost 2>/dev/null || true)"
   while read -r zone; do
     [[ -z "${zone}" ]] && continue
     ns_count="$(zone_apex_ns_count "${zone}")"
@@ -158,7 +151,7 @@ run_checks() {
 
   echo "=== drs showrepl (up to 90s) ==="
   local repl_out repl_rc=0
-  repl_out="$(timeout 90 samba_tool drs showrepl $(samba_auth) 2>&1)" || repl_rc=$?
+  repl_out="$(timeout 90 samba_tool drs showrepl 2>&1)" || repl_rc=$?
   if [[ "${repl_rc}" -eq 124 ]]; then
     warn "drs showrepl timed out"
   elif grep -qE 'failed, result|WERR_' <<<"${repl_out}"; then
@@ -171,7 +164,7 @@ run_checks() {
     warn "drs output still mentions DC1"
   fi
 
-  if samba_tool fsmo show $(samba_auth) 2>/dev/null | grep -qi "${PDC_NETBIOS}"; then
+  if samba_tool fsmo show 2>/dev/null | grep -qi "${PDC_NETBIOS}"; then
     pass "FSMO on pdc (expected pre-cutover)"
   else
     warn "Review FSMO: samba-tool fsmo show"
@@ -179,8 +172,8 @@ run_checks() {
 
   if [[ "${APPLY_FIXES}" -eq 1 ]]; then
     echo "=== apply-fixes ==="
-    samba_tool drs kcc $(samba_auth) && pass "drs kcc" || warn "drs kcc failed"
-    samba_tool dbcheck --cross-ncs --fix $(samba_auth) && pass "dbcheck --fix" || warn "dbcheck reported issues"
+    samba_tool drs kcc && pass "drs kcc" || warn "drs kcc failed"
+    samba_tool dbcheck --cross-ncs --fix && pass "dbcheck --fix" || warn "dbcheck reported issues"
     echo "Re-run: samba_dnsupdate --verbose  (review AAAA failures manually)"
   fi
 
