@@ -13,15 +13,15 @@ Designed test-first: quick CI checks on GitHub, full libvirt integration tests o
 - **Local lab storage** on kvm01 (not NFS home) — see [docs/lab-storage.md](docs/lab-storage.md)
 
 ```bash
-sudo ./scripts/lab/dirs-ensure.sh   # once per host
+sudo ./scripts/vm/dirs-ensure.sh -i lab   # once per host (lab profile)
 ```
 
 ## Quick start
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-ansible-galaxy collection install -r requirements.yml
+./scripts/bootstrap-dev.sh        # pyenv-aware venv + pip + galaxy
+# or manually:
+# eval "$(pyenv init -)" && python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # Lab vault password (local dev — change after clone)
 printf '%s' 'change-me-lab-vault' > .vault_pass_lab
@@ -44,7 +44,8 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the slice plan and deferred work.
 | `inventories/cka/` | CKA practice VMs on vlan3 (see [docs/cka-runbook.md](docs/cka-runbook.md)) |
 | `inventories/production/` | Gitignored production hosts (`hosts.yml.example` is the template) |
 | `scripts/test-*.sh` | Test entrypoints |
-| `scripts/lab/` | Libvirt network, cloud-init, VM lifecycle |
+| `scripts/vm/` | Generic VM lifecycle (lab and production profiles) |
+| `scripts/lab/` | Lab libvirt network, DDNS hook, thin wrappers (`-i lab`) |
 | `docs/cka-runbook.md` | Ad-hoc CKA practice VMs on host bridge (vlan3) |
 | `scripts/prod-run.sh` | Production playbook wrapper |
 | `tests/structural/` | Tier 2 assert playbooks |

@@ -9,9 +9,7 @@ source "${ROOT}/scripts/lib/common.sh"
 source "${ROOT}/scripts/lib/ansible.sh"
 
 main() {
-  if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
-    export PATH="${ROOT}/.venv/bin:${PATH}"
-  fi
+  ensure_venv_path "${ROOT}"
 
   require_cmd yamllint
   require_cmd ansible-lint

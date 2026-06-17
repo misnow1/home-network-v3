@@ -1,0 +1,79 @@
+---
+# Structural tests for role-based software layout.
+
+- name: Structural — software layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    baseline_vars: "{{ repo_root }}/roles/linux_baseline/vars/main.yml"
+    baseline_defaults: "{{ repo_root }}/roles/linux_baseline/defaults/main.yml"
+    baseline_tasks: "{{ repo_root }}/roles/linux_baseline/tasks/main.yml"
+    github_releases_task: "{{ repo_root }}/roles/linux_baseline/tasks/github_releases.yml"
+    github_release_item_task: "{{ repo_root }}/roles/linux_baseline/tasks/github_release_item.yml"
+    shell_task: "{{ repo_root }}/roles/linux_baseline/tasks/shell.yml"
+    zsh_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/zsh/zshrc.d/99-fzf.zsh"
+    bash_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/bash.bashrc.d/99-fzf.sh"
+    samba_defaults: "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+    software_doc: "{{ repo_root }}/docs/software.md"
+  tasks:
+    - name: Software | assert required paths exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: software_paths
+      loop:
+        - "{{ baseline_vars }}"
+        - "{{ baseline_defaults }}"
+        - "{{ baseline_tasks }}"
+        - "{{ github_releases_task }}"
+        - "{{ github_release_item_task }}"
+        - "{{ shell_task }}"
+        - "{{ zsh_dropin }}"
+        - "{{ bash_dropin }}"
+        - "{{ software_doc }}"
+
+    - name: Software | assert paths present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ software_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Software | assert baseline includes shared admin packages
+      ansible.builtin.shell: |
+        grep -q 'htop' "{{ baseline_vars }}"
+        grep -q 'zsh' "{{ baseline_vars }}"
+        grep -q 'dnsutils' "{{ baseline_vars }}"
+        grep -q 'tmux' "{{ baseline_vars }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Software | assert fzf GitHub release is configured
+      ansible.builtin.shell: |
+        grep -q 'linux_baseline_github_releases:' "{{ baseline_defaults }}"
+        grep -q 'name: fzf' "{{ baseline_defaults }}"
+        grep -q 'version:' "{{ baseline_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Software | assert baseline tasks wire github releases and shell drop-ins
+      ansible.builtin.shell: |
+        grep -q 'github_releases.yml' "{{ baseline_tasks }}"
+        grep -q 'github_release_item.yml' "{{ github_releases_task }}"
+        grep -q 'shell.yml' "{{ baseline_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Software | assert DC packages include ldb-tools and debug tools
+      ansible.builtin.shell: |
+        grep -q 'ldb-tools' "{{ samba_defaults }}"
+        grep -q 'tcpdump' "{{ samba_defaults }}"
+        grep -q 'nmap' "{{ samba_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

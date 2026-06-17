@@ -1,0 +1,15 @@
+---
+description: Python/Ansible tool paths for this repo
+alwaysApply: true
+---
+
+# Dev environment
+
+Ansible Python tools are installed in the repo virtualenv, not globally.
+
+- Bootstrap (once / after requirements change): `./scripts/bootstrap-dev.sh`
+- Before running ansible-lint, yamllint, ansible-playbook, ansible-galaxy, etc. in a shell:
+  `export PATH="$(git -C <repo-root> rev-parse --show-toplevel)/.venv/bin:$PATH"`
+- Or use fully qualified paths: `.venv/bin/ansible-lint`, `.venv/bin/yamllint`, `.venv/bin/ansible-playbook`
+- Prefer `./scripts/test-quick.sh` for linting — it sets PATH automatically.
+- Do not use `pip install --user` for project tools; keep deps in `.venv` via requirements.txt.

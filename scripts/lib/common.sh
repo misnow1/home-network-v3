@@ -6,24 +6,80 @@ set -euo pipefail
 export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 
 # VM disks and cloud images must live on local disk — NFS home (rootsquash) breaks QEMU access.
+vm_data_base() {
+  printf '%s' "${VM_DATA_BASE:-/var/lib/libvirt/images/home-network-v3}"
+}
+
+vm_data_dir() {
+  local profile="${1:-lab}"
+  printf '%s/%s' "$(vm_data_base)" "${profile}"
+}
+
+vm_images_dir() {
+  printf '%s/images' "$(vm_data_base)"
+}
+
+vm_vms_dir() {
+  local profile="${1:-lab}"
+  printf '%s/vms' "$(vm_data_dir "${profile}")"
+}
+
+vm_seeds_dir() {
+  local profile="${1:-lab}"
+  printf '%s/seeds' "$(vm_data_dir "${profile}")"
+}
+
+vm_cloud_image_path() {
+  printf '%s/noble-server-cloudimg-amd64.img' "$(vm_images_dir)"
+}
+
+vm_profile_inventory_dir() {
+  local profile="${1:?profile required}"
+  local root
+  root="$(repo_root)"
+  printf '%s/inventories/%s' "${root}" "${profile}"
+}
+
+vm_profile_inventory() {
+  local profile="${1:?profile required}"
+  local dir hosts_file
+  dir="$(vm_profile_inventory_dir "${profile}")"
+  hosts_file="${dir}/hosts.yml"
+  if [[ -f "${hosts_file}" ]]; then
+    printf '%s' "${hosts_file}"
+    return 0
+  fi
+  die "Missing ${hosts_file} — copy from ${dir}/hosts.yml.example if needed"
+}
+
+vm_profile_key_basename() {
+  local profile="${1:-lab}"
+  if [[ "${profile}" == "production" ]]; then
+    printf 'prod_id_ed25519'
+  else
+    printf 'lab_id_ed25519'
+  fi
+}
+
+# Deprecated aliases — use vm_* functions with profile instead.
 lab_data_dir() {
-  printf '%s' "${LAB_DATA_DIR:-/var/lib/libvirt/images/home-network-v3}"
+  vm_data_dir lab
 }
 
 lab_images_dir() {
-  printf '%s/images' "$(lab_data_dir)"
+  vm_images_dir
 }
 
 lab_vms_dir() {
-  printf '%s/vms' "$(lab_data_dir)"
+  vm_vms_dir lab
 }
 
 lab_seeds_dir() {
-  printf '%s/seeds' "$(lab_data_dir)"
+  vm_seeds_dir lab
 }
 
 lab_cloud_image_path() {
-  printf '%s/noble-server-cloudimg-amd64.img' "$(lab_images_dir)"
+  vm_cloud_image_path
 }
 
 repo_root() {
@@ -53,6 +109,13 @@ require_cmd() {
   command -v "${cmd}" >/dev/null 2>&1 || die "Required command not found: ${cmd}"
 }
 
+ensure_venv_path() {
+  local root="${1:-$(require_repo_root)}"
+  if [[ -x "${root}/.venv/bin/ansible-playbook" ]]; then
+    export PATH="${root}/.venv/bin:${PATH}"
+  fi
+}
+
 require_repo_root() {
   local root
   root="$(repo_root)"
@@ -71,6 +134,16 @@ vault_password_file() {
   fi
 }
 
+vault_password_file_for_profile() {
+  local root="$1"
+  local profile="$2"
+  if [[ "${profile}" == "production" ]]; then
+    printf '%s/.vault_pass' "${root}"
+    return 0
+  fi
+  vault_password_file "${root}"
+}
+
 ensure_vault_password_file() {
   local root="$1"
   local vault_file
@@ -80,6 +153,29 @@ ensure_vault_password_file() {
     chmod 600 "${vault_file}"
   fi
   [[ -f "${vault_file}" ]] || die "Missing ${vault_file} — see docs/vault-schema.md"
+  printf '%s' "${vault_file}"
+}
+
+ensure_vault_password_file_for_profile() {
+  local root="$1"
+  local profile="$2"
+  local vault_file
+  vault_file="$(vault_password_file_for_profile "${root}" "${profile}")"
+  if [[ ! -f "${vault_file}" ]]; then
+    if [[ "${profile}" == "production" && -n "${VAULT_PASS:-}" ]]; then
+      printf '%s' "${VAULT_PASS}" > "${vault_file}"
+      chmod 600 "${vault_file}"
+    elif [[ "${profile}" != "production" && -n "${VAULT_PASS_LAB:-}" ]]; then
+      printf '%s' "${VAULT_PASS_LAB}" > "${vault_file}"
+      chmod 600 "${vault_file}"
+    fi
+  fi
+  [[ -f "${vault_file}" ]] || {
+    if [[ "${profile}" == "production" ]]; then
+      die "Missing ${vault_file} (production vault password). Refusing to fall back to the lab vault — see docs/vault-schema.md"
+    fi
+    die "Missing ${vault_file} — see docs/vault-schema.md"
+  }
   printf '%s' "${vault_file}"
 }
 

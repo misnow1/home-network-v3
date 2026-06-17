@@ -5,3 +5,12 @@ chrony_ntp_servers:
   - 1.pool.ntp.org
   - 2.pool.ntp.org
   - 3.pool.ntp.org
+
+# Binaries installed from GitHub releases (not apt). Bump version deliberately.
+linux_baseline_github_releases:
+  - name: fzf
+    version: "0.60.3"
+    repo: junegunn/fzf
+    binary: fzf
+    dest: /usr/local/bin/fzf
+    mode: "0755"

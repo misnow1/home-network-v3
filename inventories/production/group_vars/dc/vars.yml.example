@@ -3,6 +3,9 @@
 #
 #   cp inventories/production/group_vars/dc/vars.yml.example \
 #      inventories/production/group_vars/dc/vars.yml
+#
+# Example production domain: home.2123studios.com / HOME.2123STUDIOS.COM / workgroup HOME
+# (workgroup is the first DNS label of dc_domain_name, uppercased).
 
 domain_name: home.example
 dc_realm: HOME.EXAMPLE
@@ -22,3 +25,16 @@ ddns_nsupdate_enabled: true
 # ddns_nsupdate_manage_ufw: true
 # ddns_nsupdate_ufw_allow_cidrs:
 #   - 192.168.1.0/24
+
+# AD migration (docs/migration-runbook.md) — set on dc1 before dc-replica-join.yml
+# samba_dc_migration_host: true
+# samba_dc_migration_mode: replica
+# samba_dc_target_server_name: dc1
+# samba_dc_join_server: pdc.example.home
+# samba_dc_join_nameservers:
+#   - 192.168.1.2
+# samba_dc_join_site: FerryCrossing   # Woodbine / Swanhollow for future DCs — docs/ad-sites.md
+#
+# Offline fallback only (legacy DC unavailable):
+# samba_dc_migration_mode: restore
+# samba_dc_backup_archive is passed via -e at playbook runtime, not stored here

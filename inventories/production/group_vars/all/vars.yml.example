@@ -3,6 +3,9 @@
 #
 #   cp inventories/production/group_vars/all/vars.yml.example \
 #      inventories/production/group_vars/all/vars.yml
+#
+# For home.2123studios.com: samba_workgroup HOME and samba_realm HOME.2123STUDIOS.COM
+# match the first DNS label (uppercased) and Kerberos realm respectively.
 
 # SSSD (domain_join role)
 sssd_ldap_id_mapping: false
@@ -12,3 +15,11 @@ sssd_fall_back_homedir: /home/%u
 # Samba member defaults (fileservers)
 samba_workgroup: HOME
 samba_realm: HOME.EXAMPLE
+
+# VM provisioning (scripts/vm/vm-create.sh -i production)
+vm_network: external-default
+vm_gateway: 192.168.1.1
+vm_subnet_prefix: 24
+vm_dns_servers:
+  - 192.168.1.1
+vm_dns_search: home.2123studios.com

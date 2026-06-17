@@ -3,6 +3,9 @@
 High-impact playbooks for lab domain controller provisioning on Ubuntu 24.04 with
 BIND9_DLZ DNS backend.
 
+See [software.md](software.md) for the full package list (baseline + DC-specific tools
+such as `ldb-tools`, `tcpdump`, `nmap`).
+
 ## Lab integration (automated)
 
 ```bash
@@ -40,17 +43,33 @@ Re-run `dc-converge.yml` twice — second run must report `changed=0`.
 
 ## Production break-glass
 
-`dc-bootstrap.yml` refuses non-lab inventory unless explicitly opted in:
+`dc-bootstrap.yml` and `dc-restore.yml` refuse non-lab inventory unless explicitly opted in:
 
 ```bash
+# Greenfield only
 ./scripts/prod-run.sh --confirm-production -- \
-  playbooks/dc-bootstrap.yml -e allow_production=true --limit dc.example.home
+  playbooks/dc-bootstrap.yml -e allow_production=true --limit dc1.example.home
+
+# AD migration — replica join (preferred, live legacy DC)
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/dc-replica-join.yml -e allow_production=true \
+  --limit dc1.home.2123studios.com
+
+# AD migration — offline backup restore (fallback)
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/dc-restore.yml -e allow_production=true \
+  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
+  --limit dc1.home.2123studios.com
 ```
 
-**Warning:** Bootstrap is destructive on first run. Only use break-glass with a documented
-recovery plan. Normal production updates use `dc-converge.yml` after initial bootstrap.
+**Warning:** Bootstrap creates a new domain. Replica join and restore migrate an
+existing domain. Only use break-glass with a documented recovery plan. Normal
+production updates use `dc-converge.yml` after initial bootstrap, replica join,
+or restore.
 
-## What bootstrap does
+See **[migration-runbook.md](migration-runbook.md)** for the full AD migration procedure.
+
+## What bootstrap does (greenfield)
 
 1. Safety asserts (lab inventory / allow_production)
 2. `linux_baseline` (packages, hostname, chrony)
@@ -59,6 +78,51 @@ recovery plan. Normal production updates use `dc-converge.yml` after initial boo
 5. `samba-tool domain provision` with `BIND9_DLZ` and RFC2307 (once — guarded by `sam.ldb`)
 6. Configures BIND DLZ, AppArmor, starts `named` and `samba-ad-dc`
 7. Copies generated `krb5.conf`
+
+## What replica join does (migration — preferred)
+
+Used when the legacy DC is still online — see [migration-runbook.md](migration-runbook.md).
+
+1. Same safety asserts as bootstrap (`allow_production`)
+2. `linux_baseline` (packages, hostname, chrony)
+3. Installs `samba-ad-dc`, BIND9, supporting packages
+4. Points resolver at legacy DC; runs `samba-tool domain join` as DC with `BIND9_DLZ`
+5. Writes replica join marker to block accidental greenfield bootstrap
+6. Configures BIND DLZ via shared `dns_bind_dlz.yml` tasks
+
+Requires in `group_vars/dc/vars.yml`:
+
+```yaml
+samba_dc_migration_mode: replica
+samba_dc_join_server: pdc.home.2123studios.com
+samba_dc_join_nameservers:
+  - 192.168.1.2
+samba_dc_join_site: FerryCrossing
+```
+
+Before join, create AD sites on pdc — see [ad-sites.md](ad-sites.md) (FerryCrossing /
+Woodbine / Swanhollow) and [migration-runbook.md](migration-runbook.md) Phase 0.
+
+## What restore does (migration — offline fallback)
+
+Used when the legacy DC is unavailable and you have a backup tarball — see
+[migration-runbook.md](migration-runbook.md).
+
+1. Same safety asserts as bootstrap (`allow_production`)
+2. `linux_baseline` (packages, hostname, chrony)
+3. Installs `samba-ad-dc`, BIND9, supporting packages
+4. Masks conflicting services
+5. `samba-tool domain backup restore` from tarball (once — guarded by `sam.ldb` absence)
+6. Writes restore marker to block accidental greenfield bootstrap
+7. Configures BIND DLZ via shared `dns_bind_dlz.yml` tasks
+
+Pass the backup path at runtime and set `samba_dc_migration_mode: restore`:
+
+```bash
+-e samba_dc_backup_archive=backups/home-ad-backup.tar
+```
+
+Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc1.
 
 ## What converge does
 
@@ -70,10 +134,12 @@ recovery plan. Normal production updates use `dc-converge.yml` after initial boo
 
 | Tag | Playbook | Purpose |
 |---|---|---|
-| `samba_packages` | dc-bootstrap | Package install only |
-| `samba_provision` | dc-bootstrap | Domain provision + samba-ad-dc |
-| `samba_dns` | dc-bootstrap | BIND9 DLZ + AppArmor |
-| `samba_kerberos` | dc-bootstrap | krb5.conf copy |
+| `samba_packages` | dc-bootstrap, dc-replica-join, dc-restore | Package install only |
+| `samba_provision` | dc-bootstrap, dc-replica-join | Domain provision/join + samba-ad-dc |
+| `samba_replica_join` | dc-replica-join | Domain join as replica DC |
+| `samba_restore` | dc-restore | Domain restore from backup |
+| `samba_dns` | dc-bootstrap, dc-replica-join, dc-restore | BIND9 DLZ + AppArmor |
+| `samba_kerberos` | dc-bootstrap, dc-replica-join, dc-restore | krb5.conf copy |
 | `samba_converge` | dc-converge | Ongoing idempotent config |
 
 See [docs/dns-architecture.md](dns-architecture.md) for DNS design and deferred DDNS work.

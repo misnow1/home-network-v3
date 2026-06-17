@@ -1,6 +1,6 @@
 #cloud-config
-hostname: ${LAB_HOST_SHORT}
-fqdn: ${LAB_FQDN}
+hostname: ${VM_HOST_SHORT}
+fqdn: ${VM_FQDN}
 manage_etc_hosts: true
 
 users:
@@ -9,7 +9,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     ssh_authorized_keys:
-      - ${LAB_SSH_PUBKEY}
+      - ${VM_SSH_PUBKEY}
     lock_passwd: true
 
 ssh_pwauth: false
@@ -22,26 +22,19 @@ packages:
   - openssh-server
   - cloud-init
   - cloud-guest-utils
+  - qemu-guest-agent
 
 write_files:
-  - path: /etc/netplan/99-lab-static.yaml
+  - path: /etc/netplan/99-vm-dhcp.yaml
     permissions: '0644'
     content: |
       network:
         version: 2
         ethernets:
-          ${LAB_NIC}:
-            dhcp4: false
-            addresses:
-              - ${LAB_VM_IP}/24
-            routes:
-              - to: default
-                via: 192.168.100.1
-            nameservers:
-              addresses:
-                - 192.168.100.1
-              search:
-                - lab.test
+          ${VM_NIC}:
+            dhcp4: true
+${VM_DNS_SEARCH_YAML}
 
 runcmd:
   - netplan apply
+  - systemctl enable --now qemu-guest-agent

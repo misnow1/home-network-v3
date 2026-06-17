@@ -153,7 +153,7 @@ run_dhcp_ddns_integration() {
   local probe_fqdn="dhcpprobe.lab.test"
   local dc_ip="192.168.100.10"
   local leased_ip=""
-  local attempt dig_a dig_ptr
+  local attempt dig_ptr
 
   require_cmd curl
   require_cmd dig
@@ -221,9 +221,7 @@ run_backup_integration() {
 }
 
 main() {
-  if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
-    export PATH="${ROOT}/.venv/bin:${PATH}"
-  fi
+  ensure_venv_path "${ROOT}"
 
   require_cmd virsh
   require_cmd virt-install

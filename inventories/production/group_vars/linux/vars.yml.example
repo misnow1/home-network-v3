@@ -1,5 +1,7 @@
 ---
 # Linux member defaults — copy to vars.yml and customize.
+#
+# Point domain_join_dns_servers at dc1 (e.g. 192.168.1.10 for home.2123studios.com).
 
 domain_name: home.example
 domain_join_dns_servers:

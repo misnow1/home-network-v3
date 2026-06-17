@@ -8,7 +8,7 @@ lab vault if the password is lost.
 | File | Encrypted | Used by |
 |---|---|---|
 | `inventories/lab/group_vars/all/vault.yml` | Yes (committed) | Lab integration tests and development |
-| `inventories/production/group_vars/vault.yml` | Yes (gitignored) | Production runs via `scripts/prod-run.sh` |
+| `inventories/production/group_vars/all/vault.yml` | Yes (gitignored) | Production runs via `scripts/prod-run.sh` |
 
 Non-secret production variables use committed `*.example` templates under
 `inventories/production/group_vars/` — copy to `vars.yml` locally (see
@@ -24,6 +24,21 @@ Non-secret production variables use committed `*.example` templates under
 GitHub Actions secret: `VAULT_PASS_LAB`
 
 Default lab development password (change after clone): `change-me-lab-vault`
+
+## ansible.cfg and vault passwords
+
+`ansible.cfg` intentionally does **not** set `vault_password_file`. Lab and production
+use different password files (`.vault_pass_lab` vs `.vault_pass`); a global default breaks
+`ansible-vault create` / `edit` for the other environment.
+
+Always pass `--vault-password-file` explicitly:
+
+| Task | Password file |
+|---|---|
+| Lab playbooks / `./scripts/test-quick.sh` | `.vault_pass_lab` (via `scripts/lib/ansible.sh`) |
+| Production playbooks | `.vault_pass` (via `scripts/prod-run.sh`) |
+| `ansible-vault` CLI (lab) | `--vault-password-file .vault_pass_lab` |
+| `ansible-vault` CLI (production) | `--vault-password-file .vault_pass` |
 
 ## Lab vault variables
 
@@ -61,8 +76,23 @@ After recreating, update the `VAULT_PASS_LAB` GitHub secret and re-run `./script
 ## Production vault
 
 Production secrets are never committed. Copy structure from the lab vault variable table
-and populate real values locally:
+and populate real values locally. Use the **production** password file, not the lab default:
 
 ```bash
-ansible-vault create inventories/production/group_vars/vault.yml --vault-password-file .vault_pass
+printf '%s' 'your-production-vault-password' > .vault_pass
+chmod 600 .vault_pass
+
+ansible-vault create inventories/production/group_vars/all/vault.yml \
+  --vault-password-file .vault_pass
 ```
+
+**Important:** The file must live under `group_vars/all/`. A vault file at
+`group_vars/vault.yml` is **not** loaded for hosts (Ansible treats that as a group
+named `vault`). If you have an older `group_vars/vault.yml`, move it:
+
+```bash
+mv inventories/production/group_vars/vault.yml \
+   inventories/production/group_vars/all/vault.yml
+```
+
+Edit or view later with the same `--vault-password-file .vault_pass` flag.

@@ -1,6 +1,6 @@
 #cloud-config
-hostname: ${LAB_HOST_SHORT}
-fqdn: ${LAB_FQDN}
+hostname: ${VM_HOST_SHORT}
+fqdn: ${VM_FQDN}
 manage_etc_hosts: true
 
 users:
@@ -9,7 +9,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     ssh_authorized_keys:
-      - ${LAB_SSH_PUBKEY}
+      - ${VM_SSH_PUBKEY}
     lock_passwd: true
 
 ssh_pwauth: false
@@ -25,15 +25,20 @@ packages:
   - qemu-guest-agent
 
 write_files:
-  - path: /etc/netplan/99-lab-dhcp.yaml
+  - path: /etc/netplan/99-vm-static.yaml
     permissions: '0644'
     content: |
       network:
         version: 2
         ethernets:
-          ${LAB_NIC}:
-            dhcp4: true
-${LAB_DNS_SEARCH_YAML}
+          ${VM_NIC}:
+            dhcp4: false
+            addresses:
+              - ${VM_IP}/${VM_SUBNET_PREFIX}
+            routes:
+              - to: default
+                via: ${VM_GATEWAY}
+${VM_DNS_SERVERS_YAML}
 
 runcmd:
   - netplan apply

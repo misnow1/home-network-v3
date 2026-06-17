@@ -1,0 +1,175 @@
+---
+# BIND9_DLZ wiring shared by bootstrap and restore (post sam.ldb exists).
+# Restored backups default to internal DNS — start Samba, then samba_upgradedns.
+
+- name: Samba DC DNS | Ensure Samba uses state smb.conf
+  ansible.builtin.import_tasks: samba_smb_conf.yml
+  tags: [samba_dns]
+
+# samba_dc_dns_hostname is used for BIND apex NS records (dns_ensure_zone_ns.yml).
+# "dns hostname" in smb.conf is Samba 4.20+ only; Ubuntu 24.04 ships 4.19.x — remove
+# if a prior playbook run added it (harmless but spams logs on every samba-tool call).
+- name: Samba DC DNS | Remove unsupported dns hostname from smb.conf
+  ansible.builtin.lineinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    regexp: '^\s*dns hostname\s*='
+    state: absent
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Mask systemd-resolved (BIND owns port 53)
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Deploy named.conf.options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: root
+    group: bind
+    mode: "0644"
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Deploy AppArmor local rules for BIND9_DLZ
+  ansible.builtin.blockinfile:
+    path: /etc/apparmor.d/local/usr.sbin.named
+    block: |
+      /var/lib/samba/bind-dns/** rwk,
+      /var/lib/samba/bind-dns/dns.keytab rk,
+      /var/lib/samba/private/krb5.conf r,
+      /usr/lib/**/samba/bind9/** rmk,
+      /usr/lib/**/samba/gensec/* rmk,
+      /usr/lib/**/samba/ldb/** rmk,
+      /usr/lib/**/ldb/modules/ldb/** rmk,
+      /var/tmp/** rwmk,
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dlz"
+    create: true
+  notify: reload apparmor
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Apply AppArmor changes before starting services
+  ansible.builtin.meta: flush_handlers
+  when: not ansible_check_mode
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Unmask and enable samba-ad-dc
+  ansible.builtin.systemd:
+    name: samba-ad-dc
+    masked: false
+    enabled: true
+  tags: [samba_provision]
+
+- name: Samba DC DNS | Start samba-ad-dc (internal DNS until BIND9_DLZ upgrade)
+  ansible.builtin.service:
+    name: samba-ad-dc
+    state: started
+  when: not ansible_check_mode
+  tags: [samba_provision]
+
+- name: Samba DC DNS | Generate BIND9_DLZ configuration
+  ansible.builtin.command:
+    argv:
+      - samba_upgradedns
+      - --dns-backend=BIND9_DLZ
+      - --migrate=no
+      - -s
+      - "{{ samba_dc_smb_conf }}"
+    creates: /var/lib/samba/bind-dns/named.conf
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Assert Samba-generated BIND include exists
+  ansible.builtin.stat:
+    path: /var/lib/samba/bind-dns/named.conf
+  register: samba_dc_bind_named_conf
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Assert BIND9_DLZ named.conf was generated
+  ansible.builtin.assert:
+    that:
+      - samba_dc_bind_named_conf.stat.exists
+    fail_msg: >-
+      /var/lib/samba/bind-dns/named.conf missing after samba_upgradedns.
+      Restored backups use internal DNS by default; ensure /etc/samba/smb.conf
+      points at {{ samba_dc_smb_conf }} and samba-ad-dc is running.
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Ensure BIND9_DLZ server services in smb.conf
+  ansible.builtin.lineinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    regexp: '^\s*server services\s*='
+    line: "\tserver services = -smb +s3fs -dns"
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Wire Samba DLZ include into named.conf.local
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.local
+    block: |
+      include "/var/lib/samba/bind-dns/named.conf";
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dlz"
+    create: true
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Restart samba-ad-dc after BIND9_DLZ upgrade
+  ansible.builtin.service:
+    name: samba-ad-dc
+    state: restarted
+  when: not ansible_check_mode
+  tags: [samba_provision]
+
+- name: Samba DC DNS | Ensure zone apex NS records before BIND starts
+  ansible.builtin.import_tasks: dns_ensure_zone_ns.yml
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Validate BIND configuration
+  ansible.builtin.command:
+    cmd: named-checkconf
+  changed_when: false
+  when: not ansible_check_mode
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Enable and restart named
+  ansible.builtin.service:
+    name: named
+    state: restarted
+    enabled: true
+  when: not ansible_check_mode
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Assert named is running
+  ansible.builtin.service_facts:
+  when: not ansible_check_mode
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Assert named service state is active
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['named.service'].state == 'running'
+    fail_msg: named is not running after BIND9_DLZ wiring
+  when: not ansible_check_mode
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Configure resolver to use local BIND
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # DC uses local BIND for {{ dc_domain_name }} AD DNS
+      nameserver 127.0.0.1
+      search {{ dc_domain_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Copy generated krb5.conf to /etc/krb5.conf
+  ansible.builtin.copy:
+    src: /var/lib/samba/private/krb5.conf
+    dest: /etc/krb5.conf
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: true
+  tags: [samba_kerberos]

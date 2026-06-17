@@ -23,6 +23,7 @@ EOF
 }
 
 main() {
+  ensure_venv_path "${ROOT}"
   require_cmd ansible-playbook
 
   local args=()
@@ -52,7 +53,8 @@ main() {
   [[ ${#args[@]} -gt 0 ]] || die "No ansible-playbook arguments provided"
 
   mkdir -p "${LOG_DIR}"
-  local log_file="${LOG_DIR}/prod-run-$(date -u +%Y%m%dT%H%M%SZ).log"
+  local log_file
+  log_file="${LOG_DIR}/prod-run-$(date -u +%Y%m%dT%H%M%SZ).log"
 
   log_info "Logging production run to ${log_file}"
   {

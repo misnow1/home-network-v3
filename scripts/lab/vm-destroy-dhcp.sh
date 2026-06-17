@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Destroy an ephemeral DHCP probe VM by libvirt name.
+# Destroy an ephemeral DHCP lab VM by libvirt domain name.
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-
-VM_NAME="${1:-dhcpprobe-lab-test}"
-
-exec "${ROOT}/scripts/lab/vm-destroy.sh" --name "${VM_NAME}"
+VM_NAME="${1:?libvirt domain name required}"
+exec "${ROOT}/scripts/vm/vm-destroy.sh" -i lab --name "${VM_NAME}"

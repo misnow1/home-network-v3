@@ -89,7 +89,7 @@ Or pass a known address:
 Connect manually:
 
 ```bash
-ssh -i scripts/lab/keys/lab_id_ed25519 ansible@<ip>
+ssh -i scripts/vm/keys/lab_id_ed25519 ansible@<ip>
 ```
 
 The `ansible` user has passwordless sudo (same key as lab integration VMs).
@@ -114,8 +114,9 @@ automated in this repo.
 
 ## Converge with Ansible
 
-After a VM is running, configure baseline packages, chrony, dev tools, and a personal
-local user (named after `$USER` on the machine running ansible-playbook).
+After a VM is running, configure baseline packages (shared admin tools, chrony, fzf),
+CKA-specific Kubernetes client tools, and a personal local user (named after `$USER` on
+the machine running ansible-playbook).
 
 ### One-time setup
 
@@ -153,9 +154,10 @@ ansible-playbook -i inventories/cka tests/integration/test_cka_converged.yml --l
 ssh "$(whoami)@$(ansible-inventory -i inventories/cka --host cka-cp1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["ansible_host"])')"
 ```
 
-The converge playbook applies [`linux_baseline`](../roles/linux_baseline/) (packages,
-hostname, chrony) then [`cka_node`](../roles/cka_node/) (zsh, fzf, htop, etc. + local
-user with passwordless sudo). Domain join is not used.
+The converge playbook applies [`linux_baseline`](../roles/linux_baseline/) (shared admin
+tools, hostname, chrony, fzf from GitHub) then [`cka_node`](../roles/cka_node/)
+(`kubectl`, `kubectx`/`kubens`, plus local user with passwordless sudo). Domain join is
+not used. See [software.md](software.md) for the full package matrix.
 
 Override the local username when `$USER` is unset (e.g. CI):
 
@@ -179,7 +181,7 @@ Removes the libvirt domain, qcow2 overlay, and cloud-init seed under
 | Script | `./scripts/lab/vm-create.sh dc01.lab.test` | `./scripts/lab/vm-create.sh --name … --network vlan3 --dhcp` |
 | Network | Isolated libvirt NAT `home-dc-lab` | libvirt network or host bridge `vlan3` |
 | IP | Static via cloud-init | DHCP on home VLAN |
-| Ansible | `baseline.yml` + domain stack | `cka-converge.yml` (baseline + dev user) |
+| Ansible | `baseline.yml` + domain stack | `cka-converge.yml` (baseline + kubectl + dev user) |
 | DNS search | `lab.test` | None (non-home-dc-lab networks) |
 
 Existing integration tests and inventory hosts are unchanged.

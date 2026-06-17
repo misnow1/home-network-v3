@@ -10,6 +10,9 @@ hypervisor_libvirt_packages:
   - virtinst
   - bridge-utils
   - python3-libvirt
+  - virt-top
+  - guestfish
+  - tcpdump
 
 docker_engine_enabled: true
 

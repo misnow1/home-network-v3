@@ -1,0 +1,162 @@
+---
+# Structural tests for AD migration artifacts.
+
+- name: Structural — migration layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    migration_runbook: "{{ repo_root }}/docs/migration-runbook.md"
+    dc_restore_playbook: "{{ repo_root }}/playbooks/dc-restore.yml"
+    dc_replica_join_playbook: "{{ repo_root }}/playbooks/dc-replica-join.yml"
+    dc_restore_tasks: "{{ repo_root }}/roles/samba_dc/tasks/restore.yml"
+    dc_replica_join_tasks: "{{ repo_root }}/roles/samba_dc/tasks/replica_join.yml"
+    dns_bind_tasks: "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
+    bootstrap_tasks: "{{ repo_root }}/roles/samba_dc/tasks/bootstrap.yml"
+    domain_leave_playbook: "{{ repo_root }}/playbooks/domain-leave.yml"
+    preflight_script: "{{ repo_root }}/scripts/migration/preflight-check.sh"
+    pdc_audit_script: "{{ repo_root }}/scripts/migration/pdc-audit.sh"
+  tasks:
+    - name: Migration | assert migration runbook exists
+      ansible.builtin.stat:
+        path: "{{ migration_runbook }}"
+      register: migration_runbook_stat
+
+    - name: Migration | assert migration runbook present
+      ansible.builtin.assert:
+        that:
+          - migration_runbook_stat.stat.exists
+
+    - name: Migration | assert dc-replica-join playbook has allow_production guard
+      ansible.builtin.shell: |
+        grep -q 'allow_production' "{{ dc_replica_join_playbook }}"
+        grep -q 'tasks_from: replica_join' "{{ dc_replica_join_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert dc-replica-join imports replica_join and dns_bind_dlz
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: replica_join' "{{ dc_replica_join_playbook }}"
+        grep -q 'samba-tool domain join' "{{ dc_replica_join_tasks }}"
+        grep -q 'vault_ad_join_user' "{{ dc_replica_join_tasks }}"
+        grep -q '--site=' "{{ dc_replica_join_tasks }}"
+        grep -q 'dns_bind_dlz' "{{ dc_replica_join_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert dc-restore playbook has allow_production guard
+      ansible.builtin.shell: |
+        grep -q 'allow_production' "{{ dc_restore_playbook }}"
+        grep -q 'tasks_from: restore' "{{ dc_restore_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert dc-restore playbook imports dns_bind_dlz
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: restore' "{{ dc_restore_playbook }}"
+        grep -q 'tasks_from: dns_bind_dlz' "{{ dc_restore_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert restore tasks call samba-tool domain backup restore
+      ansible.builtin.shell: |
+        grep -q 'samba-tool domain backup restore' "{{ dc_restore_tasks }}"
+        grep -q '--backup-file=' "{{ dc_restore_tasks }}"
+        grep -q 'creates: /var/lib/samba/private/sam.ldb' "{{ dc_restore_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert bootstrap refuses migration hosts
+      ansible.builtin.shell: |
+        grep -q 'samba_dc_migration_host' "{{ bootstrap_tasks }}"
+        grep -q 'samba_dc_restore_marker_path' "{{ bootstrap_tasks }}"
+        grep -q 'samba_dc_replica_join_marker_path' "{{ bootstrap_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert shared DNS tasks exist
+      ansible.builtin.stat:
+        path: "{{ dns_bind_tasks }}"
+      register: dns_bind_stat
+
+    - name: Migration | assert dns_bind_dlz.yml present
+      ansible.builtin.assert:
+        that:
+          - dns_bind_stat.stat.exists
+
+    - name: Migration | assert dns_bind_dlz wires smb.conf and upgradedns order
+      ansible.builtin.shell: |
+        grep -q 'samba_smb_conf' "{{ dns_bind_tasks }}"
+        grep -q 'Remove unsupported dns hostname' "{{ dns_bind_tasks }}"
+        grep -q 'samba_upgradedns' "{{ dns_bind_tasks }}"
+        grep -q 'dns_ensure_zone_ns' "{{ dns_bind_tasks }}"
+        grep -q 'samba_dc_smb_conf' "{{ dns_bind_tasks }}"
+        grep -q 'samba_dc_dns_hostname' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        grep -q 'samba_dc_smb_conf_candidates' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        awk '/Restart samba-ad-dc after BIND9_DLZ/{r=NR} /dns_ensure_zone_ns/{e=NR} \
+          /name: named/{n=NR} END{exit !(r && e && n && r < e && e < n)}' \
+          "{{ dns_bind_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert domain-leave playbook exists
+      ansible.builtin.stat:
+        path: "{{ domain_leave_playbook }}"
+      register: domain_leave_stat
+
+    - name: Migration | assert domain-leave playbook present
+      ansible.builtin.assert:
+        that:
+          - domain_leave_stat.stat.exists
+
+    - name: Migration | assert preflight script exists and is executable
+      ansible.builtin.stat:
+        path: "{{ preflight_script }}"
+      register: preflight_stat
+
+    - name: Migration | assert preflight script present
+      ansible.builtin.assert:
+        that:
+          - preflight_stat.stat.exists
+          - preflight_stat.stat.executable
+
+    - name: Migration | assert pdc audit script exists and is executable
+      ansible.builtin.stat:
+        path: "{{ pdc_audit_script }}"
+      register: pdc_audit_stat
+
+    - name: Migration | assert pdc audit script present
+      ansible.builtin.assert:
+        that:
+          - pdc_audit_stat.stat.exists
+          - pdc_audit_stat.stat.executable
+
+    - name: Migration | assert migration runbook documents pdc audit
+      ansible.builtin.shell: |
+        grep -q 'pdc-audit.sh' "{{ migration_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert migration runbook documents replica join
+      ansible.builtin.shell: |
+        grep -q 'dc-replica-join.yml' "{{ migration_runbook }}"
+        grep -q 'samba_dc_join_server' "{{ migration_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert hosts example uses dc1 naming
+      ansible.builtin.shell: |
+        grep -q 'dc1.example.home' "{{ repo_root }}/inventories/production/hosts.yml.example"
+        grep -q 'deferred:' "{{ repo_root }}/inventories/production/hosts.yml.example"
+      args:
+        executable: /bin/bash
+      changed_when: false

@@ -1,0 +1,59 @@
+---
+# Samba AD DC migration — join fresh dc1 as a replica of the live domain.
+# Preserves users, groups, computer SIDs, and passwords via DRS replication.
+# Requires the legacy DC (pdc) to stay online during join.
+#
+# See docs/migration-runbook.md. Offline fallback: playbooks/dc-restore.yml.
+#
+# Safety: refuses production inventory unless -e allow_production=true.
+#
+# Example:
+#   ./scripts/prod-run.sh --confirm-production -- \
+#     playbooks/dc-replica-join.yml -e allow_production=true \
+#     --limit dc1.home.2123studios.com
+
+- name: Join Samba AD Domain Controller as replica
+  hosts: dc
+  become: true
+  pre_tasks:
+    - name: DC replica join | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing dc-replica-join against non-lab inventory.
+          Pass -e allow_production=true for break-glass production use.
+          See docs/migration-runbook.md.
+      tags: [always]
+
+    - name: DC replica join | assert host is in lab group or break-glass is set
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in groups.get('lab', [])
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          {{ inventory_hostname }} is not in the lab inventory group.
+          Pass -e allow_production=true only after reading docs/migration-runbook.md.
+      tags: [always]
+
+    - name: DC replica join | Configure resolver for package installs
+      ansible.builtin.import_role:
+        name: samba_dc
+        tasks_from: dns_upstream_resolver
+      vars:
+        samba_dc_upstream_nameservers: "{{ samba_dc_join_nameservers }}"
+      when: samba_dc_join_nameservers | default([]) | length > 0
+      tags: [samba_dns, baseline]
+
+  roles:
+    - role: linux_baseline
+      tags: [baseline]
+
+  tasks:
+    - name: Join samba_dc as domain replica
+      ansible.builtin.import_role:
+        name: samba_dc
+        tasks_from: replica_join
+      tags: [samba_replica_join]

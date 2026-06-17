@@ -30,6 +30,12 @@
           Pass -e allow_production=true only after reading docs/dc-runbook.md.
       tags: [always]
 
+    - name: DC bootstrap | Configure upstream resolver for apt and retries
+      ansible.builtin.import_role:
+        name: samba_dc
+        tasks_from: dns_upstream_resolver
+      tags: [samba_dns, baseline]
+
   roles:
     - role: linux_baseline
       tags: [baseline]

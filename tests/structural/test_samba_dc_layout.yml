@@ -9,7 +9,9 @@
     bootstrap_tasks: "{{ repo_root }}/roles/samba_dc/tasks/bootstrap.yml"
     main_tasks: "{{ repo_root }}/roles/samba_dc/tasks/main.yml"
     dc_bootstrap_playbook: "{{ repo_root }}/playbooks/dc-bootstrap.yml"
+    dc_restore_playbook: "{{ repo_root }}/playbooks/dc-restore.yml"
     dc_converge_playbook: "{{ repo_root }}/playbooks/dc-converge.yml"
+    restore_tasks: "{{ repo_root }}/roles/samba_dc/tasks/restore.yml"
   tasks:
     - name: Samba DC | bootstrap tasks exist
       ansible.builtin.stat:
@@ -59,6 +61,47 @@
     - name: Samba DC | assert dc-bootstrap refuses production without opt-in
       ansible.builtin.shell: |
         grep -q 'allow_production' "{{ dc_bootstrap_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | restore tasks exist
+      ansible.builtin.stat:
+        path: "{{ restore_tasks }}"
+      register: restore_stat
+
+    - name: Samba DC | assert restore tasks present
+      ansible.builtin.assert:
+        that:
+          - restore_stat.stat.exists
+
+    - name: Samba DC | assert dc-restore.yml imports restore tasks
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: restore' "{{ dc_restore_playbook }}"
+        grep -q 'allow_production' "{{ dc_restore_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert dc-restore configures upstream DNS before baseline
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: dns_upstream_resolver' "{{ dc_restore_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert systemd-resolved masked only when BIND starts
+      ansible.builtin.shell: |
+        ! grep -q 'systemd-resolved' "{{ restore_tasks }}"
+        ! grep -q 'systemd-resolved' "{{ bootstrap_tasks }}"
+        grep -q 'systemd-resolved' "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert bootstrap blocks migration hosts
+      ansible.builtin.shell: |
+        grep -q 'samba_dc_migration_host' "{{ bootstrap_tasks }}"
       args:
         executable: /bin/bash
       changed_when: false

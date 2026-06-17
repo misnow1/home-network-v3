@@ -4,6 +4,8 @@
 - name: Integration — baseline convergence
   hosts: all
   gather_facts: true
+  vars_files:
+    - "{{ playbook_dir }}/../../roles/linux_baseline/defaults/main.yml"
   tasks:
     - name: Gather service facts
       ansible.builtin.service_facts:
@@ -25,3 +27,25 @@
         that:
           - ansible_facts.services['ssh.service'].state == 'running'
         fail_msg: ssh is not running
+
+    - name: Assert baseline apt packages are installed
+      ansible.builtin.command: dpkg -s {{ item }}
+      register: baseline_pkg_check
+      changed_when: false
+      failed_when: baseline_pkg_check.rc != 0
+      loop:
+        - htop
+        - zsh
+        - jq
+
+    - name: Assert fzf is on PATH
+      ansible.builtin.command: fzf --version
+      register: baseline_fzf_version
+      changed_when: false
+      failed_when: baseline_fzf_version.rc != 0
+
+    - name: Assert fzf version matches pinned release
+      ansible.builtin.assert:
+        that:
+          - linux_baseline_github_releases | selectattr('name', 'equalto', 'fzf') | map(attribute='version') | first in baseline_fzf_version.stdout
+        fail_msg: "fzf version mismatch: {{ baseline_fzf_version.stdout }}"

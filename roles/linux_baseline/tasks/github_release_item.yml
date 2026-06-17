@@ -1,0 +1,46 @@
+---
+- name: GitHub release | Install release binary
+  vars:
+    release_asset: "{{ item.name }}-{{ item.version }}-linux_amd64.tar.gz"
+    release_url: "https://github.com/{{ item.repo }}/releases/download/v{{ item.version }}/{{ release_asset }}"
+    release_tmpdir: "/tmp/ansible-github-release-{{ item.name }}-{{ item.version }}"
+  block:
+    - name: GitHub release | Check installed version
+      ansible.builtin.command: "{{ item.dest }} --version"
+      register: github_release_installed
+      changed_when: false
+      failed_when: false
+
+    - name: GitHub release | Install pinned binary
+      when: github_release_installed.rc != 0 or item.version not in github_release_installed.stdout
+      block:
+        - name: GitHub release | Create temp dir
+          ansible.builtin.file:
+            path: "{{ release_tmpdir }}"
+            state: directory
+            mode: "0700"
+
+        - name: GitHub release | Download archive
+          ansible.builtin.get_url:
+            url: "{{ release_url }}"
+            dest: "{{ release_tmpdir }}/{{ release_asset }}"
+            mode: "0644"
+
+        - name: GitHub release | Extract archive
+          ansible.builtin.unarchive:
+            src: "{{ release_tmpdir }}/{{ release_asset }}"
+            dest: "{{ release_tmpdir }}"
+            remote_src: true
+
+        - name: GitHub release | Install binary
+          ansible.builtin.copy:
+            src: "{{ release_tmpdir }}/{{ item.binary }}"
+            dest: "{{ item.dest }}"
+            mode: "{{ item.mode }}"
+            remote_src: true
+
+      always:
+        - name: GitHub release | Remove temp dir
+          ansible.builtin.file:
+            path: "{{ release_tmpdir }}"
+            state: absent
