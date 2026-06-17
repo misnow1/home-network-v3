@@ -1,0 +1,137 @@
+---
+# Join a fresh host as an additional Samba AD DC (DRS replication).
+# Imported only by playbooks/dc-replica-join.yml.
+# Preserves domain SIDs — see docs/migration-runbook.md.
+
+- name: DC replica join | Refuse join on restore-only hosts
+  ansible.builtin.stat:
+    path: "{{ samba_dc_restore_marker_path }}"
+  register: samba_dc_restore_marker
+  changed_when: false
+  tags: [samba_provision]
+
+- name: DC replica join | Assert replica join is intended
+  ansible.builtin.assert:
+    that:
+      - samba_dc_migration_host | default(false) | bool
+      - samba_dc_migration_mode | default('replica') == 'replica'
+      - not samba_dc_restore_marker.stat.exists
+      - samba_dc_join_server | length > 0
+      - samba_dc_join_nameservers | length > 0
+    fail_msg: >-
+      Replica join requires samba_dc_migration_host: true,
+      samba_dc_migration_mode: replica, samba_dc_join_server, and
+      samba_dc_join_nameservers in group_vars/dc/vars.yml.
+      Use playbooks/dc-restore.yml only for offline backup restore.
+      See docs/migration-runbook.md.
+  tags: [samba_provision]
+
+- name: DC replica join | Assert join credentials are in inventory
+  ansible.builtin.assert:
+    that:
+      - (samba_dc_join_user | default(vault_ad_join_user | default(''))) | length > 0
+      - (samba_dc_join_password | default(vault_ad_join_password | default(''))) | length > 0
+    fail_msg: >-
+      Join credentials missing. Set vault_ad_join_user and vault_ad_join_password in
+      inventories/production/group_vars/all/vault.yml. See docs/vault-schema.md.
+  tags: [samba_provision]
+
+- name: DC replica join | Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [samba_packages]
+
+- name: DC replica join | Install Samba AD DC packages
+  ansible.builtin.apt:
+    name: "{{ samba_packages }}"
+    state: present
+  tags: [samba_packages]
+
+- name: DC replica join | Mask conflicting Samba services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    - smbd
+    - nmbd
+    - winbind
+  failed_when: false
+  tags: [samba_provision]
+
+- name: DC replica join | Check if domain already joined
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_sam_ldb
+  changed_when: false
+  tags: [samba_provision]
+
+- name: DC replica join | Remove pre-existing smb.conf before first join
+  ansible.builtin.file:
+    path: /etc/samba/smb.conf
+    state: absent
+  when: not samba_sam_ldb.stat.exists
+  tags: [samba_provision]
+
+- name: DC replica join | Point resolver at existing DC for join
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # Existing DC DNS until local BIND is authoritative after replica join
+      {% for ns in samba_dc_join_nameservers %}
+      nameserver {{ ns }}
+      {% endfor %}
+      search {{ dc_domain_name }}
+    owner: root
+    group: root
+    mode: "0644"
+    follow: false
+  when: not samba_sam_ldb.stat.exists
+  tags: [samba_provision, samba_dns]
+
+- name: DC replica join | Resolve join credentials
+  ansible.builtin.set_fact:
+    samba_dc_join_user_resolved: "{{ samba_dc_join_user | default(vault_ad_join_user) }}"
+    samba_dc_join_password_resolved: "{{ samba_dc_join_password | default(vault_ad_join_password) }}"
+  no_log: true
+  tags: [samba_provision]
+
+- name: DC replica join | Build domain join command
+  ansible.builtin.set_fact:
+    samba_dc_join_argv:
+      - samba-tool
+      - domain
+      - join
+      - "{{ dc_domain_name }}"
+      - DC
+      - "--realm={{ dc_realm | upper }}"
+      - "--server={{ samba_dc_join_server }}"
+      - "--dns-backend=BIND9_DLZ"
+      - "--site={{ samba_dc_join_site }}"
+      - "-U{{ samba_dc_join_user_resolved }}"
+      - "--password={{ samba_dc_join_password_resolved }}"
+  no_log: true
+  when: not samba_sam_ldb.stat.exists
+  tags: [samba_provision]
+
+- name: DC replica join | Join domain as additional DC (BIND9_DLZ)
+  ansible.builtin.command:
+    argv: "{{ samba_dc_join_argv }}"
+    creates: /var/lib/samba/private/sam.ldb
+  no_log: true
+  when: not samba_sam_ldb.stat.exists
+  tags: [samba_provision]
+
+- name: DC replica join | Mark host as joined via replica migration
+  ansible.builtin.file:
+    path: "{{ samba_dc_replica_join_marker_path }}"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [samba_provision]
+
+- name: DC replica join | Configure BIND DLZ and start directory services
+  ansible.builtin.import_tasks: dns_bind_dlz.yml

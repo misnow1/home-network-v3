@@ -17,13 +17,13 @@ vm_inventory_host_json() {
   local fqdn="$2"
   require_cmd ansible-inventory
   require_cmd python3
-  if [[ -x "${ROOT}/.venv/bin/ansible-inventory" ]]; then
-    export PATH="${ROOT}/.venv/bin:${PATH}"
-  fi
-  local inventory
+  ensure_venv_path "${ROOT}"
+  local inventory vault_file
   inventory="$(vm_profile_inventory "${profile}")"
+  vault_file="$(ensure_vault_password_file_for_profile "${ROOT}" "${profile}")"
   ANSIBLE_CONFIG="${ROOT}/ansible.cfg" ansible-inventory \
     -i "${inventory}" \
+    --vault-password-file "${vault_file}" \
     --host "${fqdn}"
 }
 

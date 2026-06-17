@@ -1,0 +1,6 @@
+---
+- name: Install GitHub release binaries
+  ansible.builtin.include_tasks: github_release_item.yml
+  loop: "{{ linux_baseline_github_releases }}"
+  loop_control:
+    label: "{{ item.name }} {{ item.version }}"

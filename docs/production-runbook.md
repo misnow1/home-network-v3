@@ -20,7 +20,7 @@ cp inventories/production/hosts.yml.example inventories/production/hosts.yml
 cp inventories/production/group_vars/all/ansible.yml.example \
    inventories/production/group_vars/all/ansible.yml
 # Copy and edit group_vars/*.example → group_vars/*/vars.yml as needed
-# Create inventories/production/group_vars/vault.yml with real secrets
+# Create inventories/production/group_vars/all/vault.yml with real secrets
 ```
 
 5. Hostnames, groups, and `ansible_host` values filled in for your fleet.
@@ -49,14 +49,16 @@ Dry validation (wrapper refuses without confirmation):
 Run playbooks in this order for a **greenfield** site. Re-run individual converge
 playbooks idempotently after initial bootstrap.
 
-For **migrating an existing Samba AD domain**, use `dc-restore.yml` instead of
-step 2 — see [Migrating existing AD](#migrating-existing-ad) below.
+For **migrating an existing Samba AD domain**, use `dc-replica-join.yml` (live pdc)
+or `dc-restore.yml` (offline backup) instead of step 2 — see
+[Migrating existing AD](#migrating-existing-ad) below.
 
 | Step | Host group | Playbook | Notes |
 |---|---|---|---|
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
 | 2 | `dc` | `dc-bootstrap.yml` | **Greenfield only** — once; break-glass |
-| 2m | `dc` | `dc-restore.yml` | **Migration only** — from samba-tool backup |
+| 2m | `dc` | `dc-replica-join.yml` | **Migration (preferred)** — join live domain |
+| 2r | `dc` | `dc-restore.yml` | **Migration (fallback)** — offline backup |
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
 | 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
@@ -90,7 +92,8 @@ while keeping `home.2123studios.com` identities:
 | Path | Playbook | When |
 |---|---|---|
 | Greenfield | `dc-bootstrap.yml` | No existing domain — new `sam.ldb` |
-| **Migration** | **`dc-restore.yml`** | Preserve users, SIDs, passwords from backup |
+| **Migration (preferred)** | **`dc-replica-join.yml`** | Live legacy DC — DRS replication |
+| **Migration (fallback)** | **`dc-restore.yml`** | Legacy DC dead — offline backup |
 
 Full phased procedure: **[migration-runbook.md](migration-runbook.md)**.
 
@@ -100,16 +103,23 @@ Pre-flight (read-only):
 ./scripts/migration/preflight-check.sh
 ```
 
-Migration DC sequence:
+Migration DC sequence (replica join):
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 
-${PROD} playbooks/dc-restore.yml -e allow_production=true \
-  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
+${PROD} playbooks/dc-replica-join.yml -e allow_production=true \
   --limit dc1.home.2123studios.com
 ${PROD} playbooks/dc-converge.yml -e allow_production=true --limit dc1.home.2123studios.com
 ${PROD} playbooks/ddns-api.yml -e allow_production=true --limit dc1.home.2123studios.com
+```
+
+Offline restore fallback — set `samba_dc_migration_mode: restore` in `group_vars/dc/vars.yml`:
+
+```bash
+${PROD} playbooks/dc-restore.yml -e allow_production=true \
+  -e samba_dc_backup_archive=backups/home-ad-backup.tar.bz2 \
+  --limit dc1.home.2123studios.com
 ```
 
 CentOS hosts (`kvm01`, `kif`) are **deferred** — manual DNS cutover only. Ubuntu
@@ -156,7 +166,9 @@ One-time on kvm01:
 sudo ./scripts/vm/dirs-ensure.sh -i production
 ```
 
-Provision a host defined in `inventories/production/hosts.yml` (copy from example):
+Provision a host defined in `inventories/production/hosts.yml` (copy from example).
+Production inventory includes encrypted vault vars — `vm-create.sh` needs
+`.vault_pass` (same file as `prod-run.sh`):
 
 ```bash
 ./scripts/vm/vm-create.sh -i production dc1.example.home

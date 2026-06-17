@@ -83,6 +83,22 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Samba DC | assert dc-restore configures upstream DNS before baseline
+      ansible.builtin.shell: |
+        grep -q 'tasks_from: dns_upstream_resolver' "{{ dc_restore_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert systemd-resolved masked only when BIND starts
+      ansible.builtin.shell: |
+        ! grep -q 'systemd-resolved' "{{ restore_tasks }}"
+        ! grep -q 'systemd-resolved' "{{ bootstrap_tasks }}"
+        grep -q 'systemd-resolved' "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Samba DC | assert bootstrap blocks migration hosts
       ansible.builtin.shell: |
         grep -q 'samba_dc_migration_host' "{{ bootstrap_tasks }}"

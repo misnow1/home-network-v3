@@ -221,9 +221,7 @@ run_backup_integration() {
 }
 
 main() {
-  if [[ -x "${ROOT}/.venv/bin/ansible-playbook" ]]; then
-    export PATH="${ROOT}/.venv/bin:${PATH}"
-  fi
+  ensure_venv_path "${ROOT}"
 
   require_cmd virsh
   require_cmd virt-install

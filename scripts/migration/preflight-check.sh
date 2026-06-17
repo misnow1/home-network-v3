@@ -9,7 +9,8 @@ source "${ROOT}/scripts/lib/common.sh"
 
 PROD_INVENTORY_DIR="${ROOT}/inventories/production"
 PROD_INVENTORY="${PROD_INVENTORY_DIR}/hosts.yml"
-PROD_VAULT="${PROD_INVENTORY_DIR}/group_vars/vault.yml"
+PROD_VAULT="${PROD_INVENTORY_DIR}/group_vars/all/vault.yml"
+PROD_VAULT_LEGACY="${PROD_INVENTORY_DIR}/group_vars/vault.yml"
 VAULT_PASS="${ROOT}/.vault_pass"
 PROD_SSH_KEY="${ROOT}/scripts/vm/keys/prod_id_ed25519"
 WARNINGS=0
@@ -120,10 +121,10 @@ check_sam_ldb_absent() {
 
   if grep -qE '"exists": (true|false)' <<<"${stat_out}"; then
     if grep -q '"exists": true' <<<"${stat_out}"; then
-      warn "${host} already has sam.ldb — dc-restore requires a fresh host"
+      warn "${host} already has sam.ldb — dc-replica-join requires a fresh host"
       return 1
     fi
-    pass "No sam.ldb on ${host} (ready for restore)"
+    pass "No sam.ldb on ${host} (ready for replica join)"
     return 0
   fi
 
@@ -139,7 +140,7 @@ check_samba_version() {
 
   if [[ "${rc}" -ne 0 ]] || ! ansible_output_ok "${samba_out}"; then
     if grep -qE 'rc=127|rc=2|command not found|No such file or directory.*samba' <<<"${samba_out}"; then
-      pass "Samba not installed on ${host} (expected before dc-restore)"
+      pass "Samba not installed on ${host} (expected before dc-replica-join)"
       return 0
     fi
     warn "${host} could not check Samba version: ${samba_out}"
@@ -174,6 +175,14 @@ main() {
     warn "Missing ${PROD_VAULT} — create with ansible-vault before migration"
   fi
 
+  if [[ -f "${PROD_VAULT_LEGACY}" ]]; then
+    if [[ -f "${PROD_VAULT}" ]]; then
+      pass "Legacy vault path also present (${PROD_VAULT_LEGACY#"${ROOT}/"}) — safe to remove after verifying all/vault.yml"
+    else
+      warn "Vault at ${PROD_VAULT_LEGACY#"${ROOT}/"} is NOT loaded by Ansible — move to group_vars/all/vault.yml"
+    fi
+  fi
+
   if [[ -f "${VAULT_PASS}" ]]; then
     pass "Production vault password file exists: ${VAULT_PASS}"
     if [[ -f "${PROD_VAULT}" ]]; then
@@ -189,7 +198,9 @@ main() {
 
   for doc in \
     "${ROOT}/docs/migration-runbook.md" \
+    "${ROOT}/playbooks/dc-replica-join.yml" \
     "${ROOT}/playbooks/dc-restore.yml" \
+    "${ROOT}/roles/samba_dc/tasks/replica_join.yml" \
     "${ROOT}/roles/samba_dc/tasks/restore.yml"; do
     if [[ -f "${doc}" ]]; then
       pass "Present: ${doc#"${ROOT}/"}"
@@ -214,6 +225,17 @@ main() {
           if run_ansible_ping "${host}"; then
             check_sam_ldb_absent "${host}" || true
             check_samba_version "${host}" || true
+            if [[ -f "${VAULT_PASS}" && -f "${PROD_VAULT}" ]]; then
+              local join_user
+              join_user="$(ansible-inventory -i "$(prod_inventory_arg)" --host "${host}" \
+                --vault-password-file "${VAULT_PASS}" 2>/dev/null \
+                | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('vault_ad_join_user') or '')" 2>/dev/null || true)"
+              if [[ -n "${join_user}" ]]; then
+                pass "vault_ad_join_user loads into inventory for ${host}"
+              else
+                warn "vault_ad_join_user missing from merged inventory for ${host} — check group_vars/all/vault.yml"
+              fi
+            fi
           fi
         done
       fi

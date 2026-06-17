@@ -17,6 +17,7 @@ scripts/lab/keys/lab_id_ed25519
 inventories/production/hosts.yml
 inventories/production/host_vars/
 inventories/production/group_vars/vault.yml
+inventories/production/group_vars/all/vault.yml
 inventories/production/group_vars/all/ansible.yml
 inventories/production/group_vars/**/vars.yaml
 inventories/production/group_vars/**/vars.yml
@@ -39,6 +40,9 @@ logs/
 
 # Migration discovery exports (local AD dumps, fleet notes)
 .migration/
+
+# Local Samba backup archives (migration restore drills)
+backups/
 
 # Python bytecode
 __pycache__/

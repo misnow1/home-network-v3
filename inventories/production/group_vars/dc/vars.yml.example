@@ -26,7 +26,15 @@ ddns_nsupdate_enabled: true
 # ddns_nsupdate_ufw_allow_cidrs:
 #   - 192.168.1.0/24
 
-# AD migration (docs/migration-runbook.md) — set on dc1 before dc-restore.yml
+# AD migration (docs/migration-runbook.md) — set on dc1 before dc-replica-join.yml
 # samba_dc_migration_host: true
+# samba_dc_migration_mode: replica
 # samba_dc_target_server_name: dc1
+# samba_dc_join_server: pdc.example.home
+# samba_dc_join_nameservers:
+#   - 192.168.1.2
+# samba_dc_join_site: FerryCrossing   # Woodbine / Swanhollow for future DCs — docs/ad-sites.md
+#
+# Offline fallback only (legacy DC unavailable):
+# samba_dc_migration_mode: restore
 # samba_dc_backup_archive is passed via -e at playbook runtime, not stored here

@@ -1,0 +1,53 @@
+---
+# Samba AD DC reads /etc/samba/smb.conf by default. Restore writes the real config
+# under /var/lib/samba/etc/smb.conf (not private/smb.conf). Link it before
+# samba_upgradedns or samba-ad-dc start.
+
+- name: Samba DC | Locate Samba state smb.conf
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: samba_dc_state_smb_conf
+  loop: "{{ samba_dc_smb_conf_candidates }}"
+  tags: [samba_provision, samba_dns]
+
+- name: Samba DC | Resolve smb.conf path
+  ansible.builtin.set_fact:
+    samba_dc_smb_conf: >-
+      {{
+        (samba_dc_state_smb_conf.results | selectattr('stat.exists') | map(attribute='item') | list | first)
+        | default('/etc/samba/smb.conf', true)
+      }}
+  tags: [samba_provision, samba_dns]
+
+- name: Samba DC | Assert smb.conf exists
+  ansible.builtin.stat:
+    path: "{{ samba_dc_smb_conf }}"
+  register: samba_dc_smb_conf_stat
+  tags: [samba_provision, samba_dns]
+
+- name: Samba DC | Assert smb.conf is present
+  ansible.builtin.assert:
+    that:
+      - samba_dc_smb_conf_stat.stat.exists
+    fail_msg: >-
+      Samba smb.conf not found (checked {{ samba_dc_smb_conf_candidates | join(', ') }}).
+      Run domain provision or backup restore first.
+  tags: [samba_provision, samba_dns]
+
+- name: Samba DC | Ensure /etc/samba directory exists
+  ansible.builtin.file:
+    path: /etc/samba
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [samba_provision, samba_dns]
+
+- name: Samba DC | Point /etc/samba/smb.conf at Samba state smb.conf
+  ansible.builtin.file:
+    src: "{{ samba_dc_smb_conf }}"
+    dest: /etc/samba/smb.conf
+    state: link
+    force: true
+  when: samba_dc_smb_conf != '/etc/samba/smb.conf'
+  tags: [samba_provision, samba_dns]

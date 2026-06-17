@@ -1,0 +1,38 @@
+---
+# BIND9_DLZ (named 9.18+) refuses zones with no apex NS record. Samba internal DNS
+# and legacy domains are often missing them — common after replica join (ip6.arpa).
+# Use --machine-pass on the local DC (no Administrator password required).
+
+- name: Samba DC DNS | Check if domain is provisioned
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_sam_ldb
+  changed_when: false
+  tags: [samba_dns]
+
+- name: Samba DC DNS | Ensure zone apex NS records for BIND9_DLZ
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ns="{{ samba_dc_dns_hostname }}."
+    list=$(samba-tool dns zonelist localhost --machine-pass)
+    mapfile -t zones < <(
+      printf '%s\n' "$list" | awk -F': ' '/pszZoneName/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2}'
+    )
+    for zone in "${zones[@]}"; do
+      [[ -z "$zone" ]] && continue
+      if samba-tool dns query localhost "$zone" @ NS --machine-pass 2>/dev/null | grep -qE '^[[:space:]]+NS:'; then
+        echo "ok: $zone"
+        continue
+      fi
+      samba-tool dns add localhost "$zone" @ NS "$ns" --machine-pass
+      echo "added-ns: $zone"
+    done
+  args:
+    executable: /bin/bash
+  register: samba_dc_dns_zone_ns_result
+  changed_when: "'added-ns:' in samba_dc_dns_zone_ns_result.stdout"
+  when:
+    - samba_dc_dns_ensure_zone_ns | default(true) | bool
+    - samba_sam_ldb.stat.exists
+    - not ansible_check_mode
+  tags: [samba_dns]

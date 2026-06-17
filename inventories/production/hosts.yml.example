@@ -56,5 +56,10 @@ all:
     # Tracked for migration checklists — not targeted by default playbooks
     deferred:
       hosts:
+        pdc.example.home:
+          ansible_host: 203.0.113.2
+          # Legacy DC during migration — ad-hoc/debug only (passwordless sudo for ansible).
+          # Do NOT add to dc group or run dc-* playbooks against the legacy host.
+          ansible_managed: false
         kvm01.example.home:
         kif.example.home:

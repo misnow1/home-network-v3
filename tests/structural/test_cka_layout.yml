@@ -48,7 +48,8 @@
         grep -q 'cka_local_user:' "{{ cka_role_defaults }}"
         grep -q 'cka_local_user_ssh_keys:' "{{ cka_role_defaults }}"
         grep -q 'cka_node_packages:' "{{ cka_role_defaults }}"
-        grep -q 'zsh' "{{ cka_role_defaults }}"
+        grep -q 'kubernetes-client' "{{ cka_role_defaults }}"
+        grep -q 'kubectx' "{{ cka_role_defaults }}"
       args:
         executable: /bin/bash
       changed_when: false

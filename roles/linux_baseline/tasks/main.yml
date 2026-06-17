@@ -3,6 +3,14 @@
   ansible.builtin.include_tasks: packages.yml
   tags: [packages]
 
+- name: Install GitHub release binaries
+  ansible.builtin.include_tasks: github_releases.yml
+  tags: [packages]
+
+- name: Apply shell drop-ins
+  ansible.builtin.include_tasks: shell.yml
+  tags: [shell]
+
 - name: Apply hostname from inventory
   ansible.builtin.include_tasks: hostname.yml
   tags: [hostname]

@@ -33,7 +33,7 @@ See **[production-runbook.md](production-runbook.md)** for the full apply order 
 
 1. Copy `inventories/production/hosts.yml.example` to `inventories/production/hosts.yml`
 2. Copy `inventories/production/group_vars/*/vars.yml.example` files to `vars.yml` and customize
-3. Create `inventories/production/group_vars/vault.yml` with real secrets
+3. Create `inventories/production/group_vars/all/vault.yml` with real secrets
 4. Use the production wrapper — never call `ansible-playbook -i inventories/production` directly:
 
 ```bash
@@ -69,16 +69,21 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 
 ### AD migration (existing Samba domain)
 
-See **[migration-runbook.md](migration-runbook.md)** for the full procedure.
+See **[migration-runbook.md](migration-runbook.md)** for the full procedure. Before dc1
+join, create AD sites on pdc — **[ad-sites.md](ad-sites.md)** (FerryCrossing, Woodbine,
+Swanhollow).
 
 1. Pre-flight — `./scripts/migration/preflight-check.sh`
-2. Backup on old DC — manual `samba-tool domain backup` (Phase 0)
-3. **`dc-restore.yml`** on dc1 (replaces `dc-bootstrap.yml`)
+2. Optional backup on old DC — manual `samba-tool domain backup` (safety net)
+3. **`dc-replica-join.yml`** on dc1 (preferred — live pdc required)
 4. `dc-converge.yml` → `ddns-api.yml` on dc1
-5. Router/DHCP DNS cutover — manual
-6. CentOS deferred hosts — manual `/etc/resolv.conf` only
-7. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
-8. Optional — `domain-leave.yml` before in-place reprovision
-9. Decommission old pdc after validation
+5. Transfer FSMO roles — manual on dc1
+6. Router/DHCP DNS cutover — manual
+7. CentOS deferred hosts — manual `/etc/resolv.conf` only
+8. Demote old pdc — manual
+9. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
+10. Optional — `domain-leave.yml` before in-place reprovision
+
+Offline fallback when pdc is dead: **`dc-restore.yml`** (set `samba_dc_migration_mode: restore`).
 
 See [production-runbook.md](production-runbook.md) for command examples and slice runbooks.

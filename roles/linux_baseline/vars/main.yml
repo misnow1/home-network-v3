@@ -5,6 +5,21 @@ linux_baseline_packages:
   - python3-apt
   - openssh-server
   - chrony
+  - zsh
+  - htop
+  - vim
+  - curl
+  - wget
+  - git
+  - jq
+  - tree
+  - unzip
+  - net-tools
+  - iproute2
+  - dnsutils
+  - less
+  - rsync
+  - tmux
 
 chrony_service_name: chrony
 chrony_config_path: /etc/chrony/chrony.conf

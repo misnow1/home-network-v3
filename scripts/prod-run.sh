@@ -23,6 +23,7 @@ EOF
 }
 
 main() {
+  ensure_venv_path "${ROOT}"
   require_cmd ansible-playbook
 
   local args=()

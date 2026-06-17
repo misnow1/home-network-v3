@@ -1,0 +1,16 @@
+---
+# Static upstream resolvers while BIND is not yet authoritative (bootstrap/restore apt).
+
+- name: Samba DC DNS | Configure upstream resolver (BIND not yet authoritative)
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # Upstream DNS until local BIND is running on the DC
+      {% for ns in samba_dc_upstream_nameservers %}
+      nameserver {{ ns }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+    follow: false
+  tags: [samba_dns]

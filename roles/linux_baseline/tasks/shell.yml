@@ -1,0 +1,28 @@
+---
+- name: Ensure zsh drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/zsh/zshrc.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install zsh fzf drop-in
+  ansible.builtin.copy:
+    src: etc/zsh/zshrc.d/99-fzf.zsh
+    dest: /etc/zsh/zshrc.d/99-fzf.zsh
+    mode: "0644"
+
+- name: Ensure bash drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/bash.bashrc.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install bash fzf drop-in
+  ansible.builtin.copy:
+    src: etc/bash.bashrc.d/99-fzf.sh
+    dest: /etc/bash.bashrc.d/99-fzf.sh
+    mode: "0644"

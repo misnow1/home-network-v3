@@ -109,6 +109,13 @@ require_cmd() {
   command -v "${cmd}" >/dev/null 2>&1 || die "Required command not found: ${cmd}"
 }
 
+ensure_venv_path() {
+  local root="${1:-$(require_repo_root)}"
+  if [[ -x "${root}/.venv/bin/ansible-playbook" ]]; then
+    export PATH="${root}/.venv/bin:${PATH}"
+  fi
+}
+
 require_repo_root() {
   local root
   root="$(repo_root)"
@@ -127,6 +134,16 @@ vault_password_file() {
   fi
 }
 
+vault_password_file_for_profile() {
+  local root="$1"
+  local profile="$2"
+  if [[ "${profile}" == "production" ]]; then
+    printf '%s/.vault_pass' "${root}"
+    return 0
+  fi
+  vault_password_file "${root}"
+}
+
 ensure_vault_password_file() {
   local root="$1"
   local vault_file
@@ -136,6 +153,29 @@ ensure_vault_password_file() {
     chmod 600 "${vault_file}"
   fi
   [[ -f "${vault_file}" ]] || die "Missing ${vault_file} — see docs/vault-schema.md"
+  printf '%s' "${vault_file}"
+}
+
+ensure_vault_password_file_for_profile() {
+  local root="$1"
+  local profile="$2"
+  local vault_file
+  vault_file="$(vault_password_file_for_profile "${root}" "${profile}")"
+  if [[ ! -f "${vault_file}" ]]; then
+    if [[ "${profile}" == "production" && -n "${VAULT_PASS:-}" ]]; then
+      printf '%s' "${VAULT_PASS}" > "${vault_file}"
+      chmod 600 "${vault_file}"
+    elif [[ "${profile}" != "production" && -n "${VAULT_PASS_LAB:-}" ]]; then
+      printf '%s' "${VAULT_PASS_LAB}" > "${vault_file}"
+      chmod 600 "${vault_file}"
+    fi
+  fi
+  [[ -f "${vault_file}" ]] || {
+    if [[ "${profile}" == "production" ]]; then
+      die "Missing ${vault_file} (production vault password). Refusing to fall back to the lab vault — see docs/vault-schema.md"
+    fi
+    die "Missing ${vault_file} — see docs/vault-schema.md"
+  }
   printf '%s' "${vault_file}"
 }
 

@@ -30,11 +30,44 @@ samba_packages:
   - bind9
   - bind9utils
   - ldap-utils
+  - ldb-tools
+  - ldb-tools
+  - tcpdump
+  - nmap
 
-# Migration restore (playbooks/dc-restore.yml) — see docs/migration-runbook.md
+# AD migration — see docs/migration-runbook.md
+# replica: dc-replica-join.yml (preferred, live pdc required)
+# restore: dc-restore.yml (offline backup fallback)
 samba_dc_migration_host: false
+samba_dc_migration_mode: replica
 samba_dc_restore_enabled: false
 samba_dc_backup_archive: ""
-samba_dc_backup_staged_path: /var/lib/samba/backup-restore
+samba_dc_backup_staged_path: /var/tmp/samba-backup-restore
 samba_dc_target_server_name: dc1
+# FQDN without trailing dot — required for BIND9_DLZ SOA MNAME (see dns_bind_dlz.yml).
+samba_dc_dns_hostname: "{{ samba_dc_target_server_name | lower }}.{{ dc_domain_name }}"
+# Add apex NS records before starting named (BIND9_DLZ requires NS per zone).
+samba_dc_dns_ensure_zone_ns: true
 samba_dc_restore_marker_path: /var/lib/samba/private/.ansible-restored-from-backup
+samba_dc_replica_join_marker_path: /var/lib/samba/private/.ansible-replica-join
+# Existing DC to replicate from (hostname or IP). Set in production group_vars/dc/vars.yml.
+samba_dc_join_server: ""
+# Resolvers used during join (must reach samba_dc_join_server). Usually the old DC IP.
+samba_dc_join_nameservers: []
+# AD site for the new DC (must exist on the source DC). Check with: samba-tool sites list
+samba_dc_join_site: FerryCrossing
+# Join credentials: vault_ad_join_user / vault_ad_join_password in group_vars/all/vault.yml
+# Domain Admin rights required (e.g. Administrator). Optional overrides:
+# samba_dc_join_user: "{{ vault_ad_join_user }}"
+# samba_dc_join_password: "{{ vault_ad_join_password }}"
+
+# Upstream resolvers for apt/package installs before BIND is authoritative.
+samba_dc_upstream_nameservers: "{{ dc_dns_forwarders }}"
+
+# smb.conf search order — restore uses etc/smb.conf; provision may use /etc/samba/smb.conf.
+samba_dc_smb_conf_candidates:
+  - /var/lib/samba/etc/smb.conf
+  - /var/lib/samba/private/smb.conf
+  - /etc/samba/smb.conf
+# Resolved at runtime by samba_smb_conf.yml.
+samba_dc_smb_conf: /etc/samba/smb.conf
