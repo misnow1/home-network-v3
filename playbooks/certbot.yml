@@ -1,11 +1,12 @@
 ---
-# Issue TLS certificates on domain controllers and wire Samba LDAPS/START-TLS.
-# Requires dc-converge.yml first (smb.conf must exist).
+# Issue TLS certificates on certbot-managed hosts and apply service-specific TLS hooks.
+# DC hosts: Samba LDAPS/START-TLS (requires dc-converge.yml first).
+# Mail relay hosts: Postfix START-TLS (reload via deploy hook after renewal).
 #
 # Safety: refuses production inventory unless -e allow_production=true.
 
-- name: Converge Certbot TLS on domain controllers
-  hosts: dc
+- name: Converge Certbot TLS on certbot-managed hosts
+  hosts: certbot
   become: true
   pre_tasks:
     - name: Certbot | refuse production inventory without opt-in
@@ -19,15 +20,23 @@
           See docs/certbot-runbook.md.
       tags: [always]
 
-    - name: Certbot | Require TLS flags in group_vars
+    - name: Certbot | Require certbot_enabled in group_vars
       ansible.builtin.assert:
         that:
           - certbot_enabled | default(false) | bool
+        fail_msg: >-
+          Enable certbot_enabled in host or group_vars before running
+          playbooks/certbot.yml. See docs/certbot-runbook.md.
+      tags: [always]
+
+    - name: Certbot | Require Samba TLS flags on DC hosts
+      ansible.builtin.assert:
+        that:
           - samba_dc_tls_enabled | default(false) | bool
         fail_msg: >-
-          Enable certbot_enabled and samba_dc_tls_enabled in group_vars/dc/vars.yml
-          before running playbooks/certbot.yml. See docs/certbot-runbook.md and
-          inventories/production/group_vars/dc/vars.yml.example.
+          Enable samba_dc_tls_enabled in group_vars/dc/vars.yml for DC certbot runs.
+          See docs/certbot-runbook.md.
+      when: "'dc' in group_names"
       tags: [always]
 
   roles:
@@ -40,5 +49,7 @@
       ansible.builtin.import_role:
         name: samba_dc
         tasks_from: tls
-      when: samba_dc_tls_enabled | default(false) | bool
+      when:
+        - "'dc' in group_names"
+        - samba_dc_tls_enabled | default(false) | bool
       tags: [samba_tls]

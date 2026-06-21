@@ -1,0 +1,114 @@
+---
+- name: Mail relay | Require vault secrets when enabled
+  ansible.builtin.assert:
+    that:
+      - mail_relay_gmail_user | length > 0
+      - mail_relay_gmail_app_password | length > 0
+      - mail_relay_default_recipient | length > 0
+    fail_msg: >-
+      Set vault_mail_gmail_user, vault_mail_gmail_app_password, and
+      vault_mail_default_recipient in vault when converging mail relay hosts.
+  when: mail_relay_enabled | bool
+  no_log: true
+  tags: [mail_relay]
+
+- name: Mail relay | Require TLS certificate material
+  ansible.builtin.stat:
+    path: "{{ mail_relay_tls_cert_dir }}/fullchain.pem"
+  register: mail_relay_tls_cert
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Assert TLS certificate exists
+  ansible.builtin.assert:
+    that:
+      - mail_relay_tls_cert.stat.exists
+    fail_msg: >-
+      Missing TLS certificate at {{ mail_relay_tls_cert_dir }}/fullchain.pem.
+      Run playbooks/certbot.yml on this host first.
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Preseed debconf (non-interactive install)
+  ansible.builtin.shell: |
+    echo "postfix postfix/main_mailer_type select Internet Site" | debconf-set-selections
+    echo "postfix postfix/mailname string {{ mail_relay_hostname }}" | debconf-set-selections
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Install postfix
+  ansible.builtin.apt:
+    name: postfix
+    state: present
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Deploy Postfix main configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: main.cf.j2
+      dest: /etc/postfix/main.cf
+    - src: master.cf.j2
+      dest: /etc/postfix/master.cf
+    - src: virtual_aliases_regexp.j2
+      dest: /etc/postfix/virtual_aliases_regexp
+  notify: restart postfix
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Deploy Gmail SASL credentials
+  ansible.builtin.template:
+    src: sasl_passwd.j2
+    dest: /etc/postfix/sasl_passwd
+    owner: root
+    group: root
+    mode: "0600"
+  notify:
+    - mail relay postfix maps changed
+    - restart postfix
+  no_log: true
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Deploy sender rewrite map
+  ansible.builtin.copy:
+    src: sender_canonical_regexp
+    dest: /etc/postfix/sender_canonical_regexp
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart postfix
+  when: mail_relay_enabled | bool
+  tags: [mail_relay]
+
+- name: Mail relay | Enable and start postfix
+  ansible.builtin.service:
+    name: postfix
+    state: started
+    enabled: true
+  when:
+    - mail_relay_enabled | bool
+    - not ansible_check_mode
+  tags: [mail_relay]
+
+- name: Mail relay | Allow SMTP submission from trusted CIDRs (UFW)
+  community.general.ufw:
+    rule: allow
+    port: "587"
+    proto: tcp
+    src: "{{ item }}"
+    comment: home-network-v3 mail-relay submission
+  loop: "{{ mail_relay_ufw_allow_cidrs }}"
+  when:
+    - mail_relay_enabled | bool
+    - mail_relay_manage_ufw | bool
+    - mail_relay_ufw_allow_cidrs | length > 0
+  tags: [mail_relay]

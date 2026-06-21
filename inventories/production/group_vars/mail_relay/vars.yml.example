@@ -1,0 +1,29 @@
+---
+# Mail relay host group variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/mail_relay/vars.yml.example \
+#      inventories/production/group_vars/mail_relay/vars.yml
+#
+# Host FQDN should match certbot_domains (e.g. mail.home.2123studios.com).
+
+domain_name: home.example
+
+certbot_enabled: true
+certbot_provider: dreamhost_dns
+certbot_domains:
+  - mail.home.2123studios.com
+certbot_email: you@2123studios.com
+certbot_staging: true   # flip false after staging dry-run succeeds
+certbot_deploy_hook_reload_samba: false
+certbot_deploy_hook_reload_postfix: true
+
+mail_relay_enabled: true
+mail_relay_hostname: mail.home.2123studios.com
+mail_relay_domain: home.2123studios.com
+mail_relay_mynetworks:
+  - 127.0.0.0/8
+  - 192.168.1.0/24
+
+# mail_relay_manage_ufw: true
+# mail_relay_ufw_allow_cidrs:
+#   - 192.168.1.0/24

@@ -47,10 +47,25 @@ all:
           vm_name: bastion-example-home
           vm_use_dhcp: true
 
+    mail_relay:
+      hosts:
+        mail.example.home:
+          ansible_host: 203.0.113.15
+          vm_name: mail-example-home
+          vm_ip: 203.0.113.15
+          vm_memory_mb: 512
+          vm_disk_gb: 8
+
+    certbot:
+      children:
+        dc:
+        mail_relay:
+
     linux:
       children:
         dc:
         ddns_clients:
+        mail_relay:
         # hypervisors/fileservers excluded while CentOS deferred (apt-only roles)
 
     # Tracked for migration checklists — not targeted by default playbooks

@@ -6,37 +6,42 @@
   gather_facts: false
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
-    docker_compose: "{{ repo_root }}/docker/mail-relay/docker-compose.yml"
+    mail_relay_playbook: "{{ repo_root }}/playbooks/mail-relay.yml"
+    mail_relay_tasks: "{{ repo_root }}/roles/mail_relay/tasks/main.yml"
+    certbot_playbook: "{{ repo_root }}/playbooks/certbot.yml"
+    certbot_reload_hook: "{{ repo_root }}/roles/certbot/templates/reload-services.sh.j2"
     converge_tasks: "{{ repo_root }}/roles/samba_dc/tasks/converge.yml"
     dns_mail_relay_tasks: "{{ repo_root }}/roles/samba_dc/tasks/dns_mail_relay.yml"
-    postfix_relay_tasks: "{{ repo_root }}/roles/domain_join/tasks/postfix_relayclient.yml"
     domain_join_main: "{{ repo_root }}/roles/domain_join/tasks/main.yml"
-    sender_rewrite: "{{ repo_root }}/docker/mail-relay/postfix/sender_canonical_regexp"
+    sender_rewrite: "{{ repo_root }}/roles/mail_relay/files/sender_canonical_regexp"
     runbook: "{{ repo_root }}/docs/mail-relay-runbook.md"
     vault_schema: "{{ repo_root }}/docs/vault-schema.md"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
   tasks:
-    - name: Mail relay | assert docker compose uses host networking
+    - name: Mail relay | assert playbooks target correct groups
       ansible.builtin.shell: |
-        grep -q 'network_mode: host' "{{ docker_compose }}"
-        grep -q 'mail-relay:' "{{ docker_compose }}"
+        grep -q 'hosts: mail_relay' "{{ mail_relay_playbook }}"
+        grep -q 'hosts: certbot' "{{ certbot_playbook }}"
+        grep -q 'mail_relay:' "{{ prod_hosts_example }}"
+        grep -q 'certbot:' "{{ prod_hosts_example }}"
       args:
         executable: /bin/bash
       changed_when: false
 
-    - name: Mail relay | assert Postfix template files exist
+    - name: Mail relay | assert role template files exist
       ansible.builtin.stat:
         path: "{{ item }}"
       register: mail_relay_paths
       loop:
-        - "{{ repo_root }}/docker/mail-relay/Dockerfile"
-        - "{{ repo_root }}/docker/mail-relay/entrypoint.sh"
-        - "{{ repo_root }}/docker/mail-relay/postfix/main.cf.template"
-        - "{{ repo_root }}/docker/mail-relay/postfix/master.cf.template"
+        - "{{ mail_relay_tasks }}"
+        - "{{ repo_root }}/roles/mail_relay/templates/main.cf.j2"
+        - "{{ repo_root }}/roles/mail_relay/templates/master.cf.j2"
+        - "{{ repo_root }}/roles/mail_relay/templates/virtual_aliases_regexp.j2"
+        - "{{ repo_root }}/roles/mail_relay/templates/sasl_passwd.j2"
         - "{{ sender_rewrite }}"
-        - "{{ repo_root }}/docker/mail-relay/postfix/virtual_aliases_regexp.template"
-        - "{{ repo_root }}/docker/mail-relay/.env.example"
+        - "{{ repo_root }}/inventories/production/group_vars/mail_relay/vars.yml.example"
 
-    - name: Mail relay | assert docker project skeleton
+    - name: Mail relay | assert role skeleton
       ansible.builtin.assert:
         that:
           - item.stat.exists
@@ -53,6 +58,14 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Mail relay | assert certbot deploy hook supports Postfix reload
+      ansible.builtin.shell: |
+        grep -q 'certbot_deploy_hook_reload_postfix' "{{ certbot_reload_hook }}"
+        grep -q 'reload postfix' "{{ certbot_reload_hook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Mail relay | assert dc converge imports dns_mail_relay
       ansible.builtin.shell: |
         grep -q 'dns_mail_relay.yml' "{{ converge_tasks }}"
@@ -60,21 +73,10 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Mail relay | assert dns_mail_relay task file exists
-      ansible.builtin.stat:
-        path: "{{ dns_mail_relay_tasks }}"
-      register: dns_mail_relay_stat
-
-    - name: Mail relay | assert dns task present
-      ansible.builtin.assert:
-        that:
-          - dns_mail_relay_stat.stat.exists
-        fail_msg: Missing dns_mail_relay.yml
-
-    - name: Mail relay | assert domain_join wires postfix relay client
+    - name: Mail relay | assert domain_join excludes mail_relay and wires relay client
       ansible.builtin.shell: |
+        grep -q '!mail_relay' "{{ repo_root }}/playbooks/domain-join.yml"
         grep -q 'postfix_relayclient.yml' "{{ domain_join_main }}"
-        grep -q 'mail_relay_enabled' "{{ domain_join_main }}"
         grep -q 'mail_relay_hostname' "{{ repo_root }}/roles/domain_join/templates/postfix-main.cf.j2"
       args:
         executable: /bin/bash
@@ -83,6 +85,7 @@
     - name: Mail relay | assert runbook and vault schema document slice
       ansible.builtin.shell: |
         grep -q 'mail.home.2123studios.com' "{{ runbook }}"
+        grep -q 'playbooks/mail-relay.yml' "{{ runbook }}"
         grep -q 'vault_mail_gmail_user' "{{ vault_schema }}"
         grep -q 'vault_mail_gmail_app_password' "{{ vault_schema }}"
         grep -q 'vault_mail_default_recipient' "{{ vault_schema }}"

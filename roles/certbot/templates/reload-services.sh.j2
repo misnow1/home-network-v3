@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # {{ ansible_managed }}
-# Certbot deploy hook — reload Samba LDAP TLS and optional DDNS nginx after renewal.
+# Certbot deploy hook — reload services that use renewed certificates.
 set -euo pipefail
 
 {% if certbot_deploy_hook_reload_samba | bool %}
@@ -8,6 +8,12 @@ if command -v smbcontrol >/dev/null 2>&1; then
   if ! smbcontrol ldap_server reload-certs 2>/dev/null; then
     systemctl restart samba-ad-dc
   fi
+fi
+{% endif %}
+
+{% if certbot_deploy_hook_reload_postfix | bool %}
+if systemctl is-active --quiet postfix; then
+  systemctl reload postfix || systemctl restart postfix
 fi
 {% endif %}
 

@@ -1,2 +1,0 @@
-# Deliver root@*.home.2123studios.com to the configured external recipient.
-/^root@.+\.home\.2123studios\.com$/    ${MAIL_DEFAULT_RECIPIENT}

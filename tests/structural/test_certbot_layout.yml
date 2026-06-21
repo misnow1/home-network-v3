@@ -14,10 +14,11 @@
     lab_dc_vars: "{{ repo_root }}/inventories/lab/group_vars/dc/vars.yml"
     nginx_template: "{{ repo_root }}/docker/ddns-nsupdate/nginx/templates/default.conf.template"
   tasks:
-    - name: Certbot | assert playbook targets dc group
+    - name: Certbot | assert playbook targets certbot group
       ansible.builtin.shell: |
-        grep -q 'hosts: dc' "{{ certbot_playbook }}"
+        grep -q 'hosts: certbot' "{{ certbot_playbook }}"
         grep -q 'allow_production' "{{ certbot_playbook }}"
+        grep -q 'samba_dc_tls_enabled' "{{ certbot_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -31,6 +32,7 @@
         grep -q 'dreamhost-api-check.sh' "{{ certbot_dreamhost }}"
         grep -q 'certbot_dreamhost_cert_mismatch' "{{ certbot_dreamhost }}"
         grep -q 'certbot_acme_server' "{{ certbot_dreamhost }}"
+        grep -q 'certbot_deploy_hook_reload_postfix' "{{ repo_root }}/roles/certbot/defaults/main.yml"
         grep -q 'VALIDATION_RESOLVERS' "{{ repo_root }}/roles/certbot/templates/dreamhost-auth.sh.j2"
       args:
         executable: /bin/bash

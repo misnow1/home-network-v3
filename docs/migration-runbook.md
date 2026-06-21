@@ -752,7 +752,7 @@ or cron/alert mail from those hosts will fail silently.
 This is **out of scope for the AD migration playbooks** — implemented as Slice 16; see
 [mail-relay-runbook.md](mail-relay-runbook.md). End state:
 
-- Postfix **Docker container on kif** at `/srv/docker/mail-relay/` — **not** on the DC
+- Postfix on a **dedicated Ubuntu VM** at **`mail.home.2123studios.com`** — **not** on the DC or kif
 - Relay hostname **`mail.home.2123studios.com`** (A + MX in AD DNS via `dns_mail_relay.yml`)
 - Rewrite/alias rules and Gmail credentials in **repo templates + vault**, not on pdc
 - Internal hosts point `relayhost` at `mail.home.2123studios.com:587`; cut over before pdc demotion

@@ -17,7 +17,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 8 | Production convergence | **done** | Runbooks, prod wrapper, inventory examples, safety tests |
 | 9 | DHCP-driven DDNS | **done** | dnsmasq hook + Docker DDNS API on DC |
 | 10 | Certbot DNS validation | **done** | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
-| 16 | Internal mail relay | **in progress** | Postfix container on kif; Gmail smarthost; AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
+| 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 
 ## Deferred (not forgotten)
 

@@ -1,20 +1,22 @@
 # Internal mail relay runbook (Slice 16+)
 
 Replace **pdc** as the internal→external SMTP relay. Outbound server mail (cron, alerts)
-relays through **Postfix in Docker on kif**, published at **`mail.home.2123studios.com`**, and
-forwards to **Gmail** with pdc-equivalent sender rewrite rules.
+relays through **native Postfix on a dedicated Ubuntu VM** at **`mail.home.2123studios.com`**
+and forwards to **Gmail** with pdc-equivalent sender rewrite rules.
 
 See also:
 
 - [migration-runbook.md](migration-runbook.md) — pdc decommission checklist
-- [certbot-runbook.md](certbot-runbook.md) — Dreamhost DNS-01 (reuse for mail TLS on kif)
+- [certbot-runbook.md](certbot-runbook.md) — Dreamhost DNS-01 (same role as DCs)
 - [vault-schema.md](vault-schema.md) — Gmail app password variables
+- [production-runbook.md](production-runbook.md) — VM provisioning via `scripts/vm/vm-create.sh`
 
 ## Architecture
 
 | Component | Location |
 |---|---|
-| Relay container | kif — `/srv/docker/mail-relay/` |
+| Postfix relay | Dedicated VM — `mail.home.2123studios.com` |
+| TLS | Certbot snap on same VM (`certbot` inventory group) |
 | DNS A + MX | AD DNS on dc1 (Ansible `dns_mail_relay.yml`) |
 | Member `relayhost` | Ansible `domain_join` role when `mail_relay_enabled: true` |
 | Upstream | Gmail SMTP (`smtp.gmail.com:587`) with app password |
@@ -42,17 +44,28 @@ ssh pdc.home.2123studios.com 'sudo tar czf - /etc/postfix' > pdc-postfix-backup.
 vault_mail_gmail_user: you@gmail.com
 vault_mail_gmail_app_password: "<app-password>"
 vault_mail_default_recipient: you@gmail.com
+vault_dreamhost_api_key: "<dreamhost-api-key>"   # shared with DC certbot
 ```
 
-3. DC group vars (`inventories/production/group_vars/dc/vars.yml`):
+3. Copy inventory templates:
+
+```bash
+cp inventories/production/group_vars/mail_relay/vars.yml.example \
+   inventories/production/group_vars/mail_relay/vars.yml
+```
+
+Add the mail relay host to `inventories/production/hosts.yml` (see
+[`hosts.yml.example`](../inventories/production/hosts.yml.example)).
+
+4. DC group vars — point DNS at the mail VM IP:
 
 ```yaml
 mail_relay_dns_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
-mail_relay_target_ip: 192.168.1.30   # kif IP
+mail_relay_target_ip: 192.168.1.15   # mail VM
 ```
 
-4. Linux member group vars (when ready to cut over):
+5. Linux member group vars (when ready to cut over):
 
 ```yaml
 mail_relay_enabled: true
@@ -60,71 +73,41 @@ mail_relay_hostname: mail.home.2123studios.com
 mail_relay_manage_root_forward: true   # optional: remove /root/.forward
 ```
 
-## Step 1 — TLS certificate on kif
+## Step 1 — Provision the mail relay VM
 
-Issue a Let's Encrypt certificate for `mail.home.2123studios.com` using Dreamhost DNS-01
-(same approach as dc1 — see [certbot-runbook.md](certbot-runbook.md)).
-
-On kif (manual until kif is Ansible-managed):
+From the control node (kvm01 or similar):
 
 ```bash
-# Install certbot snap if needed; use Dreamhost API credentials from vault
-sudo certbot certonly --manual --preferred-challenges dns \
-  -d mail.home.2123studios.com \
-  --agree-tos -m you@2123studios.com
-# Or reuse dreamhost certbot hooks from roles/certbot/files/ if copied to kif
+./scripts/vm/vm-create.sh -i production mail.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production mail.home.2123studios.com
 ```
 
-Certs must exist at:
+Suggested sizing: 512MB–1GB RAM, 8–12GB disk (see `hosts.yml.example`).
 
-```
-/etc/letsencrypt/live/mail.home.2123studios.com/fullchain.pem
-/etc/letsencrypt/live/mail.home.2123studios.com/privkey.pem
-```
-
-Add a renewal deploy hook to reload the container:
-
-```bash
-# /etc/letsencrypt/renewal-hooks/deploy/reload-mail-relay.sh
-#!/bin/bash
-docker compose -f /srv/docker/mail-relay/docker-compose.yml up -d --force-recreate
-```
-
-## Step 2 — Deploy relay container on kif
-
-Copy the repo project to kif:
-
-```bash
-rsync -av docker/mail-relay/ kif.home.2123studios.com:/srv/docker/mail-relay/
-```
-
-On kif:
-
-```bash
-cd /srv/docker/mail-relay
-cp .env.example .env
-# Edit .env — set GMAIL_USER, GMAIL_APP_PASSWORD, MAIL_DEFAULT_RECIPIENT, mynetworks
-docker compose config    # validate compose file
-docker compose up -d --build
-docker compose logs -f mail-relay
-```
-
-## Step 3 — Replace kif host Postfix
-
-After the container passes smoke tests, stop the host Postfix service (port 25/587 conflict):
-
-```bash
-sudo systemctl disable --now postfix
-```
-
-Remove `/root/.forward` on kif once centralized aliases deliver mail correctly.
-
-## Step 4 — AD DNS records
-
-From the control node:
+## Step 2 — Converge baseline, certbot, and Postfix
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
+
+${PROD} playbooks/baseline.yml --limit mail.home.2123studios.com
+${PROD} playbooks/certbot.yml -e allow_production=true \
+  --limit mail.home.2123studios.com
+${PROD} playbooks/mail-relay.yml -e allow_production=true \
+  --limit mail.home.2123studios.com
+```
+
+Certbot uses the same Dreamhost DNS-01 hooks as dc1. Renewal reloads Postfix via
+`certbot_deploy_hook_reload_postfix: true` in mail relay group vars.
+
+Verify TLS:
+
+```bash
+openssl s_client -connect mail.home.2123studios.com:587 -starttls smtp </dev/null
+```
+
+## Step 3 — AD DNS records
+
+```bash
 ${PROD} playbooks/dc-converge.yml --limit dc1.home.2123studios.com
 ```
 
@@ -135,12 +118,12 @@ dig +short @192.168.1.10 mail.home.2123studios.com A
 dig +short @192.168.1.10 home.2123studios.com MX
 ```
 
-## Step 5 — Smoke tests
+## Step 4 — Smoke tests
 
-On kif (local delivery → relay → Gmail):
+On the mail relay VM:
 
 ```bash
-echo "relay smoke test $(date)" | mail -s "mail-relay kif test" root
+echo "relay smoke test $(date)" | mail -s "mail-relay smoke test" root
 ```
 
 From a domain-joined member (after relayhost configured):
@@ -152,15 +135,9 @@ echo "member smoke test $(date)" | mail -s "mail-relay member test" root
 Verify in Gmail:
 
 - Mail arrives at `vault_mail_default_recipient`
-- `X-Google-Original-From` or envelope reflects rewritten `@2123studios.com` sender
+- Envelope / headers reflect rewritten `@2123studios.com` sender
 
-TLS check from a member:
-
-```bash
-openssl s_client -connect mail.home.2123studios.com:587 -starttls smtp </dev/null
-```
-
-## Step 6 — Cut over members
+## Step 5 — Cut over members
 
 **Ansible-managed Ubuntu members:**
 
@@ -168,26 +145,39 @@ openssl s_client -connect mail.home.2123studios.com:587 -starttls smtp </dev/nul
 ${PROD} playbooks/domain-join.yml --limit bastion.home.2123studios.com
 ```
 
-**Legacy CentOS hosts (kvm01, etc.)** — manual `/etc/postfix/main.cf`:
+**Legacy CentOS hosts (kif, kvm01, etc.)** — manual `/etc/postfix/main.cf`:
 
 ```
 relayhost = [mail.home.2123studios.com]:587
 smtp_use_tls = yes
 ```
 
-## Step 7 — Retire pdc
+On kif: remove `/root/.forward` once centralized aliases deliver mail; set `relayhost`
+to the mail VM (kif no longer runs the relay).
+
+## Step 6 — Retire pdc
 
 Confirm no relay traffic to pdc, then proceed with migration runbook Step 8:
 
 - [migration-runbook.md](migration-runbook.md) Phase 3 checklist — "Internal mail relay no longer depends on pdc"
 - Demote or power off pdc
 
+## Apply order summary
+
+```text
+vm-create mail.home.2123studios.com
+baseline.yml → certbot.yml → mail-relay.yml   (mail VM)
+dc-converge.yml                               (dc1 — DNS A + MX)
+domain-join.yml                               (members — relayhost)
+```
+
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
 | Gmail rejects mail | Sender rewrite map; compare with pdc backup |
-| Connection refused on :587 | Container running; host Postfix disabled; firewall |
-| TLS errors | Cert paths mounted; certbot renewal |
-| Mail loops on kif | Host Postfix still running alongside container |
-| Members can't relay | `mynetworks` in `.env` includes member subnet |
+| Connection refused on :587 | `systemctl status postfix`; UFW if enabled |
+| TLS errors | Run `certbot.yml` first; check `/etc/letsencrypt/live/` |
+| `mail-relay.yml` fails on cert | certbot must complete before Postfix converge |
+| Members can't relay | `mail_relay_mynetworks` includes member subnet |
+| Playbook skipped on DC certbot | DC hosts still require `samba_dc_tls_enabled` |

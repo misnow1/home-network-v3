@@ -1,12 +1,13 @@
 # Certbot and Samba LDAP TLS runbook
 
-Slice 10 provisions **per-DC FQDN** TLS certificates and configures Samba AD DC
-**LDAPS** / **LDAP START-TLS** on port 389. Optional DDNS API nginx TLS on `:443`
-reuses the same certificate.
+Slice 10 provisions **per-host FQDN** TLS certificates via the shared `certbot` role.
+DC hosts wire certificates into Samba **LDAPS** / **LDAP START-TLS**. Mail relay hosts
+reload **Postfix** after renewal.
 
 See also:
 
 - [dc-runbook.md](dc-runbook.md) — DC bootstrap and converge
+- [mail-relay-runbook.md](mail-relay-runbook.md) — mail VM TLS + Postfix
 - [ddns-runbook.md](ddns-runbook.md) — DDNS API (optional HTTPS front-end)
 - [vault-schema.md](vault-schema.md) — `vault_dreamhost_api_key`
 
@@ -16,8 +17,10 @@ See also:
 |---|---|---|
 | Certificate issuer | Local CA (`certbot_provider: local_ca`) | Let's Encrypt DNS-01 via Dreamhost |
 | Certbot delivery | OpenSSL in `certbot` role | snap `certbot` + Dreamhost API auth/cleanup hooks |
-| Samba TLS | `samba_dc/tasks/tls.yml` via `certbot.yml` | Same |
-| PEM paths | `/etc/letsencrypt/live/<dc-fqdn>/` | Same (Certbot layout) |
+| Inventory group | `certbot` (children: `dc`; add `mail_relay` for mail VM) | Same |
+| Samba TLS | `samba_dc/tasks/tls.yml` via `certbot.yml` on DC hosts | Same |
+| Postfix TLS | N/A in lab CI | `certbot_deploy_hook_reload_postfix` on mail relay hosts |
+| PEM paths | `/etc/letsencrypt/live/<fqdn>/` | Same (Certbot layout) |
 | DDNS nginx TLS | Optional (`ddns_nsupdate_nginx_tls: false` default) | Enable after cert exists |
 
 ## Prerequisites
@@ -153,7 +156,8 @@ After `certbot.yml` succeeds on the DC:
 
 | Symptom | Check |
 |---|---|
-| All certbot tasks skipped | `certbot_enabled` / `samba_dc_tls_enabled` in `group_vars/dc/vars.yml` |
+| All certbot tasks skipped | `certbot_enabled` in host/group vars for the target |
+| DC: Samba TLS assert fails | `samba_dc_tls_enabled` in `group_vars/dc/vars.yml` |
 | Issuance skipped, cert already exists | Leftover `/etc/letsencrypt/live/<fqdn>/` from a prior run — use `-e certbot_force_renewal=true` or remove that directory on the DC |
 | LDAPS shows staging cert after `certbot_staging: false` | Re-run `certbot.yml` — role deletes mismatched lineage and re-issues against production ACME; or `-e certbot_force_renewal=true` |
 | Dreamhost API preflight fails | API key has `dns-*` commands; domain DNS managed at Dreamhost |
