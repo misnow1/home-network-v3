@@ -55,7 +55,9 @@ cp inventories/production/group_vars/mail_relay/vars.yml.example \
 ```
 
 Add the mail relay host to `inventories/production/hosts.yml` (see
-[`hosts.yml.example`](../inventories/production/hosts.yml.example)).
+[`hosts.yml.example`](../inventories/production/hosts.yml.example)). The host must be
+in both **`mail_relay`** and **`linux`** (via `linux.children.mail_relay`) so
+`baseline.yml` matches it.
 
 4. DC group vars — point DNS at the mail VM IP:
 
