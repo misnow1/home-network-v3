@@ -72,6 +72,10 @@ samba_dc_smb_conf_candidates:
 # Resolved at runtime by samba_smb_conf.yml.
 samba_dc_smb_conf: /etc/samba/smb.conf
 
+# LDAPS / START-TLS — apply with playbooks/certbot.yml (requires cert material first).
+samba_dc_tls_enabled: false
+samba_dc_tls_cert_dir: "{{ certbot_live_dir | default('/etc/letsencrypt/live/' ~ inventory_hostname) }}"
+
 # Operator break-glass SSH (dc-converge) — local Unix account with pubkey auth.
 samba_dc_operator_enabled: false
 samba_dc_operator_user: ""

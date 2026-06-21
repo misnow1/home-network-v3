@@ -66,6 +66,7 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 5. Domain members — `domain-join.yml` on `linux:!dc`
 6. DDNS clients — `ddns-client.yml` (optional)
 7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
+8. Certbot TLS — `certbot.yml` on DCs for Samba LDAPS ([certbot-runbook.md](certbot-runbook.md))
 
 ### AD migration (existing Samba domain)
 
@@ -77,12 +78,13 @@ Swanhollow).
 2. Optional backup on old DC — manual `samba-tool domain backup` (safety net)
 3. **`dc-replica-join.yml`** on dc1 (preferred — live pdc required)
 4. `dc-converge.yml` → `ddns-api.yml` on dc1 ([ddns-runbook.md](ddns-runbook.md))
-5. Transfer FSMO roles — manual on dc1
-6. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
-7. CentOS deferred hosts — manual `/etc/resolv.conf` only
-8. Demote old pdc — manual
-9. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
-10. Optional — `domain-leave.yml` before in-place reprovision
+5. `certbot.yml` on dc1 ([certbot-runbook.md](certbot-runbook.md))
+6. Transfer FSMO roles — manual on dc1
+7. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
+8. CentOS deferred hosts — manual `/etc/resolv.conf` only
+9. Demote old pdc — manual
+10. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
+11. Optional — `domain-leave.yml` before in-place reprovision
 
 Offline fallback when pdc is dead: **`dc-restore.yml`** (set `samba_dc_migration_mode: restore`).
 

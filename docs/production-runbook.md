@@ -112,6 +112,7 @@ ${PROD} playbooks/dc-replica-join.yml -e allow_production=true \
   --limit dc1.home.2123studios.com
 ${PROD} playbooks/dc-converge.yml -e allow_production=true --limit dc1.home.2123studios.com
 ${PROD} playbooks/ddns-api.yml -e allow_production=true --limit dc1.home.2123studios.com
+${PROD} playbooks/certbot.yml -e allow_production=true --limit dc1.home.2123studios.com
 ```
 
 Offline restore fallback — set `samba_dc_migration_mode: restore` in `group_vars/dc/vars.yml`:
@@ -211,9 +212,10 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | DDNS | [ddns-runbook.md](ddns-runbook.md) |
+| Certbot / LDAP TLS | [certbot-runbook.md](certbot-runbook.md) |
 | Backups | [backup-runbook.md](backup-runbook.md) |
 
 ## Deferred (post–Slice 8)
 
 - SFTP/NAS restic repositories and systemd backup timers (lab uses local repo)
-- Certbot DNS, Pi-hole, observability, bare-metal install — see [ROADMAP.md](ROADMAP.md)
+- Pi-hole, observability, bare-metal install — see [ROADMAP.md](ROADMAP.md)

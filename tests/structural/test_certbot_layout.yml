@@ -1,0 +1,66 @@
+---
+# Structural tests for Slice 10 Certbot / Samba LDAP TLS layout.
+
+- name: Structural — Certbot layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    certbot_playbook: "{{ repo_root }}/playbooks/certbot.yml"
+    certbot_tasks: "{{ repo_root }}/roles/certbot/tasks/main.yml"
+    certbot_local_ca: "{{ repo_root }}/roles/certbot/tasks/local_ca.yml"
+    certbot_dreamhost: "{{ repo_root }}/roles/certbot/tasks/dreamhost_dns.yml"
+    samba_tls_tasks: "{{ repo_root }}/roles/samba_dc/tasks/tls.yml"
+    lab_dc_vars: "{{ repo_root }}/inventories/lab/group_vars/dc/vars.yml"
+    nginx_template: "{{ repo_root }}/docker/ddns-nsupdate/nginx/templates/default.conf.template"
+  tasks:
+    - name: Certbot | assert playbook targets dc group
+      ansible.builtin.shell: |
+        grep -q 'hosts: dc' "{{ certbot_playbook }}"
+        grep -q 'allow_production' "{{ certbot_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Certbot | assert role supports local_ca and Dreamhost hooks
+      ansible.builtin.shell: |
+        grep -q 'local_ca' "{{ certbot_tasks }}"
+        grep -q 'dreamhost_dns' "{{ certbot_tasks }}"
+        grep -q 'openssl' "{{ certbot_local_ca }}"
+        grep -q 'dreamhost-auth.sh' "{{ certbot_dreamhost }}"
+        grep -q 'dreamhost-api-check.sh' "{{ certbot_dreamhost }}"
+        grep -q 'certbot_dreamhost_cert_mismatch' "{{ certbot_dreamhost }}"
+        grep -q 'certbot_acme_server' "{{ certbot_dreamhost }}"
+        grep -q 'VALIDATION_RESOLVERS' "{{ repo_root }}/roles/certbot/templates/dreamhost-auth.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Certbot | assert Samba TLS task configures smb.conf
+      ansible.builtin.shell: |
+        grep -q 'blockinfile' "{{ samba_tls_tasks }}"
+        grep -q 'tls certfile' "{{ samba_tls_tasks }}"
+        grep -q 'insertafter' "{{ samba_tls_tasks }}"
+        grep -q 'testparm' "{{ samba_tls_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Certbot | assert lab DC enables local CA provider
+      ansible.builtin.shell: |
+        grep -q 'certbot_provider: local_ca' "{{ lab_dc_vars }}"
+        grep -q 'samba_dc_tls_enabled: true' "{{ lab_dc_vars }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Certbot | assert optional DDNS nginx template exists
+      ansible.builtin.stat:
+        path: "{{ nginx_template }}"
+      register: certbot_nginx_template
+
+    - name: Certbot | require nginx TLS template
+      ansible.builtin.assert:
+        that:
+          - certbot_nginx_template.stat.exists
+        fail_msg: Missing DDNS nginx TLS template

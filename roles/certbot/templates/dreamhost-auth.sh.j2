@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+set -euo pipefail
+
+ENV_FILE="/etc/letsencrypt/dreamhost.env"
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+: "${DREAMHOST_API_KEY:?missing in ${ENV_FILE}}"
+: "${CERTBOT_DOMAIN:?}"
+: "${CERTBOT_VALIDATION:?}"
+
+PROPAGATION_SECONDS="${DREAMHOST_PROPAGATION_SECONDS:-120}"
+POLL_INTERVAL="${DREAMHOST_PROPAGATION_POLL_INTERVAL:-10}"
+VALIDATION_RESOLVERS="${DREAMHOST_VALIDATION_RESOLVERS:-8.8.8.8 1.1.1.1 ns1.dreamhost.com ns2.dreamhost.com ns3.dreamhost.com}"
+RECORD="_acme-challenge.${CERTBOT_DOMAIN}"
+UNIQUE_ID="$(uuidgen)"
+tmp_body="$(mktemp)"
+trap 'rm -f "${tmp_body}"' EXIT
+
+http_code="$(
+  curl -sS -G "https://api.dreamhost.com/" \
+    --data-urlencode "key=${DREAMHOST_API_KEY}" \
+    --data-urlencode "cmd=dns-add_record" \
+    --data-urlencode "format=json" \
+    --data-urlencode "unique_id=${UNIQUE_ID}" \
+    --data-urlencode "record=${RECORD}" \
+    --data-urlencode "type=TXT" \
+    --data-urlencode "value=${CERTBOT_VALIDATION}" \
+    --data-urlencode "comment=certbot-acme" \
+    -o "${tmp_body}" \
+    -w '%{http_code}'
+)"
+
+response="$(cat "${tmp_body}")"
+
+if [[ "${http_code}" != "200" ]] || ! grep -q '"result"[[:space:]]*:[[:space:]]*"success"' <<<"${response}"; then
+  echo "Dreamhost dns-add_record failed for ${RECORD} (HTTP ${http_code}): ${response}" >&2
+  exit 1
+fi
+
+echo "Dreamhost TXT added for ${RECORD}; polling public resolvers (up to ${PROPAGATION_SECONDS}s)"
+
+deadline=$(( $(date +%s) + PROPAGATION_SECONDS ))
+while true; do
+  for resolver in ${VALIDATION_RESOLVERS}; do
+    txt="$(
+      dig +search=0 +retry=0 +time=3 +tries=1 @"${resolver}" "${RECORD}" TXT 2>/dev/null \
+        | awk -F'"' '/TXT/ { print $2; exit }'
+    )"
+    if [[ "${txt}" == "${CERTBOT_VALIDATION}" ]]; then
+      echo "TXT visible via ${resolver}"
+      exit 0
+    fi
+  done
+
+  if (( $(date +%s) >= deadline )); then
+    echo "ERROR: TXT for ${RECORD} not visible via ${VALIDATION_RESOLVERS} after ${PROPAGATION_SECONDS}s." >&2
+    echo "Dreamhost panel may show the record; verify from another host:" >&2
+    echo "  dig @8.8.8.8 ${RECORD} TXT +short" >&2
+    echo "  dig @ns1.dreamhost.com ${RECORD} TXT +short" >&2
+    exit 1
+  fi
+
+  sleep "${POLL_INTERVAL}"
+done

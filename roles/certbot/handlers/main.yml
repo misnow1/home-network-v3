@@ -1,0 +1,6 @@
+---
+- name: Restart snap certbot renew timer
+  ansible.builtin.command:
+    cmd: snap restart certbot.renew
+  changed_when: false
+  listen: certbot renew timer changed

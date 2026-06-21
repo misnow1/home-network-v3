@@ -54,6 +54,7 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_dnsupdater_password` | 6 | DnsAdmins service account for GSS-TSIG nsupdate | `change-me-dnsupdater` |
 | `vault_ddns_shared_secret` | 9 | Bearer token for DDNS API (dhcp-script → DC) | `change-me-ddns-api` |
 | `vault_backup_repository_key` | 7 | Backup target encryption key | `change-me-backup-key` |
+| `vault_dreamhost_api_key` | 10 | Dreamhost API key (`dns-*`) for Certbot DNS-01 | production only |
 
 ## Recreate the lab vault
 

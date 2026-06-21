@@ -3,7 +3,11 @@
   ansible.builtin.shell: |
     set -euo pipefail
     cd "{{ ddns_nsupdate_install_root }}"
+    {% if ddns_nsupdate_nginx_tls | bool %}
+    docker compose --profile tls up -d --build --force-recreate
+    {% else %}
     docker compose up -d --build --force-recreate
+    {% endif %}
   args:
     executable: /bin/bash
   when: ddns_nsupdate_enabled | bool

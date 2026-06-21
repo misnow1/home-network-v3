@@ -185,6 +185,33 @@ integration tests, migration scripts).
 should show the **local** account. `id misnow1` after SSH should match your configured
 `samba_dc_operator_uid` / `gid`, not `HOME\misnow1` with uid `3000013`.
 
+## LDAP TLS (Slice 10)
+
+Samba AD DC ships with a self-signed LDAP certificate by default. Tools that validate
+TLS chains require a publicly trusted (production) or lab-local CA certificate.
+
+Run after `dc-converge.yml`:
+
+```bash
+ansible-playbook playbooks/certbot.yml --limit dc01.lab.test
+
+# production
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/certbot.yml -e allow_production=true \
+  --limit dc1.home.2123studios.com
+```
+
+See **[certbot-runbook.md](certbot-runbook.md)** for Dreamhost DNS-01, staging rollout,
+renewal, and optional DDNS nginx TLS.
+
+Quick verify (production — public CA):
+
+```bash
+openssl s_client -connect dc1.home.2123studios.com:636 \
+  -servername dc1.home.2123studios.com </dev/null
+ldapsearch -H ldaps://dc1.home.2123studios.com -x -b "" -s base namingContexts
+```
+
 ## Tags
 
 | Tag | Playbook | Purpose |
@@ -197,4 +224,4 @@ should show the **local** account. `id misnow1` after SSH should match your conf
 | `samba_kerberos` | dc-bootstrap, dc-replica-join, dc-restore | krb5.conf copy |
 | `samba_converge` | dc-converge | Ongoing idempotent config |
 
-See [docs/dns-architecture.md](dns-architecture.md) for DNS design and deferred DDNS work.
+See [docs/dns-architecture.md](dns-architecture.md) for DNS design and DDNS integration.
