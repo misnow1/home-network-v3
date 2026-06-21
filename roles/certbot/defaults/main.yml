@@ -1,0 +1,34 @@
+---
+certbot_enabled: false
+certbot_provider: dreamhost_dns
+# Defaults to inventory hostname (use FQDN entries in hosts.yml).
+certbot_domains:
+  - "{{ inventory_hostname }}"
+certbot_email: ""
+certbot_staging: false
+certbot_dry_run: false
+certbot_force_renewal: false
+certbot_acme_server: >-
+  {{
+    'https://acme-staging-v02.api.letsencrypt.org/directory'
+    if certbot_staging | bool
+    else 'https://acme-v02.api.letsencrypt.org/directory'
+  }}
+certbot_live_dir: "/etc/letsencrypt/live/{{ certbot_domains[0] }}"
+certbot_renewal_hooks_dir: /etc/letsencrypt/renewal-hooks/deploy
+certbot_local_ca_dir: /etc/letsencrypt/local-ca
+certbot_local_ca_valid_days: 825
+certbot_server_cert_valid_days: 397
+certbot_dreamhost_api_key: "{{ vault_dreamhost_api_key | default('') }}"
+certbot_dreamhost_propagation_seconds: 180
+certbot_dreamhost_propagation_poll_interval: 10
+certbot_dreamhost_validation_resolvers:
+  - 8.8.8.8
+  - 1.1.1.1
+  - ns1.dreamhost.com
+  - ns2.dreamhost.com
+  - ns3.dreamhost.com
+certbot_dreamhost_verbose: false
+certbot_deploy_hook_reload_samba: true
+certbot_deploy_hook_ddns_install_root: "{{ ddns_nsupdate_install_root | default('/opt/ddns-nsupdate') }}"
+certbot_deploy_hook_ddns_nginx_tls: "{{ ddns_nsupdate_nginx_tls | default(false) }}"

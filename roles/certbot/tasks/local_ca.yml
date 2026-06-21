@@ -1,0 +1,133 @@
+---
+- name: Certbot local CA | Set sanitized domain label
+  ansible.builtin.set_fact:
+    certbot_local_ca_domain_label: "{{ certbot_domains[0] | replace('.', '-') }}"
+
+- name: Certbot local CA | Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ certbot_local_ca_dir }}"
+    - "{{ certbot_live_dir }}"
+    - "{{ certbot_renewal_hooks_dir }}"
+
+- name: Certbot local CA | Render OpenSSL configs
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: openssl-ca.cnf.j2
+      dest: "{{ certbot_local_ca_dir }}/openssl-ca.cnf"
+    - src: openssl-server.cnf.j2
+      dest: "{{ certbot_local_ca_dir }}/openssl-server-{{ certbot_local_ca_domain_label }}.cnf"
+
+- name: Certbot local CA | Check whether server certificate is still valid
+  ansible.builtin.command:
+    cmd: openssl x509 -checkend 86400 -noout -in "{{ certbot_live_dir }}/fullchain.pem"
+  register: certbot_local_ca_cert_valid
+  changed_when: false
+  failed_when: false
+
+- name: Certbot local CA | Generate CA private key
+  ansible.builtin.command:
+    cmd: openssl genrsa -out "{{ certbot_local_ca_dir }}/ca.key" 4096
+  args:
+    creates: "{{ certbot_local_ca_dir }}/ca.key"
+
+- name: Certbot local CA | Generate CA certificate
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -new -nodes
+      -key "{{ certbot_local_ca_dir }}/ca.key"
+      -sha256 -days {{ certbot_local_ca_valid_days }}
+      -out "{{ certbot_local_ca_dir }}/ca.crt"
+      -config "{{ certbot_local_ca_dir }}/openssl-ca.cnf"
+  args:
+    creates: "{{ certbot_local_ca_dir }}/ca.crt"
+
+- name: Certbot local CA | Generate server key and certificate
+  when: certbot_local_ca_cert_valid.rc != 0
+  block:
+    - name: Certbot local CA | Generate server private key
+      ansible.builtin.command:
+        cmd: >-
+          openssl genrsa -out
+          "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.key"
+          4096
+      args:
+        creates: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.key"
+
+    - name: Certbot local CA | Generate server CSR
+      ansible.builtin.command:
+        cmd: >-
+          openssl req -new
+          -key "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.key"
+          -out "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.csr"
+          -config "{{ certbot_local_ca_dir }}/openssl-server-{{ certbot_local_ca_domain_label }}.cnf"
+      args:
+        creates: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.csr"
+
+    - name: Certbot local CA | Sign server certificate
+      ansible.builtin.command:
+        cmd: >-
+          openssl x509 -req
+          -in "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.csr"
+          -CA "{{ certbot_local_ca_dir }}/ca.crt"
+          -CAkey "{{ certbot_local_ca_dir }}/ca.key"
+          -CAcreateserial
+          -out "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.crt"
+          -days {{ certbot_server_cert_valid_days }}
+          -sha256
+          -extensions v3_req
+          -extfile "{{ certbot_local_ca_dir }}/openssl-server-{{ certbot_local_ca_domain_label }}.cnf"
+      args:
+        creates: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.crt"
+
+    - name: Certbot local CA | Build fullchain PEM
+      ansible.builtin.shell: |
+        set -euo pipefail
+        cat \
+          "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.crt" \
+          "{{ certbot_local_ca_dir }}/ca.crt" \
+          > "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}-fullchain.pem"
+      args:
+        executable: /bin/bash
+        creates: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}-fullchain.pem"
+
+    - name: Certbot local CA | Install live certificate symlinks
+      ansible.builtin.file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - src: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}-fullchain.pem"
+          dest: "{{ certbot_live_dir }}/fullchain.pem"
+        - src: "{{ certbot_local_ca_dir }}/server-{{ certbot_local_ca_domain_label }}.key"
+          dest: "{{ certbot_live_dir }}/privkey.pem"
+
+- name: Certbot local CA | Assert live certificate material is present
+  ansible.builtin.stat:
+    path: "{{ certbot_live_dir }}/fullchain.pem"
+  register: certbot_local_ca_live_chain
+
+- name: Certbot local CA | Require fullchain.pem
+  ansible.builtin.assert:
+    that:
+      - certbot_local_ca_live_chain.stat.exists
+    fail_msg: >-
+      Expected certificate at {{ certbot_live_dir }}/fullchain.pem but file is missing.
+
+- name: Certbot local CA | Restrict private key permissions
+  ansible.builtin.file:
+    path: "{{ certbot_live_dir }}/privkey.pem"
+    owner: root
+    group: root
+    mode: "0600"

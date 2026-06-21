@@ -25,6 +25,15 @@ ddns_nsupdate_enabled: true
 # ddns_nsupdate_manage_ufw: true
 # ddns_nsupdate_ufw_allow_cidrs:
 #   - 192.168.1.0/24
+# ddns_nsupdate_nginx_tls: false  # enable after certbot.yml; reuses DC FQDN cert on :443
+
+certbot_enabled: true
+certbot_provider: dreamhost_dns
+certbot_domains:
+  - dc1.home.2123studios.com
+certbot_email: sno.sno@gmail.com
+certbot_staging: true   # flip false after staging dry-run succeeds
+samba_dc_tls_enabled: true
 
 # AD migration (docs/migration-runbook.md) — set on dc1 before dc-replica-join.yml
 # samba_dc_migration_host: true

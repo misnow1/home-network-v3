@@ -1,0 +1,63 @@
+---
+- name: Samba DC TLS | Resolve smb.conf path
+  ansible.builtin.import_tasks: samba_smb_conf.yml
+
+- name: Samba DC TLS | Stat certificate fullchain
+  ansible.builtin.stat:
+    path: "{{ samba_dc_tls_cert_dir }}/fullchain.pem"
+  register: samba_dc_tls_fullchain
+
+- name: Samba DC TLS | Stat certificate private key
+  ansible.builtin.stat:
+    path: "{{ samba_dc_tls_cert_dir }}/privkey.pem"
+  register: samba_dc_tls_privkey
+
+- name: Samba DC TLS | Require certificate material
+  ansible.builtin.assert:
+    that:
+      - samba_dc_tls_fullchain.stat.exists
+      - samba_dc_tls_privkey.stat.exists
+    fail_msg: >-
+      TLS certificate not found under {{ samba_dc_tls_cert_dir }}.
+      Run playbooks/certbot.yml on this DC first.
+
+- name: Samba DC TLS | Remove misplaced TLS block appended outside [global]
+  ansible.builtin.blockinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-tls"
+    state: absent
+  notify: restart samba-ad-dc
+
+- name: Samba DC TLS | Configure LDAP TLS in smb.conf [global]
+  ansible.builtin.blockinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    block: |
+      tls enabled  = yes
+      tls keyfile  = {{ samba_dc_tls_cert_dir }}/privkey.pem
+      tls certfile = {{ samba_dc_tls_cert_dir }}/fullchain.pem
+      tls cafile   =
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-tls"
+    insertafter: "^\\[global\\]"
+  notify: restart samba-ad-dc
+
+- name: Samba DC TLS | Verify testparm reads custom certificate path
+  ansible.builtin.shell: |
+    set -euo pipefail
+    testparm -s "{{ samba_dc_smb_conf }}" 2>/dev/null | awk -F= '
+      /^[[:space:]]*tls certfile/ {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+        print $2
+      }'
+  args:
+    executable: /bin/bash
+  register: samba_dc_tls_testparm_certfile
+  changed_when: false
+
+- name: Samba DC TLS | Require testparm to reference Let's Encrypt material
+  ansible.builtin.assert:
+    that:
+      - samba_dc_tls_testparm_certfile.stdout == samba_dc_tls_cert_dir ~ '/fullchain.pem'
+    fail_msg: >-
+      smb.conf TLS settings are not active in [global]. testparm tls certfile=
+      '{{ samba_dc_tls_testparm_certfile.stdout | default('') }}' expected
+      '{{ samba_dc_tls_cert_dir }}/fullchain.pem'. Inspect {{ samba_dc_smb_conf }}.

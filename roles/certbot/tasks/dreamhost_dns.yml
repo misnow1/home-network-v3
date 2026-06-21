@@ -1,0 +1,183 @@
+---
+- name: Certbot Dreamhost | Install certbot snap
+  community.general.snap:
+    name: certbot
+    classic: true
+    state: present
+
+- name: Certbot Dreamhost | Ensure letsencrypt directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/letsencrypt
+    - "{{ certbot_renewal_hooks_dir }}"
+
+- name: Certbot Dreamhost | Deploy API env file
+  ansible.builtin.template:
+    src: dreamhost.env.j2
+    dest: /etc/letsencrypt/dreamhost.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Certbot Dreamhost | Deploy auth hooks
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - src: dreamhost-auth.sh.j2
+      dest: /etc/letsencrypt/dreamhost-auth.sh
+    - src: dreamhost-cleanup.sh.j2
+      dest: /etc/letsencrypt/dreamhost-cleanup.sh
+
+- name: Certbot Dreamhost | Install API check script
+  ansible.builtin.copy:
+    src: dreamhost-api-check.sh
+    dest: /usr/local/sbin/dreamhost-api-check.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Certbot Dreamhost | Verify Dreamhost DNS API access
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/dreamhost-api-check.sh /etc/letsencrypt/dreamhost.env
+  register: certbot_dreamhost_api_check
+  changed_when: false
+
+- name: Certbot Dreamhost | Assert Dreamhost API returned success
+  ansible.builtin.assert:
+    that:
+      - certbot_dreamhost_api_check.rc == 0
+    fail_msg: >-
+      Dreamhost dns-list_records preflight failed.
+      Output: {{ certbot_dreamhost_api_check.stdout | default('') | truncate(500) }}
+      {{ certbot_dreamhost_api_check.stderr | default('') | truncate(500) }}
+      Confirm vault_dreamhost_api_key is correct, trimmed (no trailing newline), and
+      has dns-* permissions for 2123studios.com in Dreamhost.
+
+- name: Certbot Dreamhost | Check whether certificate already exists
+  ansible.builtin.stat:
+    path: "{{ certbot_live_dir }}/fullchain.pem"
+  register: certbot_dreamhost_live_cert
+
+- name: Certbot Dreamhost | Check existing certificate expiry
+  ansible.builtin.command:
+    cmd: openssl x509 -checkend 86400 -noout -in "{{ certbot_live_dir }}/fullchain.pem"
+  register: certbot_dreamhost_cert_valid
+  changed_when: false
+  failed_when: false
+  when: certbot_dreamhost_live_cert.stat.exists
+
+- name: Certbot Dreamhost | Read existing certificate issuer
+  ansible.builtin.command:
+    cmd: openssl x509 -in "{{ certbot_live_dir }}/fullchain.pem" -noout -issuer
+  register: certbot_dreamhost_cert_issuer
+  changed_when: false
+  failed_when: false
+  when: certbot_dreamhost_live_cert.stat.exists
+
+- name: Certbot Dreamhost | Detect whether live certificate is from staging CA
+  ansible.builtin.set_fact:
+    certbot_dreamhost_cert_is_staging: >-
+      {{
+        (certbot_dreamhost_cert_issuer.stdout | default(''))
+        is search('STAGING|Fake LE')
+      }}
+  when: certbot_dreamhost_live_cert.stat.exists
+
+- name: Certbot Dreamhost | Assume no staging certificate when none exists
+  ansible.builtin.set_fact:
+    certbot_dreamhost_cert_is_staging: false
+  when: not certbot_dreamhost_live_cert.stat.exists
+
+- name: Certbot Dreamhost | Detect staging vs production mismatch
+  ansible.builtin.set_fact:
+    certbot_dreamhost_cert_mismatch: >-
+      {{
+        certbot_dreamhost_live_cert.stat.exists
+        and (certbot_staging | bool) != (certbot_dreamhost_cert_is_staging | bool)
+      }}
+
+- name: Certbot Dreamhost | Decide whether certificate issuance is required
+  ansible.builtin.set_fact:
+    certbot_dreamhost_issue_needed: >-
+      {{
+        certbot_dry_run | bool
+        or certbot_force_renewal | bool
+        or not certbot_dreamhost_live_cert.stat.exists
+        or (certbot_dreamhost_cert_valid.rc | default(1)) != 0
+        or (certbot_dreamhost_cert_mismatch | bool)
+      }}
+    certbot_dreamhost_force_renewal: >-
+      {{
+        certbot_force_renewal | bool
+        and not (certbot_dreamhost_cert_mismatch | bool)
+      }}
+
+- name: Certbot Dreamhost | Skip issuance — usable certificate already present
+  ansible.builtin.debug:
+    msg: >-
+      Leaving existing certificate at {{ certbot_live_dir }}/fullchain.pem in place.
+      Re-run with -e certbot_force_renewal=true to replace it.
+  when: not certbot_dreamhost_issue_needed | bool
+
+- name: Certbot Dreamhost | Remove mismatched certificate lineage before re-issue
+  ansible.builtin.command:
+    argv:
+      - certbot
+      - delete
+      - --non-interactive
+      - --cert-name
+      - "{{ certbot_domains[0] }}"
+  register: certbot_dreamhost_delete_mismatch
+  changed_when: certbot_dreamhost_delete_mismatch.rc == 0
+  failed_when: certbot_dreamhost_delete_mismatch.rc not in [0, 1]
+  when:
+    - not ansible_check_mode
+    - certbot_dreamhost_cert_mismatch | bool
+    - not certbot_dry_run | bool
+
+- name: Certbot Dreamhost | Build certbot domain arguments
+  ansible.builtin.set_fact:
+    certbot_dreamhost_domain_argv: "{{ certbot_dreamhost_domain_argv | default([]) + ['-d', item] }}"
+  loop: "{{ certbot_domains }}"
+
+- name: Certbot Dreamhost | Build certbot argv
+  ansible.builtin.set_fact:
+    certbot_dreamhost_argv: >-
+      {{
+        ['certbot', 'certonly', '--manual', '--preferred-challenges', 'dns',
+         '--manual-auth-hook', '/etc/letsencrypt/dreamhost-auth.sh',
+         '--manual-cleanup-hook', '/etc/letsencrypt/dreamhost-cleanup.sh',
+         '--non-interactive', '--agree-tos', '-m', certbot_email,
+         '--server', certbot_acme_server,
+         '--deploy-hook', certbot_renewal_hooks_dir + '/reload-services.sh']
+        + certbot_dreamhost_domain_argv
+        + (['--staging'] if certbot_staging | bool else [])
+        + (['--dry-run'] if certbot_dry_run | bool else [])
+        + (['--force-renewal'] if certbot_dreamhost_force_renewal | bool else [])
+        + (['-v'] if certbot_dreamhost_verbose | bool else [])
+      }}
+
+- name: Certbot Dreamhost | Issue or renew certificate # noqa: no-changed-when
+  ansible.builtin.command:
+    argv: "{{ certbot_dreamhost_argv }}"
+  register: certbot_dreamhost_issue
+  changed_when: "'Successfully received certificate' in certbot_dreamhost_issue.stdout"
+  when:
+    - not ansible_check_mode
+    - certbot_dreamhost_issue_needed | bool
+
+- name: Certbot Dreamhost | Enable automatic renewal timer
+  ansible.builtin.command:
+    cmd: snap set certbot renew.timer-enabled=on
+  changed_when: false
+  notify: certbot renew timer changed

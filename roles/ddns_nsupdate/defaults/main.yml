@@ -8,6 +8,8 @@ ddns_nsupdate_ufw_allow_cidrs: []
 ddns_nsupdate_ufw_port: "{{ '443' if (ddns_nsupdate_nginx_tls | bool) else '8765' }}"
 ddns_nsupdate_http_listen_addr: 0.0.0.0
 ddns_nsupdate_dns_zone: "{{ dc_domain_name | default(lab_domain) }}"
+ddns_nsupdate_letsencrypt_fullchain: "{{ certbot_live_dir | default('/etc/letsencrypt/live/' ~ ansible_fqdn) }}/fullchain.pem"
+ddns_nsupdate_letsencrypt_privkey: "{{ certbot_live_dir | default('/etc/letsencrypt/live/' ~ ansible_fqdn) }}/privkey.pem"
 ddns_nsupdate_dnsupdater_name: dnsupdater
 ddns_nsupdate_krb_principal: "{{ ddns_nsupdate_dnsupdater_name }}@{{ (dc_realm | default(lab_realm)) | upper }}"
 ddns_nsupdate_krb_realm: "{{ (dc_realm | default(lab_realm)) | upper }}"

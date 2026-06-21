@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+set -euo pipefail
+
+ENV_FILE="/etc/letsencrypt/dreamhost.env"
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+: "${DREAMHOST_API_KEY:?missing in ${ENV_FILE}}"
+: "${CERTBOT_DOMAIN:?}"
+: "${CERTBOT_VALIDATION:?}"
+
+RECORD="_acme-challenge.${CERTBOT_DOMAIN}"
+UNIQUE_ID="$(uuidgen)"
+tmp_body="$(mktemp)"
+trap 'rm -f "${tmp_body}"' EXIT
+
+http_code="$(
+  curl -sS -G "https://api.dreamhost.com/" \
+    --data-urlencode "key=${DREAMHOST_API_KEY}" \
+    --data-urlencode "cmd=dns-remove_record" \
+    --data-urlencode "format=json" \
+    --data-urlencode "unique_id=${UNIQUE_ID}" \
+    --data-urlencode "record=${RECORD}" \
+    --data-urlencode "type=TXT" \
+    --data-urlencode "value=${CERTBOT_VALIDATION}" \
+    -o "${tmp_body}" \
+    -w '%{http_code}'
+)"
+
+response="$(cat "${tmp_body}")"
+
+if [[ "${http_code}" != "200" ]] || ! grep -q '"result"[[:space:]]*:[[:space:]]*"success"' <<<"${response}"; then
+  echo "Dreamhost dns-remove_record failed for ${RECORD} (HTTP ${http_code}): ${response}" >&2
+  exit 1
+fi
+
+echo "Dreamhost TXT removed for ${RECORD}"

@@ -195,6 +195,22 @@ run_dhcp_ddns_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
+run_certbot_integration() {
+  provision_lab_dc
+
+  log_info "Converging Certbot TLS on ${LAB_DC_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/certbot.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Converging Certbot TLS on ${LAB_DC_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/certbot.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Running Certbot / LDAP TLS convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_certbot_converged.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Destroying lab DC ${LAB_DC_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
+}
+
 run_backup_integration() {
   log_info "Integration VM lifecycle for ${LAB_HOST} (slice=backup)"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
@@ -287,6 +303,9 @@ main() {
       ;;
     dhcp_ddns)
       run_dhcp_ddns_integration
+      ;;
+    certbot)
+      run_certbot_integration
       ;;
     backup)
       run_backup_integration

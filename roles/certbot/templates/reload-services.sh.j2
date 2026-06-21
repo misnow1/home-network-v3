@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Certbot deploy hook — reload Samba LDAP TLS and optional DDNS nginx after renewal.
+set -euo pipefail
+
+{% if certbot_deploy_hook_reload_samba | bool %}
+if command -v smbcontrol >/dev/null 2>&1; then
+  if ! smbcontrol ldap_server reload-certs 2>/dev/null; then
+    systemctl restart samba-ad-dc
+  fi
+fi
+{% endif %}
+
+{% if certbot_deploy_hook_ddns_nginx_tls | bool %}
+if [[ -d "{{ certbot_deploy_hook_ddns_install_root }}" ]]; then
+  (
+    cd "{{ certbot_deploy_hook_ddns_install_root }}"
+    docker compose --profile tls kill -s HUP ddns-nginx 2>/dev/null || true
+  )
+fi
+{% endif %}

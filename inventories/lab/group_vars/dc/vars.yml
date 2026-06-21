@@ -15,3 +15,9 @@ samba_dc_reverse_zones:
 
 docker_engine_enabled: true
 ddns_nsupdate_enabled: true
+
+certbot_enabled: true
+certbot_provider: local_ca
+certbot_domains:
+  - dc01.lab.test
+samba_dc_tls_enabled: true

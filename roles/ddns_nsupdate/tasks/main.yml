@@ -69,12 +69,14 @@
 
 - name: DDNS nsupdate | Build and start stack # noqa: no-changed-when
   ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - up
-      - -d
-      - --build
+    argv: "{{ ddns_nsupdate_compose_argv }}"
     chdir: "{{ ddns_nsupdate_install_root }}"
+  vars:
+    ddns_nsupdate_compose_argv: >-
+      {{
+        ['docker', 'compose']
+        + (['--profile', 'tls'] if ddns_nsupdate_nginx_tls | bool else [])
+        + ['up', '-d', '--build']
+      }}
   when: ddns_nsupdate_enabled | bool
   changed_when: false

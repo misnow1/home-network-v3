@@ -1,0 +1,64 @@
+---
+# Post-converge checks for Slice 10 Certbot / Samba LDAP TLS (dc01.lab.test).
+
+- name: Integration — Certbot and Samba LDAP TLS
+  hosts: dc
+  gather_facts: true
+  vars:
+    certbot_lab_ca_file: /etc/letsencrypt/local-ca/ca.crt
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert samba-ad-dc is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['samba-ad-dc.service'].state == 'running'
+        fail_msg: samba-ad-dc is not running
+
+    - name: Assert live certificate files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: certbot_live_files
+      loop:
+        - "/etc/letsencrypt/live/{{ ansible_fqdn }}/fullchain.pem"
+        - "/etc/letsencrypt/live/{{ ansible_fqdn }}/privkey.pem"
+        - "{{ certbot_lab_ca_file }}"
+
+    - name: Require certificate material on DC
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing TLS file: {{ item.item }}"
+      loop: "{{ certbot_live_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify LDAPS presents certificate for DC FQDN
+      ansible.builtin.shell: |
+        set -euo pipefail
+        openssl s_client -connect 127.0.0.1:636 -servername "{{ ansible_fqdn }}" </dev/null 2>/dev/null \
+          | openssl x509 -noout -subject
+      args:
+        executable: /bin/bash
+      register: certbot_ldaps_subject
+      changed_when: false
+      failed_when: ansible_fqdn not in certbot_ldaps_subject.stdout
+
+    - name: Assert LDAPS works with lab local CA trust
+      ansible.builtin.command:
+        cmd: ldapsearch -H ldaps://127.0.0.1 -x -b "" -s base namingContexts
+      environment:
+        LDAPTLS_CACERT: "{{ certbot_lab_ca_file }}"
+      register: certbot_ldaps_search
+      changed_when: false
+      failed_when: certbot_ldaps_search.rc != 0
+
+    - name: Assert START-TLS on LDAP port 389 works with lab local CA trust
+      ansible.builtin.command:
+        cmd: ldapsearch -H ldap://127.0.0.1 -ZZ -x -b "" -s base namingContexts
+      environment:
+        LDAPTLS_CACERT: "{{ certbot_lab_ca_file }}"
+      register: certbot_starttls_search
+      changed_when: false
+      failed_when: certbot_starttls_search.rc != 0

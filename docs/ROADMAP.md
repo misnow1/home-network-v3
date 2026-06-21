@@ -16,12 +16,12 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 7 | Backups + restore drills | **done** | Scope manifests, local restic, restore drill |
 | 8 | Production convergence | **done** | Runbooks, prod wrapper, inventory examples, safety tests |
 | 9 | DHCP-driven DDNS | **done** | dnsmasq hook + Docker DDNS API on DC |
+| 10 | Certbot DNS validation | **done** | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
 
 ## Deferred (not forgotten)
 
 | Slice | Name | Depends on | Why deferred |
 |---|---|---|---|
-| 10+ | Certbot DNS validation | Slice 2 DC, stable DNS | TLS front-end for DDNS API |
 | 10+ | Pi-hole / DNS forwarders | Slice 2/6 DNS | Operational service, not provisioning core |
 | 11+ | Observability (Prometheus/Grafana) | Slices 1–5 hosts | Monitoring is separate concern |
 | 12+ | Bare-metal install (PXE/kickstart) | Slice 1 baseline | Lab uses cloud-init; prod install later |
