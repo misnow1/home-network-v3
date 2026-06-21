@@ -20,6 +20,8 @@ See also:
 - [production-runbook.md](production-runbook.md) — wrapper and apply order
 - [dc-runbook.md](dc-runbook.md) — bootstrap vs replica join vs restore vs converge
 - [run-order.md](run-order.md) — migration apply order
+- [ddns-runbook.md](ddns-runbook.md) — DDNS API + router hook (greenfield; gates in Phase 1)
+- [unifi-gateway-dns.md](unifi-gateway-dns.md) — UCG Fiber router cutover mechanics
 - [vault-schema.md](vault-schema.md) — production secrets
 
 ## Host roles in this migration
@@ -28,7 +30,7 @@ See also:
 |---|---|---|
 | **dc1** | `192.168.1.10` | Replica join to live pdc; becomes primary after FSMO transfer |
 | **dc2** | (Phase 2) | Additional replica — same join playbook |
-| **pdc** (old) | `192.168.1.2` | Stays online until dc1 validated; demote after cutover |
+| **pdc** (old) | `192.168.1.2` | Stays online until dc1 validated; demote after cutover. Also runs **internal→external mail relay** (see [Non-AD services on pdc](#non-ad-services-on-pdc-decommission-blockers)) |
 | **kvm01** | `192.168.1.21` | CentOS — manual DNS only (deferred) |
 | **kif** | `192.168.1.152` | CentOS — manual DNS only (deferred) |
 | **bastion** | TBD | Reprovision Ubuntu 24.04 → `baseline` + `domain-join` |
@@ -36,6 +38,41 @@ See also:
 
 Production DC naming: **`dc1`**, **`dc2`**, … (`dc1.home.2123studios.com`). Retire
 `pdc` / `sdc` hostnames after demotion.
+
+---
+
+## DNS and DDNS during migration
+
+This runbook covers **AD migration** (replica join, FSMO, demote). Two related
+workstreams run in the same maintenance window but are documented elsewhere:
+
+| Workstream | What | Runbook |
+|---|---|---|
+| **AD migration** | Replica join, FSMO, demote pdc, reprovision members | This document |
+| **DDNS greenfield** | New DDNS API on dc1 + router `dhcp-script` hook | [ddns-runbook.md](ddns-runbook.md) |
+| **DNS authority shift** | Clients query dc1; retire router AD forwarding | [unifi-gateway-dns.md](unifi-gateway-dns.md) |
+
+```mermaid
+flowchart TB
+  subgraph ad [AD migration]
+    Join[dc-replica-join]
+    Converge[dc-converge]
+    FSMO[FSMO transfer]
+    Demote[demote pdc]
+    Join --> Converge --> FSMO --> Demote
+  end
+  subgraph ddns [DDNS greenfield]
+    API[ddns-api.yml]
+    Router[Router cutover + hook]
+    API --> Router
+  end
+  Converge --> API
+  FSMO --> Router
+  Router --> Demote
+```
+
+Phase 1 Steps 3 and 6 are **gates** — short checkpoints that link to the DDNS and
+router runbooks. Do not demote pdc until both gates pass.
 
 ---
 
@@ -49,8 +86,10 @@ Run from the Ansible control node before the maintenance window:
 
 Manual checks:
 
-1. **Samba version** — on old pdc and dc1, run `samba -V`. Ubuntu 24.04 Samba must
-   be **≥** Fedora pdc version or join/restore may fail.
+1. **Samba version (pre-join only)** — on old pdc and dc1, run `samba -V`. Before
+   replica join or offline restore, Ubuntu 24.04 Samba must be **≥** Fedora pdc version
+   or join/restore may fail. After a successful join, mixed versions are fine — see
+   [Samba version skew](#samba-version-skew-dc1-vs-pdc) and `repl-check.sh`.
 2. **Production inventory** — copy templates, fill real IPs/hostnames, create vault.
 3. **SSH** — copy `group_vars/all/ansible.yml.example` → `ansible.yml` (user
    `ansible`, key `scripts/vm/keys/prod_id_ed25519`); verify with preflight or
@@ -79,6 +118,32 @@ This blocks accidental `dc-bootstrap.yml` on the migration host.
 
 Optional: take an offline backup on pdc before the window (recommended safety net —
 not required for replica join). See [Appendix — offline backup](#appendix--offline-backup).
+
+### Samba version skew (dc1 vs pdc)
+
+Ubuntu 24.04 ships **Samba 4.19.x** from apt; Fedora pdc may run a newer release (e.g.
+4.21.x). Upstream stable (4.22+) is ahead of both — that gap is normal for LTS distros
+with security backports, not a sign of an unpatched install.
+
+| Phase | Version rule |
+|---|---|
+| **Before replica join / offline restore** | dc1 Samba should be **≥** pdc Samba (`samba -V` on both). Older join/restore targets may fail against a newer source. |
+| **After successful replica join** | Mixed versions (e.g. 4.19 ↔ 4.21) are **acceptable** while pdc stays online. Monitor replication; do not chase third-party packages or source builds unless join is blocked or you need a specific 4.20+ feature. |
+| **After pdc demotion** | All DCs are **Ubuntu LTS** hosts using distro `samba-ad-dc` (no Fedora, no third-party Samba builds). dc1 and any new replicas (dc2, remote-site DCs) run whatever Samba version ships with the Ubuntu LTS release in use at provision time. Keep versions aligned via `apt upgrade`; before joining a new DC, its Samba should be **≥** the DC it replicates from (`samba -V`). |
+
+While pdc is online, run replication checks from the control node:
+
+```bash
+./scripts/migration/repl-check.sh --remote dc1.home.2123studios.com
+```
+
+Known 4.19 limitation: `dns hostname =` in smb.conf is **4.20+** only (harmless warning).
+Ansible removes it in `dns_bind_dlz.yml`; see Step 4 below.
+
+**Platform policy (post-pdc):** pdc is the last non-Ubuntu DC. After demotion, provision
+every additional domain controller on **Ubuntu LTS** (Noble 24.04 today; future DCs use
+whatever LTS is current when built) with `dc-replica-join.yml` against dc1 or a peer DC.
+Do not add Fedora or source-built Samba DCs to the domain.
 
 ---
 
@@ -396,10 +461,10 @@ PROD='./scripts/prod-run.sh --confirm-production --'
 |---|---|
 | 1 | Join dc1 as replica DC |
 | 2 | Converge DC (BIND, dnsupdater, chrony) |
-| 3 | Deploy DDNS API |
+| 3 | **Gate:** Deploy DDNS API → [ddns-runbook.md](ddns-runbook.md) |
 | 4 | Verify AD and DNS locally on dc1 |
 | 5 | Transfer FSMO roles to dc1 |
-| 6 | Cut over router DHCP/DNS |
+| 6 | **Gate:** DNS/DDNS router cutover → [unifi-gateway-dns.md](unifi-gateway-dns.md) |
 | 7 | Manual DNS on CentOS hosts |
 | 8 | Demote old pdc |
 
@@ -517,18 +582,40 @@ ${PROD} playbooks/dc-converge.yml -e allow_production=true \
 
 Creates reverse zone (if missing), `dnsupdater` service account, MS-SNTP chrony settings.
 
-### Step 3 — DDNS API
+### Step 3 — Gate: DDNS API deployed
+
+**Greenfield** — not part of AD replication. Deploy after Step 2 converge (which
+creates the `dnsupdater` account the API needs). Replaces legacy `dns-updater` on pdc.
+
+Full procedure: **[ddns-runbook.md](ddns-runbook.md) § Production deployment — DC**
 
 ```bash
 ${PROD} playbooks/ddns-api.yml -e allow_production=true \
   --limit dc1.home.2123studios.com
 ```
 
+**Pass when:** API health check succeeds:
+
+```bash
+curl -fsS http://192.168.1.10:8765/ddns/v1/health   # → ok
+```
+
+`cutover-check.sh --phase pre` (Step 4) includes this check automatically.
+
 ### Step 4 — Verify on dc1
+
+From the control node (automated):
+
+```bash
+./scripts/migration/repl-check.sh --remote dc1.home.2123studios.com
+./scripts/migration/cutover-check.sh --phase pre --remote dc1.home.2123studios.com
+```
+
+Manual checks on dc1:
 
 ```bash
 sudo samba-tool domain info 127.0.0.1
-sudo samba-tool drs showrepl --machine-pass
+sudo samba-tool drs showrepl
 sudo samba-tool user list | head
 sudo samba-tool fsmo show
 dig @127.0.0.1 home.2123studios.com SOA +short
@@ -537,10 +624,10 @@ dig @127.0.0.1 _ldap._tcp.home.2123studios.com SRV +short
 kinit Administrator@HOME.2123STUDIOS.COM
 ```
 
-Use `sudo samba-tool drs showrepl --machine-pass` (or plain `sudo` as root on the DC).
-Avoid `-U user` unless you need a specific account — it prompts for a password and
-Kerberos negotiation can make the command feel hung. Expect **30–90 seconds** while
-Samba queries replication partners; that is normal when partners are slow or failing.
+Use `sudo samba-tool drs showrepl` as root on the DC (or append `--machine-pass` on
+Samba 4.20+). Avoid `-U user` unless you need a specific account — it prompts for a
+password and Kerberos negotiation can make the command feel hung. Expect **30–90 seconds**
+while Samba queries replication partners; that is normal when partners are slow or failing.
 
 Confirm `dc1.home.2123studios.com` resolves to `192.168.1.10` and inbound replication
 from pdc shows **was successful** (not `WERR_FILE_NOT_FOUND`).
@@ -577,43 +664,58 @@ BIND comes from AD DNS records, not this parameter.
 
 ### Step 5 — Transfer FSMO roles (manual, on dc1)
 
-While pdc is still running, move all FSMO roles to dc1:
+While pdc is still running, move all FSMO roles to dc1. Run on **dc1** as root.
+
+**Samba 4.19 (Ubuntu 24.04)** — no `--name` flag; transfers target the local DC.
+Most roles work with `-N` (root). **domaindns** and **forestdns** need Domain Admin
+credentials (`-UAdministrator`):
 
 ```bash
-sudo samba-tool fsmo transfer --role=schema --name=dc1
-sudo samba-tool fsmo transfer --role=domaindns --name=dc1
-sudo samba-tool fsmo transfer --role=forestdns --name=dc1
-sudo samba-tool fsmo transfer --role=pdc --name=dc1
-sudo samba-tool fsmo transfer --role=rid --name=dc1
-sudo samba-tool fsmo transfer --role=infrastructure --name=dc1
+sudo samba-tool fsmo transfer --role=schema -N
+sudo samba-tool fsmo transfer --role=pdc -N
+sudo samba-tool fsmo transfer --role=rid -N
+sudo samba-tool fsmo transfer --role=infrastructure -N
+sudo samba-tool fsmo transfer --role=naming -N
+sudo samba-tool fsmo transfer --role=domaindns -UAdministrator
+sudo samba-tool fsmo transfer --role=forestdns -UAdministrator
 sudo samba-tool fsmo show
 ```
 
-Or transfer all at once if your Samba version supports it:
+**Samba 4.20+** — may support `--role=all --name=dc1` in one command.
+
+Validate:
 
 ```bash
-sudo samba-tool fsmo transfer --role=all --name=dc1
+./scripts/migration/cutover-check.sh --phase post --remote dc1.home.2123studios.com
 ```
 
-### Step 6 — Router cutover (manual)
+(FSMO on dc1 must pass before router cutover; full post-check also expects pdc demoted.)
 
-1. Set DHCP option 6 (DNS servers) to **`192.168.1.10`** only (or both dc1 and pdc
-   briefly during validation).
-2. Install lease-driven DDNS hook — see [ddns-runbook.md](ddns-runbook.md):
+### Step 6 — Gate: DNS/DDNS router cutover
 
-```sh
-# /etc/home-ddns.env (mode 0600, root-owned)
-DDNS_UPDATE_URL="http://192.168.1.10:8765/ddns/v1/lease"
-DDNS_BEARER_TOKEN="<vault_ddns_shared_secret>"
-DDNS_DNS_DOMAIN="home.2123studios.com"
-```
+**DNS authority shift** + **router hook** — clients query dc1 directly; legacy
+on-boot AD forwarding to pdc is retired. Run after FSMO transfer (Step 5).
 
-```conf
-# dnsmasq
-dhcp-script=/usr/local/sbin/dhcp-ddns-hook.sh
-```
+**Prerequisites:** Step 3 gate passed (`ddns-api.yml` healthy); FSMO on dc1.
 
-Copy `scripts/dhcp-ddns-hook.sh` to `/usr/local/sbin/dhcp-ddns-hook.sh`.
+Full procedure:
+
+- **[unifi-gateway-dns.md](unifi-gateway-dns.md)** — UniFi UI DHCP DNS, on-boot
+  `dhcp-script` inject, remove legacy forwarding scripts
+- **[ddns-runbook.md](ddns-runbook.md) § Production deployment — router** — hook
+  env vars and API token
+
+**Pass when:**
+
+- DHCP clients receive dc1 (`192.168.1.10`) as DNS
+- Pass when:
+  - `grep dhcp-script /run/dnsmasq.dhcp.conf.d/shared.conf` shows
+    `dhcp-script=/data/home-ddns/dhcp-script-wrapper.sh`
+  - Exactly one active `dhcp-script=` across `*.conf` in that directory
+- Lease renew creates A/PTR (`dig @192.168.1.10 <hostname>.home.2123studios.com A`)
+
+Re-run `./scripts/migration/cutover-check.sh --phase post` after Step 8 (pdc demoted)
+for the full post-check.
 
 ### Step 7 — CentOS deferred hosts (manual)
 
@@ -637,9 +739,31 @@ su - misnow1   # or kinit + test login
 If kif SSH hangs on NSS, flush winbind cache or reboot after DNS change — out of
 Ansible scope for CentOS hosts.
 
+### Non-AD services on pdc (decommission blockers)
+
+pdc is not only the legacy Samba DC. It also acts as the **mail forwarder for
+internal servers**: hosts relay outbound mail to pdc, which applies **rewrite rules**
+and forwards to external recipients (currently via **Gmail** using an app password
+stored on pdc).
+
+**Do not demote or power off pdc** until internal hosts have another relay target,
+or cron/alert mail from those hosts will fail silently.
+
+This is **out of scope for the AD migration playbooks** — track long-term replacement
+in [ROADMAP.md](ROADMAP.md) (deferred: internal mail relay). Desired end state (TBD):
+
+- Dedicated relay host or container (Postfix/`msmtp`/similar) — **not** on the DC
+- Rewrite/alias rules and provider credentials in **Ansible vault**, not on the RPi
+- Internal hosts point `relayhost` / `smtp` at the new relay; cut over before pdc demotion
+- Document current pdc rewrite rules and which hosts depend on it before migration
+
+Until that slice lands, pdc may remain powered on **after** AD cutover (DNS/FSMO on dc1)
+purely as a mail relay — or run relay and DC roles in parallel until relay is moved.
+
 ### Step 8 — Demote old pdc (manual)
 
-After dc1 holds all FSMO roles and clients use dc1 for DNS:
+After dc1 holds all FSMO roles, clients use dc1 for DNS, and **internal mail relay
+has a replacement** (or you accept loss of outbound mail from dependent hosts):
 
 ```bash
 # On pdc — demote and remove from the domain (adjust flags for your Samba version)
@@ -674,22 +798,26 @@ ${PROD} playbooks/ddns-client.yml --limit bastion.home.2123studios.com   # optio
 
 ## Phase 3 — Validation checklist
 
-- [ ] `samba-tool drs showrepl` clean on dc1
+- [ ] `./scripts/migration/repl-check.sh --remote dc1.home.2123studios.com` passes
+- [ ] `./scripts/migration/cutover-check.sh --phase post --remote dc1.home.2123studios.com` passes
 - [ ] All FSMO roles on dc1 (`samba-tool fsmo show`)
 - [ ] `kinit user@HOME.2123STUDIOS.COM` succeeds for domain users
 - [ ] SSH to bastion with domain credentials
 - [ ] `getent passwd` on kvm01/kif returns domain users (no rejoin)
-- [ ] DHCP clients receive dc1 as DNS
-- [ ] DDNS hook creates A/PTR records (`dig` after lease renew)
+- [ ] DHCP clients receive dc1 as DNS ([unifi-gateway-dns.md](unifi-gateway-dns.md))
+- [ ] DDNS hook creates A/PTR after lease renew ([ddns-runbook.md](ddns-runbook.md))
+- [ ] DDNS API healthy (`curl http://192.168.1.10:8765/ddns/v1/health`)
 - [ ] Windows clients resolve `home.2123studios.com` (manual DNS if needed)
+- [ ] Internal mail relay no longer depends on pdc (or interim relay documented)
 - [ ] Old pdc demoted or powered off
 
 ---
 
 ## Phase 4 — Remote-site DCs (Woodbine, Swanhollow)
 
-Same `dc-replica-join.yml` playbook as dc1. Each site needs its subnet and site
-object in AD first ([ad-sites.md](ad-sites.md)).
+Same `dc-replica-join.yml` playbook as dc1 on **Ubuntu LTS** (distro `samba-ad-dc` only).
+Each site needs its subnet and site object in AD first ([ad-sites.md](ad-sites.md)).
+Before join, confirm the new host's `samba -V` is **≥** its replication source (usually dc1).
 
 **Woodbine example:**
 
@@ -701,7 +829,7 @@ object in AD first ([ad-sites.md](ad-sites.md)).
 **Swanhollow** — same pattern with `192.168.65.0/24`, `samba_dc_join_site: Swanhollow`,
 and `65.168.192.in-addr.arpa`.
 
-**dc2 at FerryCrossing** (same subnet as dc1) — optional local replica; use
+**dc2 at FerryCrossing** (same subnet as dc1) — optional local replica on Ubuntu LTS; use
 `samba_dc_join_site: FerryCrossing` and a distinct hostname (e.g. `dc2`).
 
 ---
@@ -717,10 +845,16 @@ If join or validation fails **before** router cutover:
 
 If failure **after** router cutover:
 
-1. Re-point DHCP option 6 back to old pdc (`192.168.1.2`) if still running.
-2. Restore `/etc/resolv.conf` on members to previous DNS servers.
-3. Transfer FSMO back to pdc if you moved them.
-4. Investigate join/replication logs on dc1 before retrying.
+1. UniFi UI — set **DHCP DNS Server** back to pdc **`192.168.1.2`** if still running.
+2. Disable DDNS on-boot inject on the gateway:
+   `mv /data/on_boot.d/20-home-ddns.sh /data/on_boot.d/20-home-ddns.sh.disabled`
+   and remove `/run/dnsmasq.dhcp.conf.d/home-ddns.conf`; `pkill dnsmasq`.
+3. Re-enable legacy on-boot AD forwarding scripts if needed (from `.disabled` backups).
+4. Restore `/etc/resolv.conf` on members to previous DNS servers.
+5. Transfer FSMO back to pdc if you moved them.
+6. Investigate join/replication logs on dc1 before retrying.
+
+See [unifi-gateway-dns.md](unifi-gateway-dns.md) § Rollback for gateway details.
 
 ---
 

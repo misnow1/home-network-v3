@@ -1,0 +1,43 @@
+---
+description: Ansible vault passwords — lab vs production
+alwaysApply: true
+---
+
+# Ansible vault
+
+`ansible.cfg` intentionally has **no** `vault_password_file`. Lab and production use different passwords; never assume a global default.
+
+## Password files (repo root, never commit)
+
+| Environment | File | Env var fallback |
+|---|---|---|
+| Lab | `.vault_pass_lab` | `VAULT_PASS_LAB` |
+| Production | `.vault_pass` | `VAULT_PASS` |
+
+Default lab password after clone: `change-me-lab-vault` (see `docs/vault-schema.md`).
+
+## Running playbooks
+
+Prefer wrappers — they set inventory, PATH, and vault password:
+
+- **Lab:** `scripts/lib/ansible.sh` helpers, `./scripts/test-quick.sh`, or VM scripts under `scripts/vm/`
+- **Production:** `./scripts/prod-run.sh --confirm-production -- playbooks/...` only — never bare `ansible-playbook -i inventories/production`
+
+## Ad-hoc `ansible-playbook` / `ansible-vault`
+
+Always pass `--vault-password-file` explicitly (or export `ANSIBLE_VAULT_PASSWORD_FILE`):
+
+```bash
+# Lab
+ansible-playbook -i inventories/lab --vault-password-file .vault_pass_lab playbooks/...
+
+# Production (prefer prod-run.sh)
+ansible-playbook -i inventories/production --vault-password-file .vault_pass playbooks/...
+```
+
+Before running, verify the password file exists; create from env var if needed (see `scripts/lib/common.sh` `ensure_vault_password_file*`).
+
+## Common failure modes
+
+- **Decryption error** — missing/wrong password file for the target inventory
+- **Join credentials missing** — vault decrypts but `vault_ad_join_user` / `vault_ad_join_password` unset in that inventory's `group_vars/all/vault.yml`

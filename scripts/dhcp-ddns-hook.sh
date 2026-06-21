@@ -2,7 +2,7 @@
 # dhcp-ddns-hook.sh — dnsmasq dhcp-script: notify DC DDNS API on lease add/old/del (IPv4 + IPv6).
 #
 # Install on the dnsmasq host (router / libvirt hypervisor). Configure dnsmasq:
-#   dhcp-script=/usr/local/sbin/home-ddns-hook.sh
+#   dhcp-script=/usr/local/sbin/dhcp-ddns-hook.sh
 #
 # Configuration (root-only, e.g. /etc/home-ddns.env — not world-readable):
 #   DDNS_UPDATE_URL          Primary HTTPS URL (e.g. https://dc2.home.example.com/ddns/v1/lease)
@@ -38,7 +38,16 @@ die() {
   exit 0
 }
 
-ENV_FILE="${DDNS_ENV_FILE:-/etc/home-ddns.env}"
+ENV_FILE="${DDNS_ENV_FILE:-}"
+if [[ -z "${ENV_FILE}" ]]; then
+  for candidate in /data/home-ddns/home-ddns.env /etc/home-ddns.env; do
+    if [[ -f "${candidate}" ]]; then
+      ENV_FILE="${candidate}"
+      break
+    fi
+  done
+fi
+ENV_FILE="${ENV_FILE:-/etc/home-ddns.env}"
 if [[ -f "$ENV_FILE" ]]; then
   set +u
   # shellcheck disable=SC1090
