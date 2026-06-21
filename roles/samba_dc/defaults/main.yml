@@ -71,3 +71,13 @@ samba_dc_smb_conf_candidates:
   - /etc/samba/smb.conf
 # Resolved at runtime by samba_smb_conf.yml.
 samba_dc_smb_conf: /etc/samba/smb.conf
+
+# Operator break-glass SSH (dc-converge) — local Unix account with pubkey auth.
+samba_dc_operator_enabled: false
+samba_dc_operator_user: ""
+samba_dc_operator_uid: null
+samba_dc_operator_gid: null
+samba_dc_operator_shell: /bin/bash
+samba_dc_operator_ssh_keys: []
+samba_dc_operator_sudo: true
+samba_dc_operator_home: "/home/{{ samba_dc_operator_user }}"

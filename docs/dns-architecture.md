@@ -34,8 +34,10 @@ dnsmasq (router/kvm01) --dhcp-script--> dhcp-ddns-hook.sh --HTTP POST-->
   ddns-nsupdate container on DC --GSS-TSIG nsupdate--> BIND on DC
 ```
 
-Production routers are configured manually (see `docs/ddns-runbook.md`). Lab libvirt
-dnsmasq uses the same hook via `scripts/lab/libvirt/lab-network.xml`.
+Production routers are configured manually — the FerryCrossing gateway is a
+UniFi Cloud Gateway Fiber; see [unifi-gateway-dns.md](unifi-gateway-dns.md) (router)
+and [ddns-runbook.md](ddns-runbook.md) (DC API + deployment). Lab libvirt dnsmasq
+uses the same hook via `scripts/lab/libvirt/lab-network.xml`.
 
 ## Configuration (Ansible-managed)
 

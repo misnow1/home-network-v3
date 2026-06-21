@@ -66,3 +66,7 @@
 - name: DC converge | Configure DNS updater service account
   ansible.builtin.import_tasks: dnsupdater.yml
   tags: [samba_converge]
+
+- name: DC converge | Configure operator break-glass SSH account
+  ansible.builtin.import_tasks: operator_ssh.yml
+  tags: [samba_converge]

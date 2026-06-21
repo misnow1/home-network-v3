@@ -293,6 +293,58 @@ def _validate_hostname(h: str) -> str:
     return h
 
 
+def _ip_version(address: str) -> str:
+    if not address:
+        return "unknown"
+    try:
+        ipaddress.IPv4Address(address)
+        return "v4"
+    except ValueError:
+        pass
+    try:
+        ipaddress.IPv6Address(address)
+        return "v6"
+    except ValueError:
+        return "unknown"
+
+
+def _log_lease(
+    *,
+    peer: str,
+    outcome: str,
+    action: str = "",
+    address: str = "",
+    hostname: str = "",
+    client_id: str = "",
+    detail: str = "",
+) -> None:
+    """Structured lease log — no bearer token or full JSON body."""
+    fields = [
+        f"outcome={outcome}",
+        f"peer={peer}",
+    ]
+    if action:
+        fields.append(f"action={action}")
+    if address:
+        fields.append(f"ip_version={_ip_version(address)}")
+        fields.append(f"address={address}")
+    if hostname:
+        fields.append(f"hostname={hostname}")
+    elif action:
+        fields.append("hostname=-")
+    if client_id:
+        fields.append(f"client_id={client_id}")
+    if detail:
+        fields.append(f"detail={detail}")
+    msg = "lease " + " ".join(fields)
+    if outcome == "ok":
+        LOG.info(msg)
+    elif outcome in ("unauthorized", "rejected"):
+        LOG.warning(msg)
+    else:
+        LOG.error(msg)
+
+
 def dispatch(action: str, address: str, hostname: str) -> None:
     h_clean = (hostname or "").strip().lower()
     try:
@@ -326,7 +378,14 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "ddns-nsupdate/1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        LOG.info("%s - %s", self.address_string(), fmt % args)
+        msg = fmt % args
+        # Successful lease POSTs log structured fields in do_POST; skip duplicate access line.
+        if "POST /ddns/v1/lease" in msg and " 200 " in msg:
+            return
+        LOG.info("%s - %s", self.address_string(), msg)
+
+    def _peer(self) -> str:
+        return self.address_string()
 
     def _send(self, code: int, body: bytes | None = None, ctype: str = "text/plain; charset=utf-8") -> None:
         self.send_response(code)
@@ -347,38 +406,77 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"not found\n")
             return
         if not _verify_bearer(self.headers.get("Authorization")):
+            _log_lease(peer=self._peer(), outcome="unauthorized")
             self._send(401, b"unauthorized\n")
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
+            _log_lease(peer=self._peer(), outcome="rejected", detail="bad_content_length")
             self._send(400, b"bad length\n")
             return
         if length <= 0 or length > _MAX_BODY:
+            _log_lease(peer=self._peer(), outcome="rejected", detail="bad_body_size")
             self._send(400, b"bad body size\n")
             return
         raw = self.rfile.read(length)
         try:
             data = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError:
+            _log_lease(peer=self._peer(), outcome="rejected", detail="invalid_json")
             self._send(400, b"invalid json\n")
             return
         action = str(data.get("action", "")).lower()
         address = str(data.get("address", "")).strip()
         hostname = str(data.get("hostname", "")).strip().lower()
+        client_id = str(data.get("client_id", "")).strip()
         if action not in ("upsert", "delete"):
+            _log_lease(
+                peer=self._peer(),
+                outcome="rejected",
+                action=action or "-",
+                address=address,
+                hostname=hostname,
+                client_id=client_id,
+                detail="bad_action",
+            )
             self._send(400, b"bad action\n")
             return
         try:
             dispatch(action, address, hostname)
         except ValueError as exc:
+            _log_lease(
+                peer=self._peer(),
+                outcome="rejected",
+                action=action,
+                address=address,
+                hostname=hostname,
+                client_id=client_id,
+                detail=str(exc),
+            )
             self._send(400, (str(exc) + "\n").encode())
             return
         except RuntimeError as exc:
             # kinit/nsupdate failures include detail in exc message; avoid duplicate stack traces.
-            LOG.error("ddns failed: %s", exc)
+            _log_lease(
+                peer=self._peer(),
+                outcome="failed",
+                action=action,
+                address=address,
+                hostname=hostname,
+                client_id=client_id,
+                detail=str(exc),
+            )
             self._send(502, (str(exc) + "\n").encode())
             return
+        _log_lease(
+            peer=self._peer(),
+            outcome="ok",
+            action=action,
+            address=address,
+            hostname=hostname,
+            client_id=client_id,
+        )
         self._send(200, b'{"ok":true}\n', ctype="application/json; charset=utf-8")
 
 

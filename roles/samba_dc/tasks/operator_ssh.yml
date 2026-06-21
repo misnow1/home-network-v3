@@ -1,0 +1,179 @@
+---
+# Local break-glass SSH account for operator admin on DC hosts.
+
+- name: DC operator SSH | Assert operator username is set
+  ansible.builtin.assert:
+    that:
+      - samba_dc_operator_user | length > 0
+    fail_msg: >-
+      samba_dc_operator_user is empty — set in group_vars/dc/vars.yml
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Assert uid and gid are configured
+  ansible.builtin.assert:
+    that:
+      - samba_dc_operator_uid is not none
+      - samba_dc_operator_gid is not none
+    fail_msg: >-
+      samba_dc_operator_uid and samba_dc_operator_gid must be set when
+      samba_dc_operator_enabled is true — match RFC2307 IDs from AD on members.
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Assert SSH public keys are configured
+  ansible.builtin.assert:
+    that:
+      - samba_dc_operator_ssh_keys | length > 0
+    fail_msg: >-
+      samba_dc_operator_ssh_keys is empty — add your public key to
+      group_vars/dc/vars.yml
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+# Domain users resolve via libnss_winbind on Samba AD DC. useradd/groupadd call getpwnam()
+# and refuse names that exist in winbind even when absent from /etc/passwd. Append local
+# entries to /etc/group and /etc/passwd directly, then adjust /etc/group for sudo.
+- name: DC operator SSH | Ensure local group and user in /etc/passwd
+  ansible.builtin.shell: |
+    set -euo pipefail
+    OP_USER="{{ samba_dc_operator_user }}"
+    OP_UID="{{ samba_dc_operator_uid }}"
+    OP_GID="{{ samba_dc_operator_gid }}"
+    OP_SHELL="{{ samba_dc_operator_shell }}"
+    OP_HOME="{{ samba_dc_operator_home }}"
+    CHANGED=0
+
+    gid_in_group_file() {
+      awk -F: -v gid="${OP_GID}" '
+        $3 == gid { found = 1 }
+        END { exit(found ? 0 : 1) }
+      ' /etc/group
+    }
+
+    # Ensure some /etc/group row has OP_GID (fix stale misnow1 row from partial runs).
+    if gid_in_group_file; then
+      if grep -q "^${OP_USER}:" /etc/group; then
+        CURRENT_GID="$(awk -F: -v u="${OP_USER}" '$1 == u { print $3; exit }' /etc/group)"
+        if [ "${CURRENT_GID}" != "${OP_GID}" ]; then
+          sed -i "s/^${OP_USER}:x:[0-9]*:/${OP_USER}:x:${OP_GID}:/" /etc/group
+          CHANGED=1
+        fi
+      fi
+    elif grep -q "^${OP_USER}:" /etc/group; then
+      sed -i "s/^${OP_USER}:x:[0-9]*:/${OP_USER}:x:${OP_GID}:/" /etc/group
+      CHANGED=1
+    else
+      echo "${OP_USER}:x:${OP_GID}:" >> /etc/group
+      CHANGED=1
+    fi
+
+    if ! gid_in_group_file; then
+      echo "Failed to ensure gid ${OP_GID} in /etc/group" >&2
+      exit 1
+    fi
+
+    if ! grep -q "^${OP_USER}:" /etc/passwd; then
+      echo "${OP_USER}:x:${OP_UID}:${OP_GID}:Local operator SSH:${OP_HOME}:${OP_SHELL}" >> /etc/passwd
+      CHANGED=1
+    else
+      CURRENT_UID="$(awk -F: -v u="${OP_USER}" '$1 == u { print $3; exit }' /etc/passwd)"
+      CURRENT_PGID="$(awk -F: -v u="${OP_USER}" '$1 == u { print $4; exit }' /etc/passwd)"
+      CURRENT_HOME="$(awk -F: -v u="${OP_USER}" '$1 == u { print $6; exit }' /etc/passwd)"
+      CURRENT_SHELL="$(awk -F: -v u="${OP_USER}" '$1 == u { print $7; exit }' /etc/passwd)"
+      if [ "${CURRENT_UID}" != "${OP_UID}" ] || [ "${CURRENT_PGID}" != "${OP_GID}" ]; then
+        sed -i "s/^${OP_USER}:x:[0-9]*:[0-9]*:/${OP_USER}:x:${OP_UID}:${OP_GID}:/" /etc/passwd
+        CHANGED=1
+      fi
+      if [ "${CURRENT_HOME}" != "${OP_HOME}" ] || [ "${CURRENT_SHELL}" != "${OP_SHELL}" ]; then
+        sed -i "s|^${OP_USER}:x:${OP_UID}:${OP_GID}:Local operator SSH:${CURRENT_HOME}:${CURRENT_SHELL}|${OP_USER}:x:${OP_UID}:${OP_GID}:Local operator SSH:${OP_HOME}:${OP_SHELL}|" /etc/passwd
+        CHANGED=1
+      fi
+    fi
+
+    if grep -q "^sudo:" /etc/group; then
+      SUDO_MEMBERS="$(awk -F: '$1 == "sudo" { print $4; exit }' /etc/group)"
+      case ",${SUDO_MEMBERS}," in
+        *,"${OP_USER}",*) ;;
+        *)
+          if [ -z "${SUDO_MEMBERS}" ]; then
+            sed -i "s/^sudo:\([^:]*\):\([^:]*\):$/sudo:\1:\2:${OP_USER}/" /etc/group
+          else
+            sed -i "s/^sudo:\([^:]*\):\([^:]*\):${SUDO_MEMBERS}$/sudo:\1:\2:${SUDO_MEMBERS},${OP_USER}/" /etc/group
+          fi
+          CHANGED=1
+          ;;
+      esac
+    fi
+
+    if [ ! -d "${OP_HOME}" ]; then
+      mkdir -p "${OP_HOME}"
+      chown "${OP_UID}:${OP_GID}" "${OP_HOME}"
+      chmod 0755 "${OP_HOME}"
+      CHANGED=1
+    fi
+
+    if [ "${CHANGED}" -eq 1 ]; then
+      echo changed
+    fi
+  args:
+    executable: /bin/bash
+  register: operator_local_account
+  changed_when: "'changed' in operator_local_account.stdout"
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Assert local operator exists in /etc/passwd
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -q
+      - "^{{ samba_dc_operator_user }}:"
+      - /etc/passwd
+  changed_when: false
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+# Use explicit paths and numeric uid/gid — do not resolve the username via NSS.
+- name: DC operator SSH | Ensure local operator homedir exists
+  ansible.builtin.file:
+    path: "{{ samba_dc_operator_home }}"
+    state: directory
+    owner: "{{ samba_dc_operator_uid }}"
+    group: "{{ samba_dc_operator_gid }}"
+    mode: "0755"
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Ensure operator .ssh directory exists
+  ansible.builtin.file:
+    path: "{{ samba_dc_operator_home }}/.ssh"
+    state: directory
+    owner: "{{ samba_dc_operator_uid }}"
+    group: "{{ samba_dc_operator_gid }}"
+    mode: "0700"
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Install authorized keys for local operator user
+  ansible.builtin.copy:
+    dest: "{{ samba_dc_operator_home }}/.ssh/authorized_keys"
+    content: "{{ samba_dc_operator_ssh_keys | join('\n') }}\n"
+    owner: "{{ samba_dc_operator_uid }}"
+    group: "{{ samba_dc_operator_gid }}"
+    mode: "0600"
+  when: samba_dc_operator_enabled | bool
+  tags: [samba_converge]
+
+- name: DC operator SSH | Grant passwordless sudo to operator user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ samba_dc_operator_user }}"
+    content: "{{ samba_dc_operator_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  when:
+    - samba_dc_operator_enabled | bool
+    - samba_dc_operator_sudo | bool
+  tags: [samba_converge]

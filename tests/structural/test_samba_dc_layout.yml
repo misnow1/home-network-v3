@@ -11,6 +11,7 @@
     dc_bootstrap_playbook: "{{ repo_root }}/playbooks/dc-bootstrap.yml"
     dc_restore_playbook: "{{ repo_root }}/playbooks/dc-restore.yml"
     dc_converge_playbook: "{{ repo_root }}/playbooks/dc-converge.yml"
+    converge_tasks: "{{ repo_root }}/roles/samba_dc/tasks/converge.yml"
     restore_tasks: "{{ repo_root }}/roles/samba_dc/tasks/restore.yml"
   tasks:
     - name: Samba DC | bootstrap tasks exist
@@ -54,6 +55,13 @@
     - name: Samba DC | assert dc-converge.yml imports converge tasks
       ansible.builtin.shell: |
         grep -q 'tasks_from: converge' "{{ dc_converge_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert converge.yml imports operator_ssh tasks
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: operator_ssh.yml' "{{ converge_tasks }}"
       args:
         executable: /bin/bash
       changed_when: false

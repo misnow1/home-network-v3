@@ -129,6 +129,61 @@ Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc
 1. Ensures `samba-ad-dc` and `named` are running
 2. Refreshes `/etc/krb5.conf`
 3. Extends chrony for MS-SNTP signing to domain members
+4. Optionally configures a **local operator SSH account** (see below)
+
+### Operator SSH (local break-glass)
+
+Domain members use **domain login** via SSSD or winbind — see
+[domain-join-runbook.md](domain-join-runbook.md) and
+[fileserver-runbook.md](fileserver-runbook.md).
+
+On a Samba AD DC, cloud-init creates only the `ansible` user for automation. The DC does
+**not** run `domain_join` or the file-server winbind+PAM stack, but Ubuntu's Samba AD DC
+packages still wire **libnss_winbind** into `/etc/nsswitch.conf`. With `samba-ad-dc`
+running, domain users (e.g. `misnow1`) resolve via NSS — often as `HOME\misnow1` with
+Samba's DC idmap range (e.g. `uid=3000013`), **not** the RFC2307 `uidNumber` members
+read via SSSD (`ldap_id_mapping = false`). The repo **masks** the standalone `winbindd`
+unit (see `roles/samba_dc/tasks/bootstrap.yml`) to avoid conflicting with `samba-ad-dc`;
+that is not the same as "no domain users in NSS."
+
+**Pubkey SSH** still needs a **local** `/etc/passwd` entry (or a homedir `authorized_keys`
+for a domain user you authenticate another way). The operator tasks create that local
+account by appending to `/etc/group` and `/etc/passwd` directly — `useradd` refuses names
+that winbind already exposes via `getpwnam()`, even when absent from `files`.
+
+For day-to-day admin SSH without the ansible key, enable a **local Unix account** in
+`group_vars/dc/vars.yml` with the same `uidNumber` / `gidNumber` as your AD user on
+joined hosts (keeps file ownership consistent on the DC filesystem):
+
+```yaml
+samba_dc_operator_enabled: true
+samba_dc_operator_user: misnow1
+samba_dc_operator_uid: <uidNumber from getent passwd on a member>
+samba_dc_operator_gid: <gidNumber from getent passwd on a member>
+samba_dc_operator_ssh_keys:
+  - "ssh-ed25519 AAAA... you@laptop"
+```
+
+Copy the example from
+`inventories/production/group_vars/dc/vars.yml.example`. Public keys are not secrets —
+do not put them in vault.
+
+After converge:
+
+```bash
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/dc-converge.yml --limit dc1.home.2123studios.com
+
+ssh misnow1@<dc-ip>
+id   # uid/gid should match RFC2307 IDs from members (e.g. 965557), not winbind's 3M range
+```
+
+Re-run converge is idempotent. Keep using `ansible` for automation (`prod-run.sh`,
+integration tests, migration scripts).
+
+`nsswitch.conf` lists `files` before `winbind`, so after converge `getent passwd misnow1`
+should show the **local** account. `id misnow1` after SSH should match your configured
+`samba_dc_operator_uid` / `gid`, not `HOME\misnow1` with uid `3000013`.
 
 ## Tags
 

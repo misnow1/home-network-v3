@@ -76,9 +76,9 @@ Swanhollow).
 1. Pre-flight — `./scripts/migration/preflight-check.sh`
 2. Optional backup on old DC — manual `samba-tool domain backup` (safety net)
 3. **`dc-replica-join.yml`** on dc1 (preferred — live pdc required)
-4. `dc-converge.yml` → `ddns-api.yml` on dc1
+4. `dc-converge.yml` → `ddns-api.yml` on dc1 ([ddns-runbook.md](ddns-runbook.md))
 5. Transfer FSMO roles — manual on dc1
-6. Router/DHCP DNS cutover — manual
+6. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
 7. CentOS deferred hosts — manual `/etc/resolv.conf` only
 8. Demote old pdc — manual
 9. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`

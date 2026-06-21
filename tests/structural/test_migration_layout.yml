@@ -16,6 +16,8 @@
     domain_leave_playbook: "{{ repo_root }}/playbooks/domain-leave.yml"
     preflight_script: "{{ repo_root }}/scripts/migration/preflight-check.sh"
     pdc_audit_script: "{{ repo_root }}/scripts/migration/pdc-audit.sh"
+    repl_check_script: "{{ repo_root }}/scripts/migration/repl-check.sh"
+    cutover_check_script: "{{ repo_root }}/scripts/migration/cutover-check.sh"
   tasks:
     - name: Migration | assert migration runbook exists
       ansible.builtin.stat:
@@ -138,6 +140,37 @@
           - pdc_audit_stat.stat.exists
           - pdc_audit_stat.stat.executable
 
+    - name: Migration | assert repl-check script exists and is executable
+      ansible.builtin.stat:
+        path: "{{ repl_check_script }}"
+      register: repl_check_stat
+
+    - name: Migration | assert repl-check script present
+      ansible.builtin.assert:
+        that:
+          - repl_check_stat.stat.exists
+          - repl_check_stat.stat.executable
+
+    - name: Migration | assert cutover-check script exists and is executable
+      ansible.builtin.stat:
+        path: "{{ cutover_check_script }}"
+      register: cutover_check_stat
+
+    - name: Migration | assert cutover-check script present
+      ansible.builtin.assert:
+        that:
+          - cutover_check_stat.stat.exists
+          - cutover_check_stat.stat.executable
+
+    - name: Migration | assert migration runbook documents replication monitoring
+      ansible.builtin.shell: |
+        grep -q 'repl-check.sh' "{{ migration_runbook }}"
+        grep -q 'cutover-check.sh' "{{ migration_runbook }}"
+        grep -q 'Samba version skew' "{{ migration_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Migration | assert migration runbook documents pdc audit
       ansible.builtin.shell: |
         grep -q 'pdc-audit.sh' "{{ migration_runbook }}"
@@ -152,6 +185,32 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Migration | assert migration runbook documents UniFi gateway cutover
+      ansible.builtin.shell: |
+        grep -q 'unifi-gateway-dns.md' "{{ migration_runbook }}"
+        grep -q 'ddns-runbook.md' "{{ migration_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Migration | assert UniFi on-boot inject script exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/router/unifi/20-home-ddns.sh"
+      register: unifi_ddns_boot_stat
+
+    - name: Migration | assert UniFi dhcp-script wrapper exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/router/unifi/dhcp-script-wrapper.sh"
+      register: unifi_dhcp_wrapper_stat
+
+    - name: Migration | assert UniFi on-boot inject script present
+      ansible.builtin.assert:
+        that:
+          - unifi_ddns_boot_stat.stat.exists
+          - unifi_ddns_boot_stat.stat.executable
+          - unifi_dhcp_wrapper_stat.stat.exists
+          - unifi_dhcp_wrapper_stat.stat.executable
 
     - name: Migration | assert hosts example uses dc1 naming
       ansible.builtin.shell: |

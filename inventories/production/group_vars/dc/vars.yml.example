@@ -38,3 +38,11 @@ ddns_nsupdate_enabled: true
 # Offline fallback only (legacy DC unavailable):
 # samba_dc_migration_mode: restore
 # samba_dc_backup_archive is passed via -e at playbook runtime, not stored here
+
+# Operator break-glass SSH (dc-converge) — pubkey is not secret; live in gitignored vars.yml
+# samba_dc_operator_enabled: true
+# samba_dc_operator_user: misnow1
+# samba_dc_operator_uid: <same uidNumber as AD user on members>
+# samba_dc_operator_gid: <same gidNumber as primary group>
+# samba_dc_operator_ssh_keys:
+#   - "ssh-ed25519 AAAA... you@laptop"
