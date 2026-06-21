@@ -20,6 +20,17 @@ else
   exit 1
 fi
 
+if [[ -f /tmp/dhcp-ddns-parse.sh ]]; then
+  mkdir -p "${DEST}/lib"
+  install -m 0644 /tmp/dhcp-ddns-parse.sh "${DEST}/lib/dhcp-ddns-parse.sh"
+elif [[ -f /tmp/lib/dhcp-ddns-parse.sh ]]; then
+  mkdir -p "${DEST}/lib"
+  install -m 0644 /tmp/lib/dhcp-ddns-parse.sh "${DEST}/lib/dhcp-ddns-parse.sh"
+else
+  echo "Missing /tmp/dhcp-ddns-parse.sh — scp from repo scripts/lib/dhcp-ddns-parse.sh first." >&2
+  exit 1
+fi
+
 if [[ -f /tmp/dhcp-script-wrapper.sh ]]; then
   install -m 0755 /tmp/dhcp-script-wrapper.sh "${DEST}/dhcp-script-wrapper.sh"
 elif [[ -f "${DEST}/dhcp-script-wrapper.sh" ]]; then

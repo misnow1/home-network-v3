@@ -13,6 +13,7 @@ for the full cutover procedure.
 | `home-ddns.env.example` | `/data/home-ddns/home-ddns.env` |
 | `20-home-ddns.sh` | `/data/on_boot.d/20-home-ddns.sh` |
 | `../dhcp-ddns-hook.sh` (repo `scripts/`) | `/data/home-ddns/dhcp-ddns-hook.sh` |
+| `../../lib/dhcp-ddns-parse.sh` (repo `scripts/lib/`) | `/data/home-ddns/lib/dhcp-ddns-parse.sh` |
 
 `20-home-ddns.sh` patches `shared.conf` to use the wrapper (chains UniFi
 `dnsmasq-dhcp-script` + DDNS hook). Do not add a second `dhcp-script=` file.
@@ -24,6 +25,7 @@ GATEWAY=gateway.example.com
 REPO=/path/to/home-network-v3
 
 scp "${REPO}/scripts/dhcp-ddns-hook.sh" \
+    "${REPO}/scripts/lib/dhcp-ddns-parse.sh" \
     "${REPO}/scripts/router/unifi/dhcp-script-wrapper.sh" \
     "${REPO}/scripts/router/unifi/home-ddns.env.example" \
     root@"${GATEWAY}":/tmp/

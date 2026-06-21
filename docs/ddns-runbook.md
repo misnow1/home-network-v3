@@ -85,7 +85,8 @@ Router configuration is **manual** — not Ansible-managed.
 ### Generic Linux router or DHCP server
 
 1. Copy `scripts/dhcp-ddns-hook.sh` to `/usr/local/sbin/dhcp-ddns-hook.sh` (`chmod +x`)
-2. Create `/etc/home-ddns.env` (mode `0600`, root-owned):
+2. Copy `scripts/lib/dhcp-ddns-parse.sh` to `/usr/local/lib/dhcp-ddns-parse.sh` (`chmod 644`)
+3. Create `/etc/home-ddns.env` (mode `0600`, root-owned):
 
 ```sh
 DDNS_UPDATE_URL="http://<dc-ip>:8765/ddns/v1/lease"
@@ -170,6 +171,32 @@ flowchart TB
 IPv4 upsert creates A + PTR. IPv4 delete removes PTR always; A is removed when
 hostname is set or inferred from PTR. IPv6 upsert/delete manages AAAA only (no
 ip6.arpa in this phase).
+
+## Troubleshooting
+
+### `invalid_address` with colon-hex `address` matching `client_id`
+
+**Symptom** (DDNS API container logs):
+
+```text
+lease outcome=rejected ... ip_version=unknown address=00:04:b4:... detail=invalid_address
+```
+
+The `address` field looks like a long colon-separated hex string (a DHCPv6 DUID),
+and often equals `client_id`. IPv4 leases in the same log window succeed normally.
+
+**Cause:** An older `dhcp-ddns-hook.sh` used naive IPv6 detection (`*:*`) and
+posted the DUID as the lease address instead of the real IPv6.
+
+**Fix:**
+
+1. Deploy current hook **and** parse library from the repo:
+   - Generic: `scripts/dhcp-ddns-hook.sh` + `scripts/lib/dhcp-ddns-parse.sh`
+   - UniFi: both files via `scripts/router/unifi/install-home-ddns.sh` (see
+     [unifi-gateway-dns.md](unifi-gateway-dns.md))
+2. Trigger a DHCPv6 renew on an affected host.
+3. Confirm API log shows `ip_version=v6 outcome=ok` and `dig @<dc> <host> AAAA`
+   returns the v6 address.
 
 ## Appendix — Lab
 

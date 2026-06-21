@@ -26,6 +26,9 @@ main() {
   log_info "Tier 1 — ansible-playbook --syntax-check"
   run_ansible_syntax_check "${ROOT}"
 
+  log_info "Tier 1 — dhcp-ddns-hook parse tests"
+  "${ROOT}/scripts/test-dhcp-ddns-hook-parse.sh"
+
   log_info "Tier 2 — production safety script"
   "${ROOT}/scripts/test-prod-safety.sh"
 
