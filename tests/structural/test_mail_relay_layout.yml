@@ -73,9 +73,10 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Mail relay | assert domain_join excludes mail_relay and wires relay client
+    - name: Mail relay | assert domain_join wires relay client for members only
       ansible.builtin.shell: |
-        grep -q '!mail_relay' "{{ repo_root }}/playbooks/domain-join.yml"
+        grep -q 'mail_relay_client_enabled' "{{ domain_join_main }}"
+        grep -q "'mail_relay' not in group_names" "{{ domain_join_main }}"
         grep -q 'postfix_relayclient.yml' "{{ domain_join_main }}"
         grep -q 'mail_relay_hostname' "{{ repo_root }}/roles/domain_join/templates/postfix-main.cf.j2"
       args:

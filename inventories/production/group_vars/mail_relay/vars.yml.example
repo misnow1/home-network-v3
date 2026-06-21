@@ -17,7 +17,9 @@ certbot_staging: true   # flip false after staging dry-run succeeds
 certbot_deploy_hook_reload_samba: false
 certbot_deploy_hook_reload_postfix: true
 
+# Server role (playbooks/mail-relay.yml) — not the domain_join relay client.
 mail_relay_enabled: true
+mail_relay_client_enabled: false
 mail_relay_hostname: mail.home.2123studios.com
 mail_relay_domain: home.2123studios.com
 mail_relay_mynetworks:

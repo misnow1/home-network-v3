@@ -43,6 +43,6 @@
     JOIN_PASSWORD: "{{ vault_ad_join_password }}"
     DOMAIN_NAME: "{{ domain_name }}"
   when: domain_name | lower not in realm_list_output.stdout | lower
-  no_log: true
+  no_log: false
   notify: restart sssd
   tags: [domain_join]

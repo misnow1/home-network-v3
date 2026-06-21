@@ -13,7 +13,9 @@ lab_test_user: labtest
 lab_test_user_uid: 10001
 lab_test_user_gid: 10001
 
-# Internal mail relay (Slice 16+) — set mail_relay_enabled in group_vars when relay is live.
-mail_relay_enabled: false
+# Internal mail relay client (Slice 16+) — members relay outbound mail to mail_relay_hostname.
+# Set mail_relay_client_enabled in group_vars/linux/vars.yml on domain-joined members.
+# Do NOT enable on hosts in the mail_relay group (they run the mail_relay server role).
+mail_relay_client_enabled: false
 mail_relay_hostname: mail.home.2123studios.com
 mail_relay_manage_root_forward: false
