@@ -35,6 +35,10 @@
       - roles/docker_engine/tasks/main.yml
       - roles/ddns_nsupdate/tasks/main.yml
       - docker/ddns-nsupdate/app.py
+      - docker/mail-relay/docker-compose.yml
+      - docs/mail-relay-runbook.md
+      - roles/samba_dc/tasks/dns_mail_relay.yml
+      - roles/domain_join/tasks/postfix_relayclient.yml
       - scripts/dhcp-ddns-hook.sh
       - roles/hypervisor/tasks/libvirt.yml
       - roles/samba_fileserver/tasks/join.yml

@@ -1,0 +1,91 @@
+---
+# Structural tests for Slice 16 internal mail relay layout.
+
+- name: Structural — mail relay layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    docker_compose: "{{ repo_root }}/docker/mail-relay/docker-compose.yml"
+    converge_tasks: "{{ repo_root }}/roles/samba_dc/tasks/converge.yml"
+    dns_mail_relay_tasks: "{{ repo_root }}/roles/samba_dc/tasks/dns_mail_relay.yml"
+    postfix_relay_tasks: "{{ repo_root }}/roles/domain_join/tasks/postfix_relayclient.yml"
+    domain_join_main: "{{ repo_root }}/roles/domain_join/tasks/main.yml"
+    sender_rewrite: "{{ repo_root }}/docker/mail-relay/postfix/sender_canonical_regexp"
+    runbook: "{{ repo_root }}/docs/mail-relay-runbook.md"
+    vault_schema: "{{ repo_root }}/docs/vault-schema.md"
+  tasks:
+    - name: Mail relay | assert docker compose uses host networking
+      ansible.builtin.shell: |
+        grep -q 'network_mode: host' "{{ docker_compose }}"
+        grep -q 'mail-relay:' "{{ docker_compose }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Mail relay | assert Postfix template files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: mail_relay_paths
+      loop:
+        - "{{ repo_root }}/docker/mail-relay/Dockerfile"
+        - "{{ repo_root }}/docker/mail-relay/entrypoint.sh"
+        - "{{ repo_root }}/docker/mail-relay/postfix/main.cf.template"
+        - "{{ repo_root }}/docker/mail-relay/postfix/master.cf.template"
+        - "{{ sender_rewrite }}"
+        - "{{ repo_root }}/docker/mail-relay/postfix/virtual_aliases_regexp.template"
+        - "{{ repo_root }}/docker/mail-relay/.env.example"
+
+    - name: Mail relay | assert docker project skeleton
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ mail_relay_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Mail relay | assert pdc-equivalent sender rewrite
+      ansible.builtin.shell: |
+        grep -q '2123studios.com' "{{ sender_rewrite }}"
+        grep -q 'home\\.2123studios\\.com' "{{ sender_rewrite }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Mail relay | assert dc converge imports dns_mail_relay
+      ansible.builtin.shell: |
+        grep -q 'dns_mail_relay.yml' "{{ converge_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Mail relay | assert dns_mail_relay task file exists
+      ansible.builtin.stat:
+        path: "{{ dns_mail_relay_tasks }}"
+      register: dns_mail_relay_stat
+
+    - name: Mail relay | assert dns task present
+      ansible.builtin.assert:
+        that:
+          - dns_mail_relay_stat.stat.exists
+        fail_msg: Missing dns_mail_relay.yml
+
+    - name: Mail relay | assert domain_join wires postfix relay client
+      ansible.builtin.shell: |
+        grep -q 'postfix_relayclient.yml' "{{ domain_join_main }}"
+        grep -q 'mail_relay_enabled' "{{ domain_join_main }}"
+        grep -q 'mail_relay_hostname' "{{ repo_root }}/roles/domain_join/templates/postfix-main.cf.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Mail relay | assert runbook and vault schema document slice
+      ansible.builtin.shell: |
+        grep -q 'mail.home.2123studios.com' "{{ runbook }}"
+        grep -q 'vault_mail_gmail_user' "{{ vault_schema }}"
+        grep -q 'vault_mail_gmail_app_password' "{{ vault_schema }}"
+        grep -q 'vault_mail_default_recipient' "{{ vault_schema }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

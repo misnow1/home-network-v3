@@ -1,0 +1,15 @@
+# Ansible-managed relay-only Postfix (domain_join role).
+# Outbound mail relays through {{ mail_relay_hostname }}.
+
+myhostname = {{ ansible_fqdn | default(inventory_hostname) }}
+mydomain = {{ domain_name }}
+myorigin = $mydomain
+inet_interfaces = loopback-only
+inet_protocols = ipv4
+
+mydestination = $myhostname, localhost.$mydomain, localhost
+
+relayhost = [{{ mail_relay_hostname }}]:587
+smtp_use_tls = yes
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1

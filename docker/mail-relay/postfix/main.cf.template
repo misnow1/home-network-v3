@@ -1,0 +1,36 @@
+# Ansible-managed internal mail relay — rendered from docker/mail-relay at container start.
+
+myhostname = ${MAIL_RELAY_HOSTNAME}
+mydomain = ${MAIL_RELAY_DOMAIN}
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+
+mydestination = $myhostname, localhost.$mydomain, localhost
+relayhost = [smtp.gmail.com]:587
+
+mynetworks = ${MAIL_RELAY_MYNETWORKS}
+
+# Gmail smarthost authentication
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_sasl_tls_security_options = noanonymous
+smtp_tls_security_level = encrypt
+smtp_use_tls = yes
+
+# TLS for internal clients (STARTTLS on submission)
+smtpd_tls_cert_file = ${TLS_CERT_DIR}/fullchain.pem
+smtpd_tls_key_file = ${TLS_CERT_DIR}/privkey.pem
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+
+# pdc-equivalent sender rewrite: root@kif.home.2123studios.com -> root-kif@2123studios.com
+sender_canonical_maps = regexp:/etc/postfix/sender_canonical_regexp
+
+# Centralized root mail delivery (replaces per-host .forward)
+virtual_alias_maps = regexp:/etc/postfix/virtual_aliases_regexp
+
+# Basic hardening
+smtpd_relay_restrictions = permit_mynetworks, reject
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination

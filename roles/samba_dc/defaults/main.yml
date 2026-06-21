@@ -85,3 +85,10 @@ samba_dc_operator_shell: /bin/bash
 samba_dc_operator_ssh_keys: []
 samba_dc_operator_sudo: true
 samba_dc_operator_home: "/home/{{ samba_dc_operator_user }}"
+
+# Internal mail relay DNS (Slice 16+) — enable in production dc group_vars.
+mail_relay_dns_enabled: false
+mail_relay_hostname: mail.home.2123studios.com
+mail_relay_dns_name: "{{ mail_relay_hostname.split('.')[0] }}"
+mail_relay_target_ip: ""
+mail_relay_mx_priority: 10

@@ -35,6 +35,11 @@ certbot_email: sno.sno@gmail.com
 certbot_staging: true   # flip false after staging dry-run succeeds
 samba_dc_tls_enabled: true
 
+# Internal mail relay (Slice 16+) — docs/mail-relay-runbook.md
+mail_relay_dns_enabled: true
+mail_relay_hostname: mail.home.2123studios.com
+mail_relay_target_ip: 192.168.1.30   # kif.home.2123studios.com — adjust to live IP
+
 # AD migration (docs/migration-runbook.md) — set on dc1 before dc-replica-join.yml
 # samba_dc_migration_host: true
 # samba_dc_migration_mode: replica
