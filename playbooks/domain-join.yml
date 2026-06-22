@@ -4,7 +4,7 @@
 # Lab integration: scripts/test-integration.sh (member01.lab.test + dc01.lab.test).
 
 - name: Join Linux hosts to AD domain
-  hosts: "linux:!dc:!mail_relay"
+  hosts: "linux:!dc"
   become: true
   roles:
     - role: domain_join

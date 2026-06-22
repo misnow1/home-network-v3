@@ -46,7 +46,7 @@
 
   tasks:
     - name: Certbot | Apply Samba LDAP TLS configuration
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: samba_dc
         tasks_from: tls
       when:
