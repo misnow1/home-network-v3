@@ -1,0 +1,96 @@
+---
+# Restrict Samba to primary LAN NIC + loopback so samba_dnsupdate does not
+# register Docker bridge IPs as DC A/AAAA records.
+
+- name: Samba DC interfaces | Resolve effective interface list
+  ansible.builtin.import_tasks: samba_interfaces_resolve.yml
+  when: samba_dc_bind_interfaces_only | bool
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Ensure smb.conf path is resolved
+  ansible.builtin.import_tasks: samba_smb_conf.yml
+  when: samba_dc_bind_interfaces_only | bool
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Check if domain is provisioned
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_dc_interfaces_sam_ldb
+  changed_when: false
+  when: samba_dc_bind_interfaces_only | bool
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Write interfaces to smb.conf
+  ansible.builtin.lineinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    regexp: '^\s*interfaces\s*='
+    line: "\tinterfaces = {{ samba_dc_interfaces_smb_conf_value }}"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+  notify: restart samba-ad-dc
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Write bind interfaces only to smb.conf
+  ansible.builtin.lineinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    regexp: '^\s*bind interfaces only\s*='
+    line: "\tbind interfaces only = yes"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+  notify: restart samba-ad-dc
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Apply Samba restart before DNS refresh
+  ansible.builtin.meta: flush_handlers
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+    - not ansible_check_mode
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Prune stale DC hostname DNS records and refresh
+  ansible.builtin.shell: |
+    set -euo pipefail
+    zone="{{ dc_domain_name }}"
+    host="{{ inventory_hostname.split('.')[0] }}"
+    declare -A allowed=()
+
+    for iface in {{ samba_dc_effective_interfaces | join(' ') }}; do
+      while read -r ip; do
+        [[ -n "$ip" ]] && allowed["$ip"]=1
+      done < <(ip -4 -o addr show dev "$iface" scope global 2>/dev/null \
+        | awk '{print $4}' | cut -d/ -f1 || true)
+      while read -r ip; do
+        [[ -n "$ip" ]] && allowed["$ip"]=1
+      done < <(ip -6 -o addr show dev "$iface" scope global 2>/dev/null \
+        | awk '{print $4}' | cut -d/ -f1 || true)
+    done
+
+    changed=0
+    while read -r rtype ip; do
+      [[ -z "$rtype" || -z "$ip" ]] && continue
+      if [[ -z "${allowed[$ip]:-}" ]]; then
+        samba-tool dns delete localhost "$zone" "$host" "$rtype" "$ip" --machine-pass
+        echo "deleted-${rtype}: ${host} -> ${ip}"
+        changed=1
+      fi
+    done < <(samba-tool dns query localhost "$zone" "$host" ALL --machine-pass 2>/dev/null \
+      | awk '/^[[:space:]]+(A|AAAA):/ { gsub(/:/, "", $1); print $1, $2 }' || true)
+
+    samba_dnsupdate --verbose
+    if [[ "$changed" -eq 1 ]]; then
+      echo "dns-records-pruned"
+    else
+      echo "dns-records-ok"
+    fi
+  args:
+    executable: /bin/bash
+  register: samba_dc_interfaces_dns_prune
+  changed_when: "'dns-records-pruned' in samba_dc_interfaces_dns_prune.stdout"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+    - not ansible_check_mode
+  tags: [samba_dns, samba_converge, samba_provision]

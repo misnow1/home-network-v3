@@ -1,0 +1,41 @@
+---
+# Resolve Samba interface list for smb.conf and samba-tool --option.
+# Imported before domain provision/join and from samba_interfaces.yml.
+
+- name: Samba DC interfaces | Resolve from explicit list
+  ansible.builtin.set_fact:
+    samba_dc_effective_interfaces: "{{ samba_dc_interfaces }}"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces | length > 0
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Assert primary IPv4 interface is available
+  ansible.builtin.assert:
+    that:
+      - ansible_default_ipv4 is defined
+      - ansible_default_ipv4.interface is defined
+      - ansible_default_ipv4.interface | length > 0
+    fail_msg: >-
+      samba_dc_interfaces is empty and ansible_default_ipv4.interface is unavailable.
+      Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]).
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces | length == 0
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Auto-detect primary NIC
+  ansible.builtin.set_fact:
+    samba_dc_effective_interfaces:
+      - lo
+      - "{{ ansible_default_ipv4.interface }}"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces | length == 0
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Build smb.conf interfaces value
+  ansible.builtin.set_fact:
+    samba_dc_interfaces_smb_conf_value: "{{ samba_dc_effective_interfaces | join(' ') }}"
+  when: samba_dc_bind_interfaces_only | bool
+  tags: [samba_dns, samba_converge, samba_provision]

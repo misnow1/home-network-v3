@@ -91,20 +91,38 @@
   when: not samba_sam_ldb.stat.exists
   tags: [samba_provision, samba_dns]
 
+- name: DC replica join | Resolve Samba interface list for join
+  ansible.builtin.import_tasks: samba_interfaces_resolve.yml
+  when:
+    - not samba_sam_ldb.stat.exists
+    - samba_dc_bind_interfaces_only | bool
+  tags: [samba_provision]
+
 - name: DC replica join | Build domain join command
   ansible.builtin.set_fact:
-    samba_dc_join_argv:
-      - samba-tool
-      - domain
-      - join
-      - "{{ dc_domain_name }}"
-      - DC
-      - "--realm={{ dc_realm | upper }}"
-      - "--server={{ samba_dc_join_server }}"
-      - "--dns-backend=BIND9_DLZ"
-      - "--site={{ samba_dc_join_site }}"
-      - "-U{{ samba_dc_join_user }}"
-      - "--password={{ samba_dc_join_password }}"
+    samba_dc_join_argv: >-
+      {{
+        [
+          'samba-tool',
+          'domain',
+          'join',
+          dc_domain_name,
+          'DC',
+          '--realm=' + (dc_realm | upper),
+          '--server=' + samba_dc_join_server,
+          '--dns-backend=BIND9_DLZ',
+          '--site=' + samba_dc_join_site,
+          '-U' + samba_dc_join_user,
+          '--password=' + samba_dc_join_password,
+        ]
+        + (
+          [
+            '--option=interfaces=' + samba_dc_interfaces_smb_conf_value,
+            '--option=bind interfaces only=yes',
+          ]
+          if samba_dc_bind_interfaces_only | bool else []
+        )
+      }}
   no_log: false
   when: not samba_sam_ldb.stat.exists
   tags: [samba_provision]

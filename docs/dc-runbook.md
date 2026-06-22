@@ -128,8 +128,10 @@ Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc
 
 1. Ensures `samba-ad-dc` and `named` are running
 2. Refreshes `/etc/krb5.conf`
-3. Extends chrony for MS-SNTP signing to domain members
-4. Optionally configures a **local operator SSH account** (see below)
+3. Restricts Samba to the primary LAN NIC for DNS self-registration (see
+   [dns-architecture.md](dns-architecture.md#dc-hostname-registration-aaaa))
+4. Extends chrony for MS-SNTP signing to domain members
+5. Optionally configures a **local operator SSH account** (see below)
 
 ### Operator SSH (local break-glass)
 

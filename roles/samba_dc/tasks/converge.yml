@@ -39,6 +39,10 @@
     remote_src: true
   tags: [samba_converge]
 
+- name: DC converge | Restrict Samba to primary LAN interface for DNS registration
+  ansible.builtin.import_tasks: samba_interfaces.yml
+  tags: [samba_dns, samba_converge]
+
 - name: DC converge | Extend chrony for MS-SNTP signing to domain members
   ansible.builtin.blockinfile:
     path: /etc/chrony/chrony.conf

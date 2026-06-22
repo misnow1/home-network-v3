@@ -49,6 +49,29 @@ uses the same hook via `scripts/lab/libvirt/lab-network.xml`.
 | `/var/lib/samba/private/dnsupdater.keytab` | `dnsupdater.yml` | Client update credentials (Slice 6) |
 | `/etc/krb5.keytab.dnsupdater` | `ddns_client` role | Member copy of dnsupdater keytab |
 | `/opt/ddns-nsupdate/` | `ddns_nsupdate` role | Docker compose project (Slice 9) |
+| Samba `smb.conf` `interfaces` / `bind interfaces only` | `samba_interfaces.yml` | DC self-registration limited to primary NIC + lo |
+
+## DC hostname registration (A/AAAA)
+
+Samba's `samba_dnsupdate` (triggered by `samba-ad-dc`) registers the DC's own hostname
+in AD DNS. Without interface binding, **every** host IP — including Docker bridges
+(`docker0`, `br-*`) — can appear as A/AAAA records.
+
+Ansible enforces on bootstrap, replica join, and converge:
+
+```ini
+interfaces = lo <primary-nic>
+bind interfaces only = yes
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `samba_dc_bind_interfaces_only` | `true` | Enable interface binding |
+| `samba_dc_interfaces` | `[]` | Explicit list (e.g. `[lo, enp1s0]`); empty = auto-detect `lo` + `ansible_default_ipv4.interface` |
+
+After binding, converge prunes stale A/AAAA records for the DC hostname and runs
+`samba_dnsupdate`. Override `samba_dc_interfaces` in host_vars when auto-detect picks
+the wrong NIC.
 
 ## Integration test proof
 

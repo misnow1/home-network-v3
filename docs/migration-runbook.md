@@ -364,8 +364,18 @@ sudo samba-tool dns delete 127.0.0.1 home.2123studios.com pdc AAAA <ipv6> -UAdmi
 dig +short @127.0.0.1 pdc.home.2123studios.com AAAA   # must be empty
 ```
 
-Optional but recommended before rejoin — stop Samba from using WAN IPv6 for DC traffic
-(edit `/etc/samba/smb.conf`, then `sudo systemctl restart samba`):
+On **new DCs** (`dc1`, `dc2`, …), interface binding is managed by Ansible
+(`samba_interfaces.yml` via `dc-converge.yml`) — see
+[dns-architecture.md](dns-architecture.md#dc-hostname-registration-aaaa). For the
+legacy **pdc** only, you may still need a one-time manual cleanup before demote:
+
+```bash
+sudo samba-tool dns query 127.0.0.1 home.2123studios.com pdc ALL -UAdministrator
+sudo samba-tool dns delete 127.0.0.1 home.2123studios.com pdc AAAA <ipv6> -UAdministrator
+```
+
+Optional on legacy pdc — stop Samba from using WAN IPv6 for DC traffic until demoted
+(edit `/etc/samba/smb.conf`, then `sudo systemctl restart samba-ad-dc`):
 
 ```ini
 interfaces = 192.168.1.2/24 127.0.0.0/8
