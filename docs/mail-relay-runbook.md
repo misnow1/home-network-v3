@@ -18,7 +18,7 @@ See also:
 | Postfix relay | Dedicated VM — `mail.home.2123studios.com` |
 | TLS | Certbot snap on same VM (`certbot` inventory group) |
 | DNS A + MX | AD DNS on dc1 (Ansible `dns_mail_relay.yml`) |
-| Member `relayhost` | Ansible `domain_join` role when `mail_relay_enabled: true` |
+| Member `relayhost` | Ansible `domain_join` role when `mail_relay_client_enabled: true` |
 | Upstream | Gmail SMTP (`smtp.gmail.com:587`) with app password |
 
 Sender rewrite (replicates pdc `/etc/postfix/sender_rewrite`):
@@ -70,10 +70,14 @@ mail_relay_target_ip: 192.168.1.15   # mail VM
 5. Linux member group vars (when ready to cut over):
 
 ```yaml
-mail_relay_enabled: true
+mail_relay_client_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
 mail_relay_manage_root_forward: true   # optional: remove /root/.forward
 ```
+
+The mail VM uses `mail_relay_client_enabled: false` in `group_vars/mail_relay/` so
+`domain-join.yml` joins AD without configuring relay-client Postfix (server role handles
+that via `mail-relay.yml`).
 
 ## Step 1 — Provision the mail relay VM
 
@@ -86,17 +90,22 @@ From the control node (kvm01 or similar):
 
 Suggested sizing: 512MB–1GB RAM, 8–12GB disk (see `hosts.yml.example`).
 
-## Step 2 — Converge baseline, certbot, and Postfix
+## Step 2 — Converge baseline, domain join, certbot, and Postfix
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 
 ${PROD} playbooks/baseline.yml --limit mail.home.2123studios.com
+${PROD} playbooks/domain-join.yml --limit mail.home.2123studios.com
 ${PROD} playbooks/certbot.yml -e allow_production=true \
   --limit mail.home.2123studios.com
 ${PROD} playbooks/mail-relay.yml -e allow_production=true \
   --limit mail.home.2123studios.com
 ```
+
+Run `domain-join.yml` before certbot so the mail VM is domain-joined and uses AD DNS.
+With `mail_relay_client_enabled: false` in mail relay group vars, domain join does **not**
+install relay-client Postfix — `mail-relay.yml` owns server config.
 
 Certbot uses the same Dreamhost DNS-01 hooks as dc1. Renewal reloads Postfix via
 `certbot_deploy_hook_reload_postfix: true` in mail relay group vars.
@@ -141,9 +150,11 @@ Verify in Gmail:
 
 ## Step 5 — Cut over members
 
-**Ansible-managed Ubuntu members:**
+**Ansible-managed Ubuntu members** (with `mail_relay_client_enabled: true` in
+`group_vars/linux/`):
 
 ```bash
+${PROD} playbooks/baseline.yml --limit bastion.home.2123studios.com
 ${PROD} playbooks/domain-join.yml --limit bastion.home.2123studios.com
 ```
 
@@ -168,9 +179,9 @@ Confirm no relay traffic to pdc, then proceed with migration runbook Step 8:
 
 ```text
 vm-create mail.home.2123studios.com
-baseline.yml → certbot.yml → mail-relay.yml   (mail VM)
-dc-converge.yml                               (dc1 — DNS A + MX)
-domain-join.yml                               (members — relayhost)
+baseline.yml → domain-join.yml → certbot.yml → mail-relay.yml   (mail VM)
+dc-converge.yml                                                 (dc1 — DNS A + MX)
+baseline.yml → domain-join.yml                                  (members — relayhost client)
 ```
 
 ## Troubleshooting
