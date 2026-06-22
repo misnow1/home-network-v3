@@ -195,6 +195,7 @@ GATEWAY=gateway.home.2123studios.com
 REPO=/path/to/home-network-v3
 
 scp "${REPO}/scripts/dhcp-ddns-hook.sh" \
+    "${REPO}/scripts/lib/dhcp-ddns-parse.sh" \
     "${REPO}/scripts/router/unifi/dhcp-script-wrapper.sh" \
     "${REPO}/scripts/router/unifi/home-ddns.env.example" \
     root@"${GATEWAY}":/tmp/

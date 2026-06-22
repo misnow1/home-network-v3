@@ -10,6 +10,7 @@
     ddns_nsupdate_tasks: "{{ repo_root }}/roles/ddns_nsupdate/tasks/main.yml"
     docker_engine_tasks: "{{ repo_root }}/roles/docker_engine/tasks/main.yml"
     hook_script: "{{ repo_root }}/scripts/dhcp-ddns-hook.sh"
+    parse_lib: "{{ repo_root }}/scripts/lib/dhcp-ddns-parse.sh"
     docker_app: "{{ repo_root }}/docker/ddns-nsupdate/app.py"
     hook_ensure: "{{ repo_root }}/scripts/lab/ddns-hook-ensure.sh"
     vm_create_dhcp: "{{ repo_root }}/scripts/lab/vm-create-dhcp.sh"
@@ -46,6 +47,7 @@
       register: dhcp_ddns_paths
       loop:
         - "{{ hook_script }}"
+        - "{{ parse_lib }}"
         - "{{ docker_app }}"
         - "{{ hook_ensure }}"
         - "{{ vm_create_dhcp }}"
