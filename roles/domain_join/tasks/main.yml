@@ -10,3 +10,10 @@
 - name: Configure SSSD and PAM homedir
   ansible.builtin.include_tasks: configure.yml
   tags: [domain_configure]
+
+- name: Configure Postfix relay client
+  ansible.builtin.include_tasks: postfix_relayclient.yml
+  when:
+    - mail_relay_client_enabled | bool
+    - "'mail_relay' not in group_names"
+  tags: [domain_mail_relay]

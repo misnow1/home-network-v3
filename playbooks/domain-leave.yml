@@ -4,7 +4,7 @@
 # Excludes DC hosts. See docs/migration-runbook.md.
 
 - name: Leave AD domain on Linux members
-  hosts: "linux:!dc"
+  hosts: "linux:!dc:!mail_relay"
   become: true
   roles:
     - role: domain_leave

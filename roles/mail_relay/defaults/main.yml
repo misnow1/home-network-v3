@@ -1,0 +1,16 @@
+---
+mail_relay_enabled: true
+mail_relay_hostname: "{{ inventory_hostname }}"
+mail_relay_domain: "{{ domain_name | default('home.2123studios.com') }}"
+mail_relay_mynetworks:
+  - 127.0.0.0/8
+  - 192.168.1.0/24
+
+mail_relay_gmail_user: "{{ vault_mail_gmail_user | default('') }}"
+mail_relay_gmail_app_password: "{{ vault_mail_gmail_app_password | default('') }}"
+mail_relay_default_recipient: "{{ vault_mail_default_recipient | default('') }}"
+
+mail_relay_tls_cert_dir: "{{ certbot_live_dir | default('/etc/letsencrypt/live/' ~ mail_relay_hostname) }}"
+
+mail_relay_manage_ufw: false
+mail_relay_ufw_allow_cidrs: []

@@ -1,0 +1,31 @@
+# {{ ansible_managed }}
+# Internal SMTP relay — Slice 16+
+
+myhostname = {{ mail_relay_hostname }}
+mydomain = {{ mail_relay_domain }}
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+
+mydestination = $myhostname, localhost.$mydomain, localhost
+relayhost = [smtp.gmail.com]:587
+
+mynetworks = {{ mail_relay_mynetworks | join(', ') }}
+
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_sasl_tls_security_options = noanonymous
+smtp_tls_security_level = encrypt
+smtp_use_tls = yes
+
+smtpd_tls_cert_file = {{ mail_relay_tls_cert_dir }}/fullchain.pem
+smtpd_tls_key_file = {{ mail_relay_tls_cert_dir }}/privkey.pem
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+
+sender_canonical_maps = regexp:/etc/postfix/sender_canonical_regexp
+virtual_alias_maps = regexp:/etc/postfix/virtual_aliases_regexp
+
+smtpd_relay_restrictions = permit_mynetworks, reject
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination

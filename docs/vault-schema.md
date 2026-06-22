@@ -55,6 +55,9 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_ddns_shared_secret` | 9 | Bearer token for DDNS API (dhcp-script → DC) | `change-me-ddns-api` |
 | `vault_backup_repository_key` | 7 | Backup target encryption key | `change-me-backup-key` |
 | `vault_dreamhost_api_key` | 10 | Dreamhost API key (`dns-*`) for Certbot DNS-01 | production only |
+| `vault_mail_gmail_user` | 16 | Gmail address for internal mail relay SASL auth | production only |
+| `vault_mail_gmail_app_password` | 16 | Gmail app password for relay smarthost | production only |
+| `vault_mail_default_recipient` | 16 | Delivery target for root@*.home.2123studios.com | production only |
 
 ## Recreate the lab vault
 

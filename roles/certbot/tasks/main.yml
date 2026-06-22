@@ -33,6 +33,15 @@
     - certbot_provider == 'dreamhost_dns'
   no_log: true
 
+- name: Certbot | Ensure renewal hook directory exists
+  ansible.builtin.file:
+    path: "{{ certbot_renewal_hooks_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: certbot_enabled | bool
+
 - name: Certbot | Deploy renewal deploy hook
   ansible.builtin.template:
     src: reload-services.sh.j2
@@ -43,13 +52,13 @@
   when: certbot_enabled | bool
 
 - name: Certbot | Issue certificate with local CA (lab)
-  ansible.builtin.import_tasks: local_ca.yml
+  ansible.builtin.include_tasks: local_ca.yml
   when:
     - certbot_enabled | bool
     - certbot_provider == 'local_ca'
 
 - name: Certbot | Issue certificate via Dreamhost DNS-01 (production)
-  ansible.builtin.import_tasks: dreamhost_dns.yml
+  ansible.builtin.include_tasks: dreamhost_dns.yml
   when:
     - certbot_enabled | bool
     - certbot_provider == 'dreamhost_dns'

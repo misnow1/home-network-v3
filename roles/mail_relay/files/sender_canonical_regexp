@@ -1,0 +1,2 @@
+# Replicate pdc /etc/postfix/sender_rewrite (regexp map).
+/^([^@]*)@([^\.]+)\.home\.2123studios\.com$/    $1-$2@2123studios.com

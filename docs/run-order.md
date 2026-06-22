@@ -66,7 +66,8 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 5. Domain members — `domain-join.yml` on `linux:!dc`
 6. DDNS clients — `ddns-client.yml` (optional)
 7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
-8. Certbot TLS — `certbot.yml` on DCs for Samba LDAPS ([certbot-runbook.md](certbot-runbook.md))
+8. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
+9. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
 
 ### AD migration (existing Samba domain)
 
@@ -79,12 +80,13 @@ Swanhollow).
 3. **`dc-replica-join.yml`** on dc1 (preferred — live pdc required)
 4. `dc-converge.yml` → `ddns-api.yml` on dc1 ([ddns-runbook.md](ddns-runbook.md))
 5. `certbot.yml` on dc1 ([certbot-runbook.md](certbot-runbook.md))
-6. Transfer FSMO roles — manual on dc1
-7. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
-8. CentOS deferred hosts — manual `/etc/resolv.conf` only
-9. Demote old pdc — manual
-10. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
-11. Optional — `domain-leave.yml` before in-place reprovision
+6. Mail relay VM — `baseline.yml` → `certbot.yml` → `mail-relay.yml`; `dc-converge.yml` for DNS ([mail-relay-runbook.md](mail-relay-runbook.md))
+7. Transfer FSMO roles — manual on dc1
+8. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
+9. CentOS deferred hosts — manual `/etc/resolv.conf` only
+10. Demote old pdc — manual (after mail relay cutover)
+11. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
+12. Optional — `domain-leave.yml` before in-place reprovision
 
 Offline fallback when pdc is dead: **`dc-restore.yml`** (set `samba_dc_migration_mode: restore`).
 

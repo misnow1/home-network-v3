@@ -5,3 +5,10 @@
     state: restarted
   listen: restart sssd
   when: not ansible_check_mode
+
+- name: Restart postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  listen: restart postfix
+  when: not ansible_check_mode

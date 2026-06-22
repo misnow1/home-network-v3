@@ -1,0 +1,41 @@
+---
+- name: Postfix relay client | Preseed debconf (non-interactive install)
+  ansible.builtin.shell: |
+    echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
+    echo "postfix postfix/mailname string {{ ansible_fqdn | default(inventory_hostname) }}" \
+      | debconf-set-selections
+  args:
+    executable: /bin/bash
+  changed_when: false
+  tags: [domain_mail_relay]
+
+- name: Postfix relay client | Install postfix
+  ansible.builtin.apt:
+    name: postfix
+    state: present
+  tags: [domain_mail_relay]
+
+- name: Postfix relay client | Deploy relay-only main.cf
+  ansible.builtin.template:
+    src: postfix-main.cf.j2
+    dest: /etc/postfix/main.cf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart postfix
+  tags: [domain_mail_relay]
+
+- name: Postfix relay client | Enable and start postfix
+  ansible.builtin.service:
+    name: postfix
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [domain_mail_relay]
+
+- name: Postfix relay client | Remove stale root .forward when managed
+  ansible.builtin.file:
+    path: /root/.forward
+    state: absent
+  when: mail_relay_manage_root_forward | bool
+  tags: [domain_mail_relay]

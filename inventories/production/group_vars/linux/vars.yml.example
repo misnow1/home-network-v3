@@ -8,3 +8,8 @@ domain_join_dns_servers:
   - 203.0.113.10
 domain_member_allow_groups:
   - Domain Users
+
+# Relay outbound cron mail through mail.home (domain_join postfix client — not on mail VM).
+mail_relay_client_enabled: true
+mail_relay_hostname: mail.home.2123studios.com
+mail_relay_manage_root_forward: true

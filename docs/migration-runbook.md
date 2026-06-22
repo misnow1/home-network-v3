@@ -749,13 +749,14 @@ stored on pdc).
 **Do not demote or power off pdc** until internal hosts have another relay target,
 or cron/alert mail from those hosts will fail silently.
 
-This is **out of scope for the AD migration playbooks** — track long-term replacement
-in [ROADMAP.md](ROADMAP.md) (deferred: internal mail relay). Desired end state (TBD):
+This is **out of scope for the AD migration playbooks** — implemented as Slice 16; see
+[mail-relay-runbook.md](mail-relay-runbook.md). End state:
 
-- Dedicated relay host or container (Postfix/`msmtp`/similar) — **not** on the DC
-- Rewrite/alias rules and provider credentials in **Ansible vault**, not on the RPi
-- Internal hosts point `relayhost` / `smtp` at the new relay; cut over before pdc demotion
-- Document current pdc rewrite rules and which hosts depend on it before migration
+- Postfix on a **dedicated Ubuntu VM** at **`mail.home.2123studios.com`** — **not** on the DC or kif
+- Relay hostname **`mail.home.2123studios.com`** (A + MX in AD DNS via `dns_mail_relay.yml`)
+- Rewrite/alias rules and Gmail credentials in **repo templates + vault**, not on pdc
+- Internal hosts point `relayhost` at `mail.home.2123studios.com:587`; cut over before pdc demotion
+- pdc sender rewrite preserved: `root@host.home.2123studios.com` → `root-host@2123studios.com`
 
 Until that slice lands, pdc may remain powered on **after** AD cutover (DNS/FSMO on dc1)
 purely as a mail relay — or run relay and DC roles in parallel until relay is moved.

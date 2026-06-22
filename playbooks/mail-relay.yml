@@ -1,0 +1,26 @@
+---
+# Converge internal SMTP relay (Postfix + Gmail smarthost).
+# Requires baseline.yml and certbot.yml on the same host first.
+#
+# Lab: not integrated in CI — production mail relay host only.
+# Production: scripts/prod-run.sh --confirm-production -- playbooks/mail-relay.yml \
+#   --limit mail.home.2123studios.com
+
+- name: Converge internal mail relay
+  hosts: mail_relay
+  become: true
+  pre_tasks:
+    - name: Mail relay | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing mail-relay against non-lab inventory without allow_production=true.
+          See docs/mail-relay-runbook.md.
+      tags: [always]
+
+  roles:
+    - role: mail_relay
+      tags: [mail_relay]

@@ -1,0 +1,15 @@
+---
+- name: Rebuild Postfix sasl map
+  ansible.builtin.command:
+    cmd: postmap /etc/postfix/sasl_passwd
+  listen: mail relay postfix maps changed
+  changed_when: true
+
+- name: Restart postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  listen:
+    - mail relay postfix maps changed
+    - restart postfix
+  when: not ansible_check_mode
