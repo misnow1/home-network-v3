@@ -6,6 +6,10 @@
   ansible.builtin.import_tasks: samba_smb_conf.yml
   tags: [samba_dns]
 
+- name: Samba DC DNS | Restrict Samba to primary LAN interface for DNS registration
+  ansible.builtin.import_tasks: samba_interfaces.yml
+  tags: [samba_dns]
+
 # samba_dc_dns_hostname is used for BIND apex NS records (dns_ensure_zone_ns.yml).
 # "dns hostname" in smb.conf is Samba 4.20+ only; Ubuntu 24.04 ships 4.19.x — remove
 # if a prior playbook run added it (harmless but spams logs on every samba-tool call).

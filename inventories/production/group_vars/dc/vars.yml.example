@@ -27,6 +27,9 @@ ddns_nsupdate_enabled: true
 #   - 192.168.1.0/24
 # ddns_nsupdate_nginx_tls: false  # enable after certbot.yml; reuses DC FQDN cert on :443
 
+# Samba interface binding — auto-detects lo + primary NIC; override if wrong:
+# samba_dc_interfaces: [lo, enp1s0]
+
 certbot_enabled: true
 certbot_provider: dreamhost_dns
 certbot_domains:

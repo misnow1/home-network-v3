@@ -113,3 +113,35 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Samba DC | samba_interfaces tasks exist
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces.yml"
+      register: samba_interfaces_stat
+
+    - name: Samba DC | assert samba_interfaces tasks present
+      ansible.builtin.assert:
+        that:
+          - samba_interfaces_stat.stat.exists
+
+    - name: Samba DC | assert dns_bind_dlz imports samba_interfaces
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: samba_interfaces.yml' "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert converge imports samba_interfaces
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: samba_interfaces.yml' "{{ converge_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert bootstrap passes interface options to provision
+      ansible.builtin.shell: |
+        grep -q 'samba_interfaces_resolve.yml' "{{ bootstrap_tasks }}"
+        grep -q 'bind interfaces only=yes' "{{ bootstrap_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

@@ -54,3 +54,34 @@
       changed_when: false
       no_log: true
       failed_when: kinit_result.rc != 0
+
+    - name: Query DC hostname A records from BIND on DC
+      ansible.builtin.command: dig +short @127.0.0.1 {{ inventory_hostname }} A
+      register: dc_hostname_a
+      changed_when: false
+
+    - name: Assert DC hostname A record includes expected LAN IP
+      ansible.builtin.assert:
+        that:
+          - (vm_ip | default(ansible_host)) in dc_hostname_a.stdout_lines
+        fail_msg: >-
+          Expected {{ vm_ip | default(ansible_host) }} in A records for
+          {{ inventory_hostname }}; got {{ dc_hostname_a.stdout_lines }}
+
+    - name: Assert DC hostname A records exclude Docker bridge range
+      ansible.builtin.assert:
+        that:
+          - dc_hostname_a.stdout_lines | select('match', '^172\.(1[6-9]|2[0-9]|3[01])\.') | list | length == 0
+        fail_msg: >-
+          DC A records must not include Docker bridge addresses (172.16.0.0/12);
+          got {{ dc_hostname_a.stdout_lines }}
+
+    - name: Assert smb.conf binds Samba to primary interface only
+      ansible.builtin.shell: |
+        set -euo pipefail
+        smb_conf="$(readlink -f /etc/samba/smb.conf 2>/dev/null || echo /etc/samba/smb.conf)"
+        grep -qE '^\s*bind interfaces only\s*=\s*yes' "$smb_conf"
+        grep -qF "{{ ansible_default_ipv4.interface }}" "$smb_conf"
+      args:
+        executable: /bin/bash
+      changed_when: false
