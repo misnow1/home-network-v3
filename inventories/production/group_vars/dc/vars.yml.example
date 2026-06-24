@@ -13,8 +13,20 @@ dc_domain_name: home.example
 dc_dns_forwarders:
   - 1.1.1.1
   - 8.8.8.8
+# MS-SNTP signing — VLAN 1 only (IoT VLAN 2 uses DNS ACLs but not DC time sync).
 dc_ntp_allow_cidr: 192.168.1.0/24
 samba_dc_chrony_group: _chrony
+
+# Estate-wide BIND query/recursion ACLs — all hosts in the dc group inherit this.
+# Do not duplicate in host_vars; see docs/dns-architecture.md.
+dc_trusted_networks:
+  - 192.168.1.0/24    # FerryCrossing VLAN 1
+  - 192.168.3.0/24    # FerryCrossing VLAN 2 (IoT)
+  - 192.168.33.0/24   # Woodbine (VPN-forwarded queries)
+  - 192.168.65.0/24   # Swanhollow (VPN-forwarded queries)
+  # NOT 192.168.5.0/24 — VLAN 3 (restricted) stays isolated from AD DNS
+
+samba_dc_dns_allowed_networks: "{{ dc_trusted_networks }}"
 
 samba_dc_dnsupdater_enabled: true
 samba_dc_reverse_zones:
@@ -25,6 +37,7 @@ ddns_nsupdate_enabled: true
 # ddns_nsupdate_manage_ufw: true
 # ddns_nsupdate_ufw_allow_cidrs:
 #   - 192.168.1.0/24
+#   # add 192.168.3.0/24 only if IoT DHCP will POST to the DDNS API on dc1
 # ddns_nsupdate_nginx_tls: false  # enable after certbot.yml; reuses DC FQDN cert on :443
 
 # Samba interface binding — auto-detects lo + primary NIC; override if wrong:
@@ -50,7 +63,8 @@ mail_relay_target_ip: 192.168.1.15   # mail.home.2123studios.com VM — adjust t
 # samba_dc_join_server: pdc.example.home
 # samba_dc_join_nameservers:
 #   - 192.168.1.2
-# samba_dc_join_site: FerryCrossing   # Woodbine / Swanhollow for future DCs — docs/ad-sites.md
+# AD site for dc1 — see docs/ad-sites.md
+# samba_dc_join_site: FerryCrossing
 #
 # Offline fallback only (legacy DC unavailable):
 # samba_dc_migration_mode: restore

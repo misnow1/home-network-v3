@@ -22,14 +22,21 @@ options {
     // but only recurse/answer for trusted networks to avoid being an open
     // resolver (DNS amplification / cache-poisoning exposure).
     listen-on { any; };
+    listen-on-v6 { any; };
     allow-query {
         localhost;
+{% if samba_dc_dns_include_localnets | bool %}
+        localnets;
+{% endif %}
 {% for net in samba_dc_dns_allowed_networks %}
         {{ net }};
 {% endfor %}
     };
     allow-recursion {
         localhost;
+{% if samba_dc_dns_include_localnets | bool %}
+        localnets;
+{% endif %}
 {% for net in samba_dc_dns_allowed_networks %}
         {{ net }};
 {% endfor %}

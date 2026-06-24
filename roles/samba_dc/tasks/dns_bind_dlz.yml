@@ -30,12 +30,7 @@
   tags: [samba_dns]
 
 - name: Samba DC DNS | Deploy named.conf.options
-  ansible.builtin.template:
-    src: named.conf.options.j2
-    dest: /etc/bind/named.conf.options
-    owner: root
-    group: bind
-    mode: "0644"
+  ansible.builtin.import_tasks: dns_bind_options.yml
   tags: [samba_dns]
 
 - name: Samba DC DNS | Deploy AppArmor local rules for BIND9_DLZ

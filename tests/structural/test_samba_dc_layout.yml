@@ -145,3 +145,28 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Samba DC | assert converge deploys named.conf.options
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: dns_bind_options.yml' "{{ converge_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert named.conf.options includes IPv6 and localnets
+      ansible.builtin.shell: |
+        grep -q 'listen-on-v6' "{{ repo_root }}/roles/samba_dc/templates/named.conf.options.j2"
+        grep -q 'localnets' "{{ repo_root }}/roles/samba_dc/templates/named.conf.options.j2"
+        grep -q 'samba_dc_dns_include_localnets' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        grep -q 'dc_trusted_networks' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert production dc example documents dc_trusted_networks
+      ansible.builtin.shell: |
+        grep -q 'dc_trusted_networks' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
+        grep -q '192.168.3.0/24' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
+      args:
+        executable: /bin/bash
+      changed_when: false
