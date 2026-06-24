@@ -1,0 +1,61 @@
+---
+# Structural tests for Slice 13 lab DC replica integration.
+
+- name: Structural — dc replica layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    lab_hosts: "{{ repo_root }}/inventories/lab/hosts.yml"
+    dc02_host_vars: "{{ repo_root }}/inventories/lab/host_vars/dc02.lab.test/vars.yml"
+    integration_script: "{{ repo_root }}/scripts/test-integration.sh"
+    replica_test: "{{ repo_root }}/tests/integration/test_dc_replica_converged.yml"
+    ci_workflow: "{{ repo_root }}/.github/workflows/test-integration-dc-replica.yml"
+  tasks:
+    - name: DC replica | assert lab inventory lists dc02
+      ansible.builtin.shell: |
+        grep -q 'dc02.lab.test:' "{{ lab_hosts }}"
+        grep -A20 '^    dc:' "{{ lab_hosts }}" | grep -q 'dc02.lab.test'
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: DC replica | assert dc02 host_vars set migration join settings
+      ansible.builtin.shell: |
+        grep -q 'samba_dc_migration_host: true' "{{ dc02_host_vars }}"
+        grep -q 'samba_dc_join_server: dc01.lab.test' "{{ dc02_host_vars }}"
+        grep -q 'samba_dc_join_site: Default-First-Site-Name' "{{ dc02_host_vars }}"
+        grep -q 'samba_dc_target_server_name: dc02' "{{ dc02_host_vars }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: DC replica | assert integration script wires dc_replica slice
+      ansible.builtin.shell: |
+        grep -q 'run_dc_replica_integration' "{{ integration_script }}"
+        grep -q 'dc_replica)' "{{ integration_script }}"
+        grep -q 'dc-replica-join.yml' "{{ integration_script }}"
+        grep -q 'test_dc_replica_converged.yml' "{{ integration_script }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: DC replica | assert replica integration test playbook exists
+      ansible.builtin.stat:
+        path: "{{ replica_test }}"
+      register: replica_test_stat
+
+    - name: DC replica | assert replica integration test present
+      ansible.builtin.assert:
+        that:
+          - replica_test_stat.stat.exists
+
+    - name: DC replica | assert CI workflow exists for nightly/manual runs
+      ansible.builtin.shell: |
+        grep -q 'workflow_dispatch' "{{ ci_workflow }}"
+        grep -q 'schedule:' "{{ ci_workflow }}"
+        grep -q 'INTEGRATION_SLICE=dc_replica' "{{ ci_workflow }}"
+        grep -q 'self-hosted' "{{ ci_workflow }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

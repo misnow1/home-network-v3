@@ -1,0 +1,28 @@
+---
+# Cloud-init maps the VM hostname to 127.0.1.1; samba_dnsupdate then targets
+# 127.0.1.1:53 for GSS-TSIG updates but BIND listens on the LAN IP / 127.0.0.1.
+# Map the DC FQDN to its LAN IP so local DNS registration succeeds (replica DCs).
+
+- name: Samba DC DNS hosts | Check if domain is provisioned
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_dc_dns_hosts_sam_ldb
+  changed_when: false
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC DNS hosts | Remove cloud-init 127.0.1.1 hostname alias
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    state: absent
+  when: samba_dc_dns_hosts_sam_ldb.stat.exists
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC DNS hosts | Map DC FQDN to LAN IP
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^\s*{{ (vm_ip | default(ansible_host)) | regex_escape() }}\s+{{ inventory_hostname | regex_escape() }}(\s|$)'
+    line: "{{ vm_ip | default(ansible_host) }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
+    insertafter: '^127\.0\.0\.1\s'
+  when: samba_dc_dns_hosts_sam_ldb.stat.exists
+  tags: [samba_dns, samba_converge, samba_provision]

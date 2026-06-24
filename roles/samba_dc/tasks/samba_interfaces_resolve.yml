@@ -13,11 +13,11 @@
 - name: Samba DC interfaces | Assert primary IPv4 interface is available
   ansible.builtin.assert:
     that:
-      - ansible_default_ipv4 is defined
-      - ansible_default_ipv4.interface is defined
-      - ansible_default_ipv4.interface | length > 0
+      - ansible_facts['default_ipv4'] is defined
+      - ansible_facts['default_ipv4']['interface'] is defined
+      - ansible_facts['default_ipv4']['interface'] | length > 0
     fail_msg: >-
-      samba_dc_interfaces is empty and ansible_default_ipv4.interface is unavailable.
+      samba_dc_interfaces is empty and default_ipv4.interface is unavailable.
       Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]).
   when:
     - samba_dc_bind_interfaces_only | bool
@@ -28,7 +28,7 @@
   ansible.builtin.set_fact:
     samba_dc_effective_interfaces:
       - lo
-      - "{{ ansible_default_ipv4.interface }}"
+      - "{{ ansible_facts['default_ipv4']['interface'] }}"
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length == 0

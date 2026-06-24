@@ -39,6 +39,10 @@
     remote_src: true
   tags: [samba_converge]
 
+- name: DC converge | Fix /etc/hosts for local Samba DNS updates
+  ansible.builtin.import_tasks: dns_hosts.yml
+  tags: [samba_dns, samba_converge]
+
 - name: DC converge | Restrict Samba to primary LAN interface for DNS registration
   ansible.builtin.import_tasks: samba_interfaces.yml
   tags: [samba_dns, samba_converge]

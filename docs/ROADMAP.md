@@ -17,6 +17,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 8 | Production convergence | **done** | Runbooks, prod wrapper, inventory examples, safety tests |
 | 9 | DHCP-driven DDNS | **done** | dnsmasq hook + Docker DDNS API on DC |
 | 10 | Certbot DNS validation | **done** | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
+| 13 | DC replica | **done** | `dc02.lab.test` replica join; `INTEGRATION_SLICE=dc_replica`; CI nightly |
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 
 ## Deferred (not forgotten)
@@ -26,7 +27,6 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 10+ | Pi-hole / DNS forwarders | Slice 2/6 DNS | Operational service, not provisioning core |
 | 11+ | Observability (Prometheus/Grafana) | Slices 1–5 hosts | Monitoring is separate concern |
 | 12+ | Bare-metal install (PXE/kickstart) | Slice 1 baseline | Lab uses cloud-init; prod install later |
-| 13+ | DC replica | Slice 2 DC | Single DC sufficient for lab |
 | 14+ | Windows provisioning | Slice 2 AD | Manual/docs only — Windows clients out of scope |
 | 15+ | NFS exports | Slice 5 file server | SMB first; NFS if needed later |
 

@@ -168,6 +168,10 @@
     mode: "0644"
   tags: [samba_dns]
 
+- name: Samba DC DNS | Fix /etc/hosts for local Samba DNS updates
+  ansible.builtin.import_tasks: dns_hosts.yml
+  tags: [samba_dns]
+
 - name: Samba DC DNS | Copy generated krb5.conf to /etc/krb5.conf
   ansible.builtin.copy:
     src: /var/lib/samba/private/krb5.conf

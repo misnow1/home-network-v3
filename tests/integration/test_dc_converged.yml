@@ -81,7 +81,7 @@
         set -euo pipefail
         smb_conf="$(readlink -f /etc/samba/smb.conf 2>/dev/null || echo /etc/samba/smb.conf)"
         grep -qE '^\s*bind interfaces only\s*=\s*yes' "$smb_conf"
-        grep -qF "{{ ansible_default_ipv4.interface }}" "$smb_conf"
+        grep -qF "{{ ansible_facts['default_ipv4']['interface'] }}" "$smb_conf"
       args:
         executable: /bin/bash
       changed_when: false

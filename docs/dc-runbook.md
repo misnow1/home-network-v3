@@ -14,6 +14,15 @@ such as `ldb-tools`, `tcpdump`, `nmap`).
 
 Default host is `dc01.lab.test` — creates VM, bootstraps AD, converges, verifies, tears down.
 
+Slice 13 replica integration (two DCs — longer; opt-in locally, nightly in CI):
+
+```bash
+INTEGRATION_SLICE=dc_replica ./scripts/test-integration.sh
+```
+
+GitHub Actions workflow `Test Integration DC Replica` runs the same test on the kvm01
+self-hosted runner (nightly schedule + manual `workflow_dispatch`).
+
 Override for Slice 1 regression:
 
 ```bash
@@ -31,6 +40,23 @@ ansible-playbook playbooks/dc-converge.yml --limit dc01.lab.test
 ansible-playbook tests/integration/test_dc_converged.yml --limit dc01.lab.test
 
 ./scripts/lab/vm-destroy.sh dc01.lab.test
+```
+
+### Manual lab workflow — replica DC (Slice 13)
+
+Requires a bootstrapped `dc01.lab.test` first. `dc02` uses
+`Default-First-Site-Name` (greenfield bootstrap site) — see
+`inventories/lab/host_vars/dc02.lab.test/vars.yml`.
+
+```bash
+./scripts/lab/vm-create.sh dc02.lab.test
+./scripts/lab/wait-ssh.sh dc02.lab.test
+
+ansible-playbook playbooks/dc-replica-join.yml --limit dc02.lab.test
+ansible-playbook playbooks/dc-converge.yml --limit dc
+ansible-playbook tests/integration/test_dc_replica_converged.yml --limit dc
+
+./scripts/lab/vm-destroy.sh dc02.lab.test
 ```
 
 Re-run `dc-converge.yml` twice — second run must report `changed=0`.

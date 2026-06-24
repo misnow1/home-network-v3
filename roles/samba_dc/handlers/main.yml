@@ -6,6 +6,14 @@
   listen: restart samba-ad-dc
   when: not ansible_check_mode
 
+# BIND9_DLZ reads DNS from Samba — reload named after directory restarts.
+- name: Restart named after samba-ad-dc (BIND9_DLZ)
+  ansible.builtin.service:
+    name: named
+    state: restarted
+  listen: restart samba-ad-dc
+  when: not ansible_check_mode
+
 - name: Restart named
   ansible.builtin.service:
     name: named

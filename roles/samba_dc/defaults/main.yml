@@ -75,7 +75,7 @@ samba_dc_smb_conf: /etc/samba/smb.conf
 # Restrict Samba (and samba_dnsupdate) to primary LAN NIC + loopback so Docker
 # bridge IPs are not registered as DC A/AAAA records. See samba_interfaces.yml.
 samba_dc_bind_interfaces_only: true
-# Empty list = auto-detect lo + ansible_default_ipv4.interface at runtime.
+# Empty list = auto-detect lo + ansible_facts['default_ipv4']['interface'] at runtime.
 samba_dc_interfaces: []
 
 # LDAPS / START-TLS — apply with playbooks/certbot.yml (requires cert material first).

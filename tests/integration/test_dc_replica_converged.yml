@@ -1,0 +1,88 @@
+---
+# Post-converge checks for Slice 13 integration tests (dc01 + dc02.lab.test).
+# Per-DC baseline checks, then replica-specific directory/DNS discovery.
+#
+# Avoid samba-tool drs showrepl/replicate on replica DCs: bind interfaces only
+# breaks self-RPC (--machine-pass / local DRS queries fail on dc02).
+
+- name: Import per-DC convergence checks
+  import_playbook: test_dc_converged.yml
+
+- name: Integration — Samba AD DC replica directory
+  hosts: dc
+  become: true
+  gather_facts: false
+  vars:
+    samba_base_dn: "{{ lab_domain.split('.') | map('regex_replace', '^', 'DC=') | join(',') }}"
+    samba_servers_dn: "CN=Servers,CN=Default-First-Site-Name,CN=Sites,CN=Configuration,{{ samba_base_dn }}"
+  tasks:
+    # Configuration NC requires auth over LDAP; read local sam.ldb as root instead.
+    - name: Query AD site server objects from local sam.ldb
+      ansible.builtin.command:
+        argv:
+          - ldbsearch
+          - -H
+          - /var/lib/samba/private/sam.ldb
+          - -b
+          - "{{ samba_servers_dn }}"
+          - -s
+          - sub
+          - "(objectClass=server)"
+          - cn
+      register: site_servers
+      changed_when: false
+      failed_when: site_servers.rc != 0
+
+    - name: Assert both DC server objects are in the directory
+      ansible.builtin.assert:
+        that:
+          - "'cn: dc01' in site_servers.stdout | lower"
+          - "'cn: dc02' in site_servers.stdout | lower"
+        fail_msg: >-
+          Expected DC01 and DC02 server objects under {{ samba_servers_dn }}
+          on {{ inventory_hostname }}; got {{ site_servers.stdout }}
+
+    - name: Query zone apex NS records from local BIND
+      ansible.builtin.command: dig +short @127.0.0.1 {{ lab_domain }} NS
+      register: zone_apex_ns
+      changed_when: false
+
+    - name: Assert zone apex has NS records
+      ansible.builtin.assert:
+        that:
+          - zone_apex_ns.stdout | length > 0
+        fail_msg: >-
+          No apex NS records for {{ lab_domain }} on {{ inventory_hostname }};
+          got {{ zone_apex_ns.stdout_lines }}
+
+- name: Integration — dual DC DNS discovery
+  hosts: dc01.lab.test
+  gather_facts: false
+  tasks:
+    - name: Query _ldap._tcp SRV records from primary DC BIND
+      ansible.builtin.command: dig +short @127.0.0.1 _ldap._tcp.{{ lab_domain }} SRV
+      register: ldap_srv_all
+      changed_when: false
+
+    - name: Assert both DCs appear in _ldap._tcp SRV answers
+      ansible.builtin.assert:
+        that:
+          - ldap_srv_all.stdout | length > 0
+          - "'dc01' in ldap_srv_all.stdout | lower"
+          - "'dc02' in ldap_srv_all.stdout | lower"
+        fail_msg: >-
+          Expected _ldap._tcp SRV records for dc01 and dc02; got
+          {{ ldap_srv_all.stdout_lines }}
+
+    - name: Query dc02 A record from primary DC BIND
+      ansible.builtin.command: dig +short @127.0.0.1 dc02.{{ lab_domain }} A
+      register: dc02_a_from_dc01
+      changed_when: false
+
+    - name: Assert dc02 A record is published from primary DC
+      ansible.builtin.assert:
+        that:
+          - "'192.168.100.12' in dc02_a_from_dc01.stdout_lines"
+        fail_msg: >-
+          Expected dc02.{{ lab_domain }} A 192.168.100.12 from dc01 BIND;
+          got {{ dc02_a_from_dc01.stdout_lines }}
