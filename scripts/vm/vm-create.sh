@@ -24,6 +24,7 @@ USE_DHCP=0
 NESTED_VIRT=0
 NETWORK_EXPLICIT=0
 INVENTORY_FQDN=""
+DRY_RUN=0
 
 usage() {
   cat <<EOF
@@ -47,6 +48,8 @@ Options:
   --network NAME    libvirt network (default: home-dc-lab for ad-hoc)
   --dhcp            DHCP cloud-init on libvirt network
   --nested-virt     Enable host-passthrough CPU
+  --dry-run         Build disk + cloud-init seed; write install.sh and domain.xml
+                    without defining the VM (for offline install on another hypervisor)
   -h, --help        Show this help
 
 Examples:
@@ -54,6 +57,7 @@ Examples:
   $(basename "$0") -i production dc1.home.2123studios.com --disk-gb 20
   $(basename "$0") -i production --name dc1 --fqdn dc1.home.2123studios.com --ip 192.168.1.10 --network external-default
   $(basename "$0") --name cka-cp1 --network vlan3 --dhcp --memory 4096 --vcpus 2 --disk-gb 20
+  $(basename "$0") -i production --dry-run dc02.home.2123studios.com
 EOF
 }
 
@@ -108,6 +112,10 @@ parse_args() {
         ;;
       --nested-virt)
         NESTED_VIRT=1
+        shift
+        ;;
+      --dry-run)
+        DRY_RUN=1
         shift
         ;;
       -h|--help)
@@ -205,23 +213,36 @@ create_vm() {
   local disk_gb="$9"
   local nested_virt="${10}"
 
-  require_cmd virsh
-  require_cmd virt-install
   require_cmd qemu-img
   require_cmd envsubst
 
-  vm_ensure_network_for_profile "${PROFILE}" "${net_name}" "${bridge}"
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    require_cmd virsh
+    require_cmd virt-install
+    vm_ensure_network_for_profile "${PROFILE}" "${net_name}" "${bridge}"
+  else
+    log_info "Dry-run: skipping libvirt network checks and VM define"
+  fi
 
   "${ROOT}/scripts/vm/keys-ensure.sh" -i "${PROFILE}" >/dev/null
-  "${ROOT}/scripts/vm/dirs-ensure.sh" -i "${PROFILE}" >/dev/null
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    mkdir -p "$(vm_images_dir)" "$(vm_vms_dir "${PROFILE}")" "$(vm_seeds_dir "${PROFILE}")"
+  else
+    "${ROOT}/scripts/vm/dirs-ensure.sh" -i "${PROFILE}" >/dev/null
+  fi
   "${ROOT}/scripts/vm/image-ensure.sh" >/dev/null
 
-  local base_image disk_path seed_iso
+  local base_image disk_path seed_iso seed_dir network_arg
   base_image="$(vm_cloud_image_path)"
   disk_path="$(vm_vms_dir "${PROFILE}")/${vm_name}.qcow2"
+  seed_dir="$(vm_seeds_dir "${PROFILE}")/${vm_name}"
 
-  if virsh dominfo "${vm_name}" >/dev/null 2>&1; then
-    die "VM ${vm_name} already exists — run vm-destroy.sh first"
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    if virsh dominfo "${vm_name}" >/dev/null 2>&1; then
+      die "VM ${vm_name} already exists — run vm-destroy.sh first"
+    fi
+  elif [[ -d "${seed_dir}" && -f "${disk_path}" ]]; then
+    log_warn "Dry-run: reusing existing disk and seed dir for ${vm_name}"
   fi
 
   vm_create_disk "${PROFILE}" "${disk_path}" "${base_image}" "${disk_gb}"
@@ -240,34 +261,39 @@ create_vm() {
   fi
   chmod 644 "${seed_iso}" 2>/dev/null || true
 
-  local network_arg
   network_arg="$(vm_build_network_arg "${bridge}" "${net_name}")"
 
-  local virt_args=(
-    --connect "${LIBVIRT_DEFAULT_URI:-qemu:///system}"
-    --name "${vm_name}"
-    --memory "${memory_mb}"
-    --vcpus "${vcpus}"
-    --disk "path=${disk_path},format=qcow2,bus=virtio"
-    --disk "path=${seed_iso},device=cdrom"
-    --os-variant ubuntu24.04
-    --network "${network_arg}"
-    --graphics none
-    --console "pty,target.type=serial"
-    --import
-    --noautoconsole
-  )
-
-  if [[ "${nested_virt}" -eq 1 ]]; then
-    virt_args+=(--cpu host-passthrough)
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    vm_write_install_artifacts "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
+      "${disk_path}" "${seed_iso}" "${base_image}" "${network_arg}" \
+      "${memory_mb}" "${vcpus}" "${nested_virt}" "${seed_dir}"
+    if [[ "${cloud_init_mode}" == "dhcp" ]]; then
+      log_info "Dry-run complete for ${vm_name} (${fqdn}, DHCP)"
+    else
+      log_info "Dry-run complete for ${vm_name} (${fqdn} @ ${vm_ip})"
+    fi
+    log_info "Artifacts:"
+    log_info "  disk:      ${disk_path}"
+    log_info "  seed ISO:  ${seed_iso}"
+    log_info "  install:   ${seed_dir}/install.sh"
+    if [[ -f "${seed_dir}/domain.xml" ]]; then
+      log_info "  domain:    ${seed_dir}/domain.xml"
+    fi
+    log_info "  manifest:  ${seed_dir}/manifest.txt"
+    log_info "Copy disk, seed directory, and base image to the target hypervisor, then run install.sh"
+    return 0
   fi
+
+  local -a virt_argv=()
+  vm_build_virt_install_argv virt_argv "${vm_name}" "${disk_path}" "${seed_iso}" \
+    "${network_arg}" "${memory_mb}" "${vcpus}" "${nested_virt}"
 
   if [[ "${cloud_init_mode}" == "dhcp" ]]; then
     log_info "Creating VM ${vm_name} (${fqdn}, DHCP)"
   else
     log_info "Creating VM ${vm_name} (${fqdn} @ ${vm_ip})"
   fi
-  virt-install "${virt_args[@]}"
+  virt-install "${virt_argv[@]}"
   log_info "VM ${vm_name} created"
 }
 

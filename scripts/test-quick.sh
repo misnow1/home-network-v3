@@ -29,6 +29,9 @@ main() {
   log_info "Tier 1 — dhcp-ddns-hook parse tests"
   "${ROOT}/scripts/test-dhcp-ddns-hook-parse.sh"
 
+  log_info "Tier 1 — vm-create dry-run smoke test"
+  "${ROOT}/scripts/test-vm-create-dry-run.sh"
+
   log_info "Tier 2 — production safety script"
   "${ROOT}/scripts/test-prod-safety.sh"
 

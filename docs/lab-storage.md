@@ -84,3 +84,55 @@ Lab wrappers in `scripts/lab/` pass `-i lab` automatically. Production:
 ```
 
 See [production-runbook.md](production-runbook.md) and [migration-runbook.md](migration-runbook.md).
+
+## Cross-hypervisor install (`--dry-run`)
+
+Build VM artifacts on a modern hypervisor (for example kvm01) and install on another
+host (for example kif) that may lack ansible-inventory, cloud-init tooling, or a full
+git checkout with vault access.
+
+On the **build** host:
+
+```bash
+./scripts/vm/keys-ensure.sh -i production
+sudo ./scripts/vm/dirs-ensure.sh -i production
+./scripts/vm/vm-create.sh -i production --dry-run dc02.home.2123studios.com
+```
+
+This creates:
+
+| Artifact | Path |
+|---|---|
+| qcow2 overlay | `production/vms/<vm_name>.qcow2` |
+| cloud-init seed | `production/seeds/<vm_name>/seed.iso` (+ `user-data`, `meta-data`) |
+| install script | `production/seeds/<vm_name>/install.sh` |
+| domain XML | `production/seeds/<vm_name>/domain.xml` (when `virt-install` is available) |
+| manifest | `production/seeds/<vm_name>/manifest.txt` |
+
+Copy to the **target** hypervisor (same `VM_DATA_BASE` layout is simplest):
+
+```bash
+rsync -av /var/lib/libvirt/images/home-network-v3/images/ \
+  kif:/var/lib/libvirt/images/home-network-v3/images/
+rsync -av /var/lib/libvirt/images/home-network-v3/production/vms/dc02.qcow2 \
+  kif:/var/lib/libvirt/images/home-network-v3/production/vms/
+rsync -av /var/lib/libvirt/images/home-network-v3/production/seeds/dc02/ \
+  kif:/var/lib/libvirt/images/home-network-v3/production/seeds/dc02/
+```
+
+On the target:
+
+```bash
+sudo /var/lib/libvirt/images/home-network-v3/production/seeds/dc02/install.sh
+./scripts/vm/wait-ssh.sh -i production dc02.home.2123studios.com
+```
+
+If the backing image path differs on the target, rebase before install:
+
+```bash
+qemu-img rebase -u -b /var/lib/libvirt/images/home-network-v3/images/noble-server-cloudimg-amd64.img \
+  /var/lib/libvirt/images/home-network-v3/production/vms/dc02.qcow2
+```
+
+Override paths at install time with `DISK_PATH`, `SEED_ISO`, `BASE_IMAGE`, or
+`VM_DATA_BASE` (see `install.sh`).
