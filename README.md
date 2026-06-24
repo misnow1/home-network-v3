@@ -28,7 +28,8 @@ printf '%s' 'change-me-lab-vault' > .vault_pass_lab
 chmod 600 .vault_pass_lab
 
 ./scripts/test-quick.sh          # tiers 1+2
-./scripts/test-integration.sh    # tier 3 on kvm01
+./scripts/test-integration.sh    # tier 3 on kvm01 (default slice from LAB_HOST)
+INTEGRATION_SLICE=dc_replica ./scripts/test-integration.sh   # two-DC replica test
 ./scripts/test-all.sh            # both
 ```
 
@@ -54,6 +55,10 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the slice plan and deferred work.
 
 Configure repository secret `VAULT_PASS_LAB` to match the lab vault password documented in
 [docs/vault-schema.md](docs/vault-schema.md).
+
+- **Test Quick** — linters and structural tests on every push/PR
+- **Test Integration DC Replica** — nightly + manual `workflow_dispatch` on the kvm01
+  self-hosted runner (`INTEGRATION_SLICE=dc_replica`)
 
 ## Production runs
 

@@ -52,10 +52,63 @@
 
 - name: Samba DC interfaces | Prune stale DC hostname DNS records and refresh
   ansible.builtin.shell: |
-    set -euo pipefail
+    set -uo pipefail
     zone="{{ dc_domain_name }}"
     host="{{ inventory_hostname.split('.')[0] }}"
+    cache="/var/lib/samba/private/dns_update_cache"
     declare -A allowed=()
+
+    wait_for_samba() {
+      local i
+      for i in $(seq 1 30); do
+        if samba-tool domain info 127.0.0.1 >/dev/null 2>&1; then
+          return 0
+        fi
+        sleep 2
+      done
+      return 1
+    }
+
+    dns_errors_only_already_exist() {
+      local output="$1"
+      grep -q 'ERROR(runtime):' <<<"$output" || return 1
+      ! grep 'ERROR(runtime):' <<<"$output" | grep -qv 'WERR_DNS_ERROR_RECORD_ALREADY_EXISTS'
+    }
+
+    run_samba_dnsupdate() {
+      local output rc=0 attempt
+      for attempt in 1 2 3; do
+        output=$(samba_dnsupdate --verbose 2>&1) || rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+          printf '%s\n' "$output"
+          return 0
+        fi
+        if dns_errors_only_already_exist "$output"; then
+          rm -f "$cache"
+          printf '%s\n' "$output" >&2
+          systemctl restart named 2>/dev/null || true
+          sleep 3
+          wait_for_samba || true
+          continue
+        fi
+        if grep -q 'Cannot contact any KDC' <<<"$output"; then
+          printf '%s\n' "$output" >&2
+          sleep 5
+          wait_for_samba || true
+          continue
+        fi
+        printf '%s\n' "$output" >&2
+        return "$rc"
+      done
+      if dns_errors_only_already_exist "$output"; then
+        rm -f "$cache"
+        printf '%s\n' "$output" >&2
+        echo "dns-update-cache-resynced"
+        return 0
+      fi
+      printf '%s\n' "$output" >&2
+      return "$rc"
+    }
 
     for iface in {{ samba_dc_effective_interfaces | join(' ') }}; do
       while read -r ip; do
@@ -79,7 +132,17 @@
     done < <(samba-tool dns query localhost "$zone" "$host" ALL --machine-pass 2>/dev/null \
       | awk '/^[[:space:]]+(A|AAAA):/ { gsub(/:/, "", $1); print $1, $2 }' || true)
 
-    samba_dnsupdate --verbose
+    wait_for_samba || true
+    run_samba_dnsupdate || {
+      expected_ip="{{ vm_ip | default(ansible_host) }}"
+      if dig +short @127.0.0.1 "${host}.${zone}" A | grep -qx "$expected_ip"; then
+        echo "dns-records-verified-via-dig"
+        rm -f "$cache"
+      else
+        exit 1
+      fi
+    }
+
     if [[ "$changed" -eq 1 ]]; then
       echo "dns-records-pruned"
     else

@@ -1,0 +1,27 @@
+---
+# Tier 3 integration — Samba AD DC replica (Slice 13).
+# Runs on kvm01 self-hosted runner (libvirt). Nightly + manual trigger only.
+
+name: Test Integration DC Replica
+
+'on':
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  dc-replica:
+    runs-on: self-hosted
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Write lab vault password
+        run: printf '%s' "${{ secrets.VAULT_PASS_LAB }}" > .vault_pass_lab
+
+      - name: Run dc_replica integration test
+        run: INTEGRATION_SLICE=dc_replica ./scripts/test-integration.sh
+        env:
+          VAULT_PASS_LAB: ${{ secrets.VAULT_PASS_LAB }}

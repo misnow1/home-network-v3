@@ -10,6 +10,7 @@ source "${ROOT}/scripts/lib/ansible.sh"
 
 LAB_HOST="${LAB_HOST:-hv01.lab.test}"
 LAB_DC_HOST="${LAB_DC_HOST:-dc01.lab.test}"
+LAB_DC2_HOST="${LAB_DC2_HOST:-dc02.lab.test}"
 SKIP_VM_TESTS="${SKIP_VM_TESTS:-0}"
 
 run_baseline_integration() {
@@ -35,6 +36,40 @@ run_dc_integration() {
 
   log_info "Running Samba AD DC convergence assertions"
   run_ansible_playbook "${ROOT}" tests/integration/test_dc_converged.yml --limit "${LAB_HOST}"
+}
+
+run_dc_replica_integration() {
+  log_info "Provisioning primary lab DC ${LAB_DC_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_DC_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_DC_HOST}"
+
+  log_info "Bootstrapping Samba AD DC on ${LAB_DC_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/dc-bootstrap.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Converging Samba AD DC on ${LAB_DC_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/dc-converge.yml --limit "${LAB_DC_HOST}"
+
+  log_info "Provisioning replica lab DC ${LAB_DC2_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC2_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_DC2_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_DC2_HOST}"
+
+  log_info "Joining ${LAB_DC2_HOST} as replica DC"
+  run_ansible_playbook "${ROOT}" playbooks/dc-replica-join.yml --limit "${LAB_DC2_HOST}"
+
+  log_info "Converging both lab DCs (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/dc-converge.yml --limit dc
+
+  log_info "Converging both lab DCs (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/dc-converge.yml --limit dc
+
+  log_info "Running Samba AD DC replica convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_dc_replica_converged.yml --limit dc
+
+  log_info "Destroying replica integration test VMs"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC2_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
 provision_lab_dc() {
@@ -288,6 +323,9 @@ main() {
       "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
       run_dc_integration
       "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
+      ;;
+    dc_replica)
+      run_dc_replica_integration
       ;;
     domain_join)
       run_domain_join_integration

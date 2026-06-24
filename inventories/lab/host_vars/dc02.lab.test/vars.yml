@@ -1,0 +1,14 @@
+---
+# Slice 13 — replica DC joined to dc01 (see docs/dc-runbook.md).
+
+samba_dc_migration_host: true
+samba_dc_migration_mode: replica
+samba_dc_target_server_name: dc02
+samba_dc_join_server: dc01.lab.test
+samba_dc_join_nameservers:
+  - 192.168.100.10
+samba_dc_join_site: Default-First-Site-Name
+# Keep replica test lean — certbot/ddns are separate slices
+certbot_enabled: false
+ddns_nsupdate_enabled: false
+docker_engine_enabled: false
