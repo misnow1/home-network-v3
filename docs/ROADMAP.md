@@ -18,6 +18,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 9 | DHCP-driven DDNS | **done** | dnsmasq hook + Docker DDNS API on DC |
 | 10 | Certbot DNS validation | **done** | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
 | 13 | DC replica | **done** | `dc02.lab.test` replica join; `INTEGRATION_SLICE=dc_replica`; CI nightly |
+| 17 | Cross-site DNS + IPv6 | **done** | `dc_trusted_networks`, BIND `localnets` + IPv6, multi-VLAN/remote-site docs |
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 
 ## Deferred (not forgotten)

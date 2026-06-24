@@ -95,3 +95,59 @@ the wrong NIC.
 - `dig @dc01` confirms A + PTR
 
 See `docs/ddns-runbook.md` for converge order and manual examples.
+
+## Production — trusted networks and BIND ACLs
+
+All hosts in the Ansible `dc` group (dc1, dc2, future site DCs) receive identical
+BIND query/recursion ACLs from **`group_vars/dc/vars.yml`** — never per-host BIND edits.
+
+| Variable | Scope | Purpose |
+|---|---|---|
+| `dc_trusted_networks` | All DCs | Estate-wide IPv4 CIDRs permitted to query/recurse |
+| `samba_dc_dns_allowed_networks` | All DCs | Defaults to `dc_trusted_networks`; templated into `named.conf.options` |
+| `dc_ntp_allow_cidr` | All DCs | MS-SNTP chrony allow — often **narrower** than DNS (e.g. VLAN 1 only) |
+| `samba_dc_dns_include_localnets` | Role default | Adds BIND `localnets` ACL for on-link GUA (dynamic ISP prefix) |
+
+**host_vars** per DC hold only site-specific join flags, reverse zones, and NIC overrides
+— see [dc-runbook.md](dc-runbook.md).
+
+After changing ACLs, converge every DC:
+
+```bash
+ansible-playbook playbooks/dc-converge.yml --limit dc
+```
+
+Production example (`inventories/production/group_vars/dc/vars.yml`):
+
+```yaml
+dc_trusted_networks:
+  - 192.168.1.0/24    # FerryCrossing VLAN 1
+  - 192.168.3.0/24    # FerryCrossing VLAN 2 (IoT)
+  - 192.168.33.0/24   # Woodbine (VPN-forwarded)
+  - 192.168.65.0/24   # Swanhollow (VPN-forwarded)
+  # NOT 192.168.5.0/24 — VLAN 3 isolated
+
+samba_dc_dns_allowed_networks: "{{ dc_trusted_networks }}"
+dc_ntp_allow_cidr: 192.168.1.0/24   # chrony — VLAN 1 only
+```
+
+Router/DHCP configuration is manual — see [unifi-gateway-dns.md](unifi-gateway-dns.md)
+and [remote-site-dns.md](remote-site-dns.md).
+
+## IPv6 and dynamic ISP prefix
+
+BIND listens on IPv6 (`listen-on-v6 { any; }`) and includes the built-in **`localnets`**
+ACL when `samba_dc_dns_include_localnets: true` (default). `localnets` matches every
+network corresponding to a local interface address — when the ISP delegates a new GUA
+`/64` after a modem reboot, on-link clients are permitted without Ansible edits.
+
+| Concern | Approach |
+|---|---|
+| DC hostname AAAA | **Do not publish** ISP GUA — `samba_interfaces.yml` binds Samba to LAN NIC + lo |
+| Client AAAA | DHCPv6 lease path via `dhcp-ddns-hook.sh` (Slice 9) |
+| Hardcoded `2600:…/64` | **Never** in inventory — use `localnets` |
+| Stale client AAAA after prefix change | DDNS upsert on lease renew; manual `samba-tool dns delete` for orphans |
+| Auto ip6.arpa reverse zone | See [migration-runbook.md](migration-runbook.md) — add NS glue or delete zone |
+
+After a modem reboot, run `dc-converge.yml --limit dc` if BIND was restarted before the
+new prefix appeared on the NIC; otherwise `localnets` updates automatically on reload.

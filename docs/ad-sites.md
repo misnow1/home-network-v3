@@ -7,11 +7,14 @@ This domain spans three locations:
 
 | Site | Location | Subnet | Primary DC (planned) |
 |---|---|---|---|
-| **FerryCrossing** | Main house | `192.168.1.0/24` | `dc1` (`192.168.1.10`) |
+| **FerryCrossing** | Main house | `192.168.1.0/24` (VLAN 1) | `dc1` / `dc2` |
+| **FerryCrossing** | Main house — IoT | `192.168.3.0/24` (VLAN 2) | Same site; queries dc1/dc2 |
 | **Woodbine** | Second house | `192.168.33.0/24` | Future replica DC |
 | **Swanhollow** | Parents' house | `192.168.65.0/24` | Future replica DC |
 
-`dc1` joins and lives in **FerryCrossing**. Remote sites can exist in AD before a
+**Not in AD:** `192.168.5.0/24` (VLAN 3, restricted) — isolated from AD DNS by design.
+
+`dc1` and `dc2` join and live in **FerryCrossing**. Remote sites can exist in AD before a
 local DC is installed — create the site and subnet now; join a DC later with
 `--site=Woodbine` or `--site=Swanhollow`.
 
@@ -26,6 +29,7 @@ See also:
 - [migration-runbook.md](migration-runbook.md) — Phase 0 (run on legacy pdc before dc1 join)
 - [dc-runbook.md](dc-runbook.md) — replica join playbook
 - [dns-architecture.md](dns-architecture.md) — DNS and reverse zones per site
+- [remote-site-dns.md](remote-site-dns.md) — conditional forwarders until local DCs exist
 
 ## Inventory variables
 
@@ -78,6 +82,7 @@ Assign subnets (idempotent — skip or ignore errors if already present):
 
 ```bash
 sudo samba-tool sites subnet add 192.168.1.0/24 FerryCrossing
+sudo samba-tool sites subnet add 192.168.3.0/24 FerryCrossing
 sudo samba-tool sites subnet add 192.168.33.0/24 Woodbine
 sudo samba-tool sites subnet add 192.168.65.0/24 Swanhollow
 ```

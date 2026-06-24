@@ -346,10 +346,35 @@ This is optional; most sites only need the on-boot script.
 
 ## Remote sites
 
-The FerryCrossing UCG (`192.168.1.1`) is documented here. Remote-site routers
-(e.g. Woodbine `192.168.33.1`) may need site-specific DNS once a local DC
-exists — see [ad-sites.md](ad-sites.md). That work is out of scope for this
-runbook.
+The FerryCrossing UCG (`192.168.1.1`) is documented above. Remote-site gateways
+(Woodbine `192.168.33.1`, Swanhollow `192.168.65.1`) use **conditional forwarders**
+to FerryCrossing DCs until each site has a local DC — see
+[remote-site-dns.md](remote-site-dns.md).
+
+## Multi-VLAN (FerryCrossing)
+
+FerryCrossing has multiple VLANs. BIND ACLs on every DC (`dc_trusted_networks` in
+`group_vars/dc/vars.yml`) control which subnets may query dc1/dc2.
+
+| VLAN | Subnet | DHCP DNS | Notes |
+|---|---|---|---|
+| 1 (default) | `192.168.1.0/24` | dc1 + dc2 | Primary LAN; DDNS hook on UCG |
+| 2 (IoT) | `192.168.3.0/24` | dc1 + dc2 | Inter-VLAN routing; allow UDP/TCP 53 to DCs |
+| 3 (restricted) | `192.168.5.0/24` | Router/public only | **Isolated** — not in `dc_trusted_networks` |
+
+### VLAN 2 (IoT)
+
+1. UniFi Network → **Settings** → **Networks** → IoT VLAN → **DHCP**.
+2. Set **DHCP DNS Server** to **dc1 and dc2** (`192.168.1.10`, `192.168.1.11`).
+3. Confirm firewall rules allow IoT → DC **UDP/TCP 53** (add 88/389/445 only if IoT
+   hosts are domain-joined).
+
+MS-SNTP from DCs remains VLAN 1 only (`dc_ntp_allow_cidr`); IoT uses router or public NTP.
+
+### VLAN 3 (restricted)
+
+No changes — clients do not query AD DNS. Do not add `192.168.5.0/24` to DC ACLs or
+AD site subnets.
 
 ## Token rotation
 

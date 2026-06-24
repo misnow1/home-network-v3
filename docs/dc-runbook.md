@@ -156,8 +156,30 @@ Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc
 2. Refreshes `/etc/krb5.conf`
 3. Restricts Samba to the primary LAN NIC for DNS self-registration (see
    [dns-architecture.md](dns-architecture.md#dc-hostname-registration-aaaa))
-4. Extends chrony for MS-SNTP signing to domain members
-5. Optionally configures a **local operator SSH account** (see below)
+4. Deploys BIND options (`named.conf.options`) with estate-wide query ACLs from
+   `dc_trusted_networks` / `samba_dc_dns_allowed_networks` — identical on **every**
+   host in the `dc` group (**re-applied every converge**, not only at bootstrap)
+5. Extends chrony for MS-SNTP signing (`dc_ntp_allow_cidr` — often narrower than DNS)
+6. Optionally configures a **local operator SSH account** (see below)
+
+### Group vars vs host vars (all DCs)
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `dc_trusted_networks` | `group_vars/dc/vars.yml` | BIND allow-query/recursion CIDRs (all DCs) |
+| `samba_dc_dns_allowed_networks` | group (default: above) | Templated into BIND |
+| `dc_ntp_allow_cidr` | group | chrony MS-SNTP allow (e.g. VLAN 1 only) |
+| `samba_dc_join_site`, reverse zones | `host_vars/<dc>/` | Per-DC join site and local reverse zone |
+
+After any ACL or BIND template change, converge **all** DCs:
+
+```bash
+ansible-playbook playbooks/dc-converge.yml --limit dc
+# production:
+./scripts/prod-run.sh --confirm-production -- playbooks/dc-converge.yml --limit dc
+```
+
+See [dns-architecture.md](dns-architecture.md#production--trusted-networks-and-bind-acls).
 
 ### Operator SSH (local break-glass)
 

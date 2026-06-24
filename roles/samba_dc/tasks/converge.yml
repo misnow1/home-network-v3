@@ -29,6 +29,10 @@
   when: not ansible_check_mode
   tags: [samba_converge]
 
+- name: DC converge | Deploy BIND query/recursion ACLs (named.conf.options)
+  ansible.builtin.import_tasks: dns_bind_options.yml
+  tags: [samba_dns, samba_converge]
+
 - name: DC converge | Refresh /etc/krb5.conf from Samba-generated copy
   ansible.builtin.copy:
     src: /var/lib/samba/private/krb5.conf

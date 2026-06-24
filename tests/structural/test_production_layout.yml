@@ -109,6 +109,16 @@
         path: "{{ prod_safety }}"
       register: prod_safety_stat
 
+    - name: Production | assert remote-site DNS doc exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/docs/remote-site-dns.md"
+      register: remote_site_dns_doc
+
+    - name: Production | assert remote-site DNS doc present
+      ansible.builtin.assert:
+        that:
+          - remote_site_dns_doc.stat.exists
+
     - name: Production | assert prod safety script is executable
       ansible.builtin.assert:
         that:

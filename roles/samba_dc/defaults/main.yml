@@ -10,11 +10,18 @@ dc_dns_forwarders:
 dc_ntp_allow_cidr: 192.168.100.0/24
 samba_dc_chrony_group: _chrony
 
-# Networks permitted to query/recurse against BIND on the DC. Keep this scoped
-# to trusted subnets so the DC is never an open recursive resolver. Defaults to
-# the same trusted CIDR used for NTP signing.
-samba_dc_dns_allowed_networks:
+# Estate-wide trusted IPv4 networks for BIND query/recursion ACLs. Override in
+# group_vars/dc/vars.yml (production lists all VLANs + remote AD sites).
+# MS-SNTP (chrony) uses dc_ntp_allow_cidr separately — often a subset of this list.
+dc_trusted_networks:
   - "{{ dc_ntp_allow_cidr }}"
+
+# Networks permitted to query/recurse against BIND on the DC. Keep this scoped
+# to trusted subnets so the DC is never an open recursive resolver.
+samba_dc_dns_allowed_networks: "{{ dc_trusted_networks }}"
+
+# Include BIND localnets ACL (on-link GUA /64 when ISP prefix delegation changes).
+samba_dc_dns_include_localnets: true
 
 samba_dc_dnsupdater_enabled: false
 samba_dc_dnsupdater_name: dnsupdater
