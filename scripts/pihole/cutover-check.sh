@@ -74,9 +74,9 @@ check_pihole_ad_forward() {
 check_pihole_blocking() {
   local pihole_ip="$1"
   local label="$2"
-  local out rc=0
+  local out
 
-  out="$(dig +time=2 +tries=1 "@${pihole_ip}" "${BLOCK_TEST}" A +short 2>/dev/null || true)" || rc=$?
+  out="$(dig +time=2 +tries=1 "@${pihole_ip}" "${BLOCK_TEST}" A +short 2>/dev/null || true)"
   if [[ -z "${out}" || "${out}" == "0.0.0.0" ]]; then
     pass "${label}: blocklist active for ${BLOCK_TEST}"
   else
