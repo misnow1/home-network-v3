@@ -14,8 +14,13 @@ main() {
   require_cmd yamllint
   require_cmd ansible-lint
   require_cmd ansible-playbook
+  require_cmd shellcheck
 
   ensure_vault_password_file "${ROOT}" >/dev/null
+
+  log_info "Tier 1 — shellcheck"
+  mapfile -t shell_scripts < <(find "${ROOT}/scripts" -type f -name '*.sh' | sort)
+  shellcheck -S warning "${shell_scripts[@]}"
 
   log_info "Tier 1 — yamllint"
   (cd "${ROOT}" && yamllint .)

@@ -7,6 +7,7 @@ Designed test-first: quick CI checks on GitHub, full libvirt integration tests o
 
 - Python 3.11+
 - `ansible-core`, `ansible-lint`, `yamllint` (`pip install -r requirements.txt`)
+- `shellcheck` (system package — `./scripts/test-quick.sh`)
 - `virsh`, `virt-install`, `qemu-img` (integration tests)
 - `cloud-localds` or `genisoimage` (cloud-init seed ISO)
 - `envsubst` (gettext)
