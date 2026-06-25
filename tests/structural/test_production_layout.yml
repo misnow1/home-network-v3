@@ -94,6 +94,8 @@
         - inventories/production/group_vars/dc/vars.yml.example
         - inventories/production/group_vars/linux/vars.yml.example
         - inventories/production/group_vars/linux/ansible.yml.example
+        - inventories/production/group_vars/pihole/vars.yml.example
+        - inventories/production/group_vars/pihole/ansible.yml.example
 
     - name: Production | assert group_vars examples present
       ansible.builtin.assert:

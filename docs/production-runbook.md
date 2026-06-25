@@ -61,6 +61,7 @@ or `dc-restore.yml` (offline backup) instead of step 2 — see
 | 2r | `dc` | `dc-restore.yml` | **Migration (fallback)** — offline backup |
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
+| 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
 | 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind |
@@ -218,4 +219,4 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 ## Deferred (post–Slice 8)
 
 - SFTP/NAS restic repositories and systemd backup timers (lab uses local repo)
-- Pi-hole, observability, bare-metal install — see [ROADMAP.md](ROADMAP.md)
+- Pi-hole — [pihole-runbook.md](pihole-runbook.md); observability, bare-metal install — see [ROADMAP.md](ROADMAP.md)

@@ -1,0 +1,5 @@
+# {{ ansible_managed | default(true) }}
+# Static local DNS — migrated from UniFi Local DNS Records or manual entries.
+{% for record in pihole_local_dns_records %}
+{{ record.ip }} {{ record.name }}
+{% endfor %}

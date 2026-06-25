@@ -52,3 +52,7 @@ if [[ "${SKIP_GALAXY}" -eq 0 ]]; then
 fi
 
 echo "Done. Tools: ${ROOT}/.venv/bin/ansible-lint"
+
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "Note: install shellcheck for ./scripts/test-quick.sh (e.g. dnf install shellcheck)"
+fi

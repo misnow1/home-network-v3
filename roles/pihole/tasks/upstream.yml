@@ -1,0 +1,30 @@
+---
+- name: Pi-hole | Read current upstream DNS
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.upstreams
+  register: pihole_upstreams_current
+  changed_when: false
+
+# pihole-FTL prints TOML-style arrays (unquoted strings), not JSON — parse manually.
+- name: Pi-hole | Parse current upstream DNS
+  ansible.builtin.set_fact:
+    pihole_upstreams_current_list: >-
+      {{
+        pihole_upstreams_current.stdout
+        | default('', true)
+        | trim
+        | regex_replace('^\[|\]$', '')
+        | split(',')
+        | map('trim')
+        | reject('equalto', '')
+        | list
+        | sort
+      }}
+
+- name: Pi-hole | Set upstream DNS
+  ansible.builtin.command:
+    cmd: >-
+      pihole-FTL --config dns.upstreams
+      '{{ pihole_upstream_dns | to_json }}'
+  when: pihole_upstreams_current_list != (pihole_upstream_dns | sort)
+  notify: Pi-hole reloaddns

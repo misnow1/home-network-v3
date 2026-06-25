@@ -1,0 +1,64 @@
+---
+- name: Pi-hole | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (pihole_enabled | bool)
+
+- name: Pi-hole | Verify pihole CLI is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/pihole
+  register: pihole_cli
+
+- name: Pi-hole | Require curl/basic-install
+  ansible.builtin.assert:
+    that:
+      - pihole_cli.stat.exists
+    fail_msg: >-
+      Pi-hole is not installed on this host. Use the curl installer from
+      https://docs.pi-hole.net/main/basic-install/ before running pihole-converge.yml.
+
+- name: Pi-hole | Require v6 TOML config
+  ansible.builtin.stat:
+    path: /etc/pihole/pihole.toml
+  register: pihole_toml_config
+
+- name: Pi-hole | Refuse Pi-hole v5 (setupVars-only installs)
+  ansible.builtin.assert:
+    that:
+      - pihole_toml_config.stat.exists
+    fail_msg: >-
+      /etc/pihole/pihole.toml not found — this role supports Pi-hole v6 only.
+      Upgrade with pihole -up or reinstall via https://docs.pi-hole.net/main/basic-install/
+
+- name: Pi-hole | Record Pi-hole version
+  ansible.builtin.command:
+    cmd: pihole version
+  register: pihole_version_cmd
+  changed_when: false
+
+- name: Pi-hole | Show detected version
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: {{ pihole_version_cmd.stdout | default('unknown') }}"
+
+- name: Pi-hole | Validate DC server list
+  ansible.builtin.assert:
+    that:
+      - pihole_dc_servers | length > 0
+      - pihole_upstream_dns | length > 0
+    fail_msg: Set pihole_dc_servers and pihole_upstream_dns in group_vars/pihole/vars.yml
+
+- name: Pi-hole | Converge AD zone forwarding
+  ansible.builtin.import_tasks: ad_forwarding.yml
+
+- name: Pi-hole | Converge upstream DNS
+  ansible.builtin.import_tasks: upstream.yml
+
+- name: Pi-hole | Converge local static DNS records
+  ansible.builtin.import_tasks: local_dns.yml
+  when: pihole_local_dns_records | length > 0
+
+- name: Pi-hole | Update blocklists (optional)
+  ansible.builtin.command:
+    cmd: pihole -g
+  changed_when: true
+  when: pihole_update_gravity | bool
+  tags: [pihole_gravity]

@@ -1,0 +1,27 @@
+---
+# Pi-hole group variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/pihole/vars.yml.example \
+#      inventories/production/group_vars/pihole/vars.yml
+#
+# Config-only: assumes curl/basic-install on each host. Do not add pihole to the
+# linux group (apt-only playbooks).
+
+pihole_dc_servers:
+  - 192.168.1.10
+  - 192.168.1.11
+
+pihole_ad_domain: home.2123studios.com
+
+pihole_reverse_zones:
+  - 1.168.192.in-addr.arpa
+  # - 3.168.192.in-addr.arpa   # uncomment if IoT reverse zone exists on DCs
+
+pihole_upstream_dns:
+  - 1.1.1.1
+  - 8.8.8.8
+
+# Migrate UniFi Local DNS Records here before cutover (see docs/pihole-runbook.md).
+# pihole_local_dns_records:
+#   - name: printer.home.2123studios.com
+#     ip: 192.168.1.50

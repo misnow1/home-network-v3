@@ -1,0 +1,9 @@
+---
+- name: Pi-hole | Deploy custom.list static records
+  ansible.builtin.template:
+    src: custom.list.j2
+    dest: "{{ pihole_custom_list }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Pi-hole reloaddns

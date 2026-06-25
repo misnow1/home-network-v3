@@ -131,8 +131,23 @@ samba_dc_dns_allowed_networks: "{{ dc_trusted_networks }}"
 dc_ntp_allow_cidr: 192.168.1.0/24   # chrony — VLAN 1 only
 ```
 
-Router/DHCP configuration is manual — see [unifi-gateway-dns.md](unifi-gateway-dns.md)
-and [remote-site-dns.md](remote-site-dns.md).
+Router/DHCP configuration is manual — see [unifi-gateway-dns.md](unifi-gateway-dns.md),
+[remote-site-dns.md](remote-site-dns.md), and [pihole-runbook.md](pihole-runbook.md).
+
+## Production — Pi-hole (Slice 10+)
+
+FerryCrossing clients use **Pi-hole** as their only DNS. Pi-hole forwards AD and reverse
+zones to dc1/dc2; public queries use Pi-hole blocklists and upstream resolvers aligned
+with `dc_dns_forwarders`.
+
+```
+Client → Pi-hole (.18/.22) → dc1/dc2 (AD zones)
+                           → upstream public DNS (everything else)
+UCG dhcp-script → DDNS API → BIND on dc1
+```
+
+Ansible: `playbooks/pihole-converge.yml` on the `pihole` inventory group (config-only;
+curl-installed CentOS/Rocky hosts). DHCP remains on the UCG — see [pihole-runbook.md](pihole-runbook.md).
 
 ## IPv6 and dynamic ISP prefix
 

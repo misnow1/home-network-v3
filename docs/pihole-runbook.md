@@ -1,0 +1,242 @@
+# Pi-hole DNS runbook (Slice 10+)
+
+Production ad/malware filtering with Pi-hole in front of clients, while **dc1/dc2
+remain authoritative** for `home.2123studios.com` via BIND DLZ.
+
+See also:
+
+- [dns-architecture.md](dns-architecture.md) — BIND DLZ, DDNS pipeline, DC ACLs
+- [unifi-gateway-dns.md](unifi-gateway-dns.md) — UCG DHCP, dhcp-script wrapper (unchanged)
+- [ddns-runbook.md](ddns-runbook.md) — lease-driven DDNS to dc1
+- [remote-site-dns.md](remote-site-dns.md) — no Pi-hole changes in this slice
+
+## Architecture
+
+```
+DHCP client ──(option 6)──► Pi-hole (.18 + .22)
+                              ├─ AD zones ──► dc1/dc2 BIND
+                              └─ public ──► blocklists + upstream (1.1.1.1, 8.8.8.8)
+UCG dnsmasq ──(dhcp-script only)──► DDNS API on dc1 ──► BIND
+```
+
+**Do not:**
+
+- List dc1/dc2 as secondary client DNS (Windows bypasses Pi-hole)
+- Point `dc_dns_forwarders` at Pi-hole (loop risk; hides per-client stats)
+- Use the router (192.168.1.1) as a DNS resolver for clients
+
+## Hosts
+
+| Host | IP | OS | Install |
+|---|---|---|---|
+| pihole1 | 192.168.1.18 | CentOS 9 | curl/basic-install |
+| pihole2 | 192.168.1.22 | Rocky 10.1 | curl/basic-install |
+
+Pi-hole hosts are **config-only Ansible** — not in the `linux` group. Do not run
+`baseline.yml` or other apt-only playbooks against them.
+
+## Discovery (before first converge)
+
+Requires **Pi-hole v6** (`/etc/pihole/pihole.toml`). The Ansible role refuses v5-only installs.
+
+On each Pi-hole host (as root):
+
+```bash
+pihole version
+test -f /etc/pihole/pihole.toml && echo ok || echo "missing pihole.toml — upgrade required"
+pihole-FTL --config misc.etc_dnsmasq_d 2>/dev/null || true
+pihole-FTL --config dns.upstreams 2>/dev/null || true
+pihole-FTL --config dns.revServers 2>/dev/null || true
+grep -rh '^server=' /etc/dnsmasq.d/ 2>/dev/null || true
+```
+
+| Setting | Purpose |
+|---|---|
+| `/etc/pihole/pihole.toml` | v6 config (required) |
+| `misc.etc_dnsmasq_d` | must be `true` for `/etc/dnsmasq.d/05-ad-zones.conf` |
+| `dns.revServers` | cleared by Ansible (replaced by dnsmasq `server=/zone/` lines) |
+| `/etc/dnsmasq.d/05-ad-zones.conf` | AD + reverse forwarding to dc1/dc2 |
+
+Pi-hole v6 **ignores** `/etc/dnsmasq.d` until `misc.etc_dnsmasq_d` is enabled —
+the Ansible role sets this automatically.
+
+## Prerequisites
+
+1. `dc-converge.yml` completed on dc1 and dc2 (BIND DLZ authoritative)
+2. `ddns-api.yml` on dc1 — DDNS API healthy:
+
+   ```bash
+   curl -fsS "http://192.168.1.10:8765/ddns/v1/health"
+   ```
+
+3. Production inventory includes `pihole` group — copy templates:
+
+   ```bash
+   cp inventories/production/group_vars/pihole/vars.yml.example \
+      inventories/production/group_vars/pihole/vars.yml
+   # Add pihole hosts to inventories/production/hosts.yml
+   ```
+
+4. SSH to both Pi-hole VMs — often **root** on curl-installed CentOS/Rocky:
+
+   ```bash
+   cp inventories/production/group_vars/pihole/ansible.yml.example \
+      inventories/production/group_vars/pihole/ansible.yml
+   ```
+
+   Or set `ansible_user: root` on each host in `hosts.yml`.
+
+## Ansible converge
+
+```bash
+PROD='./scripts/prod-run.sh --confirm-production --'
+
+${PROD} playbooks/pihole-converge.yml -e allow_production=true
+```
+
+**What the role configures:**
+
+| Item | Path / mechanism |
+|---|---|
+| AD zone forwarding | `/etc/dnsmasq.d/05-ad-zones.conf` + `misc.etc_dnsmasq_d=true` |
+| Upstream public DNS | `pihole-FTL --config dns.upstreams` |
+| Disable UI conditional forwarding | `dns.revServers=[]` |
+| Static local names (optional) | `/etc/pihole/custom.list` from `pihole_local_dns_records` |
+| Reload | `pihole reloaddns` handler |
+
+Optional blocklist refresh:
+
+```bash
+${PROD} playbooks/pihole-converge.yml -e allow_production=true --tags pihole_gravity \
+  -e pihole_update_gravity=true
+```
+
+## Pre-cutover verification
+
+From the control node:
+
+```bash
+./scripts/pihole/cutover-check.sh --phase pre
+```
+
+Manual checks:
+
+```bash
+dig @192.168.1.18 dc1.home.2123studios.com A +short          # → 192.168.1.10
+dig @192.168.1.18 _ldap._tcp.home.2123studios.com SRV +short
+dig @192.168.1.18 doubleclick.net A +short                  # blocked / empty
+dig @192.168.1.10 home.2123studios.com SOA +short           # authoritative on DC
+```
+
+Compare `/etc/dnsmasq.d/05-ad-zones.conf` on both Pi-hole hosts — must be identical.
+
+## Static DNS audit (UniFi → Pi-hole)
+
+Before cutover, export **UniFi Local DNS Records** (Settings → Internet → DNS → Local
+DNS Records) and any legacy router hostnames.
+
+For each static name not registered via AD DDNS:
+
+1. Prefer AD static A on dc1 for domain-joined infrastructure
+2. Otherwise add to `pihole_local_dns_records` in `group_vars/pihole/vars.yml`:
+
+   ```yaml
+   pihole_local_dns_records:
+     - name: printer.home.2123studios.com
+       ip: 192.168.1.50
+   ```
+
+3. Re-run `pihole-converge.yml`
+4. Verify: `dig @192.168.1.18 printer.home.2123studios.com A +short`
+
+After migration, **retire** router-local DNS records — clients no longer query the UCG
+for resolution.
+
+## Cutover procedure
+
+### 1. Converge Pi-hole (both hosts)
+
+Run `pihole-converge.yml` and `./scripts/pihole/cutover-check.sh --phase pre`.
+
+### 2. Test from a pilot client (before DHCP change)
+
+On one workstation, set DNS manually to 192.168.1.18. Confirm AD login, internal
+hostnames, and blocked domains. Revert DNS when done.
+
+### 3. UniFi UI — DHCP DNS (VLAN 1)
+
+1. UniFi Network → **Settings** → **Networks** → Default LAN → **DHCP**
+2. Set **DHCP DNS Server** to **192.168.1.18** and **192.168.1.22** only
+3. Apply; renew leases on sample clients (`dhclient`, reboot, or `ipconfig /renew`)
+
+**Do not** change the dhcp-script wrapper — see [unifi-gateway-dns.md](unifi-gateway-dns.md).
+
+### 4. Validate VLAN 1
+
+```bash
+./scripts/pihole/cutover-check.sh --phase post
+```
+
+Confirm:
+
+- Pi-hole dashboard shows **client IPs** (not dc1)
+- UniFi client list still shows hostnames (from dhcp-script, not DNS)
+- DDNS: renew lease → `dig @192.168.1.10 <hostname>.home.2123studios.com A`
+
+### 5. UniFi UI — IoT VLAN 2
+
+Same DHCP DNS servers (.18 + .22). See [unifi-gateway-dns.md](unifi-gateway-dns.md)
+multi-VLAN section.
+
+### 6. Retire router DNS forwarding
+
+Remove legacy on-boot scripts that inject `server=/home.2123studios.com/` to dc1/dc2
+(e.g. `07-create-local-dns-conf.sh`). Remove runtime files:
+
+```bash
+rm -f /run/dnsmasq.dhcp.conf.d/local_custom_dns.conf
+kill "$(cat /run/dnsmasq-main.pid)"
+```
+
+The router must **not** answer client DNS for AD zones anymore — Pi-hole forwards
+directly to dc1/dc2.
+
+### 7. VLAN 3 (restricted)
+
+No changes — stays on router/public DNS; not in `dc_trusted_networks`.
+
+## IPv6 (phase 2)
+
+1. Enable Pi-hole IPv6 listening in Web UI or `pihole.toml` when ready
+2. UniFi DHCPv6 RDNSS → Pi-hole addresses if supported; else temporary dc1/dc2 for v6
+3. Extend `pihole_reverse_zones` for ip6.arpa if client AAAA DDNS is in use
+4. Re-run converge and validate `dig AAAA` through Pi-hole
+
+## Remote sites
+
+No changes in this slice. Woodbine/Swanhollow keep router conditional forwarders to
+dc1/dc2 — see [remote-site-dns.md](remote-site-dns.md).
+
+## Rollback
+
+1. UniFi UI — set DHCP DNS back to **dc1** (192.168.1.10) and **dc2** (192.168.1.11)
+2. Optionally restore router `server=/` on-boot scripts from `.disabled` backups
+3. Renew client leases
+4. Pi-hole config can remain — clients simply stop using it
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| AD auth fails via Pi-hole | Missing `_msdcs` or SRV forwarding | Check `05-ad-zones.conf`; `dig SRV` via Pi-hole |
+| Pi-hole shows only dc1 IP as client | Clients still use DC as DNS | Fix DHCP option 6; remove DC secondary DNS |
+| Internal names NXDOMAIN | Static names still on router | Migrate to `pihole_local_dns_records` |
+| dnsmasq.d ignored | `misc.etc_dnsmasq_d=false` | Re-run converge; confirm `misc.etc_dnsmasq_d=true` |
+| Short names fail | non-FQDN forwarding disabled | Use FQDN `host.home.2123studios.com` |
+| DDNS broken | dhcp-script wrapper removed/changed | Restore [unifi-gateway-dns.md](unifi-gateway-dns.md) wrapper |
+
+## Pi-hole Web UI notes
+
+- **Do not** enable Conditional Forwarding if it duplicates `05-ad-zones.conf`
+- Upstream DNS in UI should match `pihole_upstream_dns` (Ansible is source of truth)
+- Blocklists apply to non-forwarded queries; AD zones pass through to DCs

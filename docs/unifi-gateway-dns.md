@@ -6,11 +6,13 @@ Production DHCP/DNS runs on a **UniFi Cloud Gateway Fiber** (UCG Fiber, model
 
 During AD migration, legacy **on-boot scripts** that conditionally forwarded AD
 subdomains (`server=/home.2123studios.com/…`) to the old DC are **retired**.
-Clients query **dc1** directly for DNS; the gateway keeps only the **dhcp-script**
-hook for lease-driven DDNS.
+Clients query **Pi-hole** for DNS; Pi-hole forwards AD zones to dc1/dc2. The gateway
+keeps **DHCP** and the **dhcp-script** hook for lease-driven DDNS and UniFi client
+tracking — it is not a DNS resolver for clients.
 
 See also:
 
+- [pihole-runbook.md](pihole-runbook.md) — Pi-hole forwarding, DHCP cutover, static DNS migration
 - [ddns-runbook.md](ddns-runbook.md) — DDNS API, bearer token, hook behaviour, migration timing
 - [migration-runbook.md](migration-runbook.md) — when router cutover fits in AD migration
 - [dns-architecture.md](dns-architecture.md) — BIND DLZ and DDNS pipeline
@@ -24,16 +26,26 @@ DHCP client → UCG dnsmasq → server=/home.2123studios.com/ → pdc
                           → upstream public DNS
 ```
 
-**After (post-migration):**
+**After (Pi-hole + AD on DCs):**
+
+```
+DHCP client ──(option 6)──► Pi-hole (.18 + .22)
+                              ├─ AD zones ──► dc1/dc2 BIND
+                              └─ public ──► blocklists + upstream
+UCG dnsmasq ──(dhcp-script)──► DDNS API on dc1 :8765 ──► BIND
+```
+
+- **Retire:** conditional `server=/` AD forwarding on the UCG (Pi-hole forwards to DCs).
+- **UniFi UI:** DHCP DNS server → Pi-hole (`192.168.1.18`, `192.168.1.22`).
+- **On-boot inject:** `dhcp-script` only (no UniFi UI for this).
+- **Do not** list dc1/dc2 as client DNS — see [pihole-runbook.md](pihole-runbook.md).
+
+**Earlier post-migration (direct to DC, pre-Pi-hole):**
 
 ```
 DHCP client ──(option 6)──► dc1 BIND (authoritative AD DNS)
 UCG dnsmasq ──(dhcp-script)──► DDNS API on dc1 :8765 ──► BIND
 ```
-
-- **Retire:** conditional `server=/` forwarding to pdc.
-- **UniFi UI:** DHCP DNS server → dc1 (`192.168.1.10`).
-- **On-boot inject:** `dhcp-script` only (no UniFi UI for this).
 
 ## Persistence model
 
@@ -135,7 +147,7 @@ ls /data/on_boot.d/
 
 | Mechanism | Survives reboot/update? | This migration |
 |---|---|---|
-| **UniFi UI — DHCP DNS Server** (Settings → Networks → DHCP) | Yes (controller-managed) | **Use** — DHCP option 6 → dc1 |
+| **UniFi UI — DHCP DNS Server** (Settings → Networks → DHCP) | Yes (controller-managed) | **Use** — DHCP option 6 → Pi-hole (.18 + .22); see [pihole-runbook.md](pihole-runbook.md) |
 | **UniFi UI — DNS Records / Local Hostnames** | Yes | Optional static LAN names; not needed for AD zone |
 | **UniFi UI — WAN upstream DNS** | Yes | Unchanged; dc1 handles AD queries |
 | **`/data/on_boot.d/*.sh`** | Yes (`/data/` preserved) | **Use** — patch `shared.conf` `dhcp-script` → wrapper |
@@ -179,8 +191,9 @@ Before changing the gateway:
 
 1. UniFi Network → **Settings** → **Networks** → primary LAN (e.g. Default).
 2. Open **DHCP** (set Advanced Configuration to **Manual** if DNS fields are hidden).
-3. Set **DHCP DNS Server** to **`192.168.1.10`** (dc1 only).
-   - During validation you may briefly list dc1 and pdc; use dc1 only for steady state.
+3. Set **DHCP DNS Server** to **`192.168.1.18`** and **`192.168.1.22`** (Pi-hole pair).
+   - During Pi-hole rollout, converge both hosts before changing DHCP — [pihole-runbook.md](pihole-runbook.md).
+   - Pre-Pi-hole validation may briefly use dc1 only; steady state is Pi-hole only (not dc1/dc2).
 4. **Apply** changes.
 
 This survives firmware updates without on-boot scripts.
@@ -358,16 +371,15 @@ FerryCrossing has multiple VLANs. BIND ACLs on every DC (`dc_trusted_networks` i
 
 | VLAN | Subnet | DHCP DNS | Notes |
 |---|---|---|---|
-| 1 (default) | `192.168.1.0/24` | dc1 + dc2 | Primary LAN; DDNS hook on UCG |
-| 2 (IoT) | `192.168.3.0/24` | dc1 + dc2 | Inter-VLAN routing; allow UDP/TCP 53 to DCs |
+| 1 (default) | `192.168.1.0/24` | Pi-hole `.18` + `.22` | Primary LAN; DDNS hook on UCG |
+| 2 (IoT) | `192.168.3.0/24` | Pi-hole `.18` + `.22` | Inter-VLAN routing; Pi-hole → dc1/dc2 for AD |
 | 3 (restricted) | `192.168.5.0/24` | Router/public only | **Isolated** — not in `dc_trusted_networks` |
 
 ### VLAN 2 (IoT)
 
 1. UniFi Network → **Settings** → **Networks** → IoT VLAN → **DHCP**.
-2. Set **DHCP DNS Server** to **dc1 and dc2** (`192.168.1.10`, `192.168.1.11`).
-3. Confirm firewall rules allow IoT → DC **UDP/TCP 53** (add 88/389/445 only if IoT
-   hosts are domain-joined).
+2. Set **DHCP DNS Server** to **Pi-hole** (`192.168.1.18`, `192.168.1.22`).
+3. Confirm firewall rules allow IoT → Pi-hole **UDP/TCP 53** and Pi-hole → DC **UDP/TCP 53**.
 
 MS-SNTP from DCs remains VLAN 1 only (`dc_ntp_allow_cidr`); IoT uses router or public NTP.
 
