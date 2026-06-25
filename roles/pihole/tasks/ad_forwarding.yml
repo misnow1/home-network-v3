@@ -1,0 +1,47 @@
+---
+- name: Pi-hole | Ensure dnsmasq.d directory exists
+  ansible.builtin.file:
+    path: "{{ pihole_ad_zones_conf | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Pi-hole | Deploy AD zone forwarding snippet
+  ansible.builtin.template:
+    src: 05-ad-zones.conf.j2
+    dest: "{{ pihole_ad_zones_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read etc_dnsmasq_d setting
+  ansible.builtin.command:
+    cmd: pihole-FTL --config misc.etc_dnsmasq_d
+  register: pihole_etc_dnsmasq_d_current
+  changed_when: false
+  when: pihole_enable_etc_dnsmasq_d | bool
+
+- name: Pi-hole | Enable /etc/dnsmasq.d
+  ansible.builtin.command:
+    cmd: pihole-FTL --config misc.etc_dnsmasq_d true
+  when:
+    - pihole_enable_etc_dnsmasq_d | bool
+    - pihole_etc_dnsmasq_d_current.stdout | trim != 'true'
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read revServers setting
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.revServers
+  register: pihole_rev_servers_current
+  changed_when: false
+  when: pihole_disable_rev_servers | bool
+
+- name: Pi-hole | Disable conditional forwarding (revServers)
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.revServers '[]'
+  when:
+    - pihole_disable_rev_servers | bool
+    - pihole_rev_servers_current.stdout | trim != '[]'
+  notify: Pi-hole reloaddns

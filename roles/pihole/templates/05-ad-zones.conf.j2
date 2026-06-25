@@ -1,0 +1,13 @@
+# {{ ansible_managed | default(true) }}
+# AD + reverse zone forwarding to BIND on domain controllers.
+# Managed by home-network-v3 roles/pihole — do not edit on host.
+
+{% for dc in pihole_dc_servers %}
+server=/{{ pihole_ad_domain }}/{{ dc }}
+server=/_msdcs.{{ pihole_ad_domain }}/{{ dc }}
+{% endfor %}
+{% for zone in pihole_reverse_zones %}
+{% for dc in pihole_dc_servers %}
+server=/{{ zone }}/{{ dc }}
+{% endfor %}
+{% endfor %}

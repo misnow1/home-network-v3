@@ -56,6 +56,17 @@ all:
           vm_memory_mb: 512
           vm_disk_gb: 8
 
+    # Config-only Pi-hole (curl install on CentOS/Rocky). NOT in linux group.
+    # SSH: often root-only — see group_vars/pihole/ansible.yml.example
+    pihole:
+      hosts:
+        pihole1.example.home:
+          ansible_host: 203.0.113.18
+          ansible_managed: true
+        pihole2.example.home:
+          ansible_host: 203.0.113.22
+          ansible_managed: true
+
     certbot:
       children:
         dc:

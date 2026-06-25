@@ -1,0 +1,92 @@
+---
+# Structural tests for Pi-hole config-only role (Slice 10+).
+
+- name: Structural — Pi-hole layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    pihole_role_tasks: "{{ repo_root }}/roles/pihole/tasks/main.yml"
+    pihole_ad_template: "{{ repo_root }}/roles/pihole/templates/05-ad-zones.conf.j2"
+    pihole_playbook: "{{ repo_root }}/playbooks/pihole-converge.yml"
+    pihole_runbook: "{{ repo_root }}/docs/pihole-runbook.md"
+    pihole_cutover: "{{ repo_root }}/scripts/pihole/cutover-check.sh"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+    pihole_vars_example: "{{ repo_root }}/inventories/production/group_vars/pihole/vars.yml.example"
+  tasks:
+    - name: Pi-hole | assert role and playbook exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: pihole_paths
+      loop:
+        - "{{ pihole_role_tasks }}"
+        - "{{ pihole_ad_template }}"
+        - "{{ pihole_playbook }}"
+        - "{{ pihole_runbook }}"
+        - "{{ pihole_cutover }}"
+        - "{{ pihole_vars_example }}"
+
+    - name: Pi-hole | assert layout files present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing {{ item.item }}"
+      loop: "{{ pihole_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Pi-hole | assert role does not install packages
+      ansible.builtin.shell: |
+        ! grep -qE 'ansible\.(builtin\.)?(yum|dnf|apt|package):' "{{ repo_root }}/roles/pihole/tasks/"*.yml
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert AD zone template uses server= forwarding
+      ansible.builtin.shell: |
+        grep -q 'server=/' "{{ pihole_ad_template }}"
+        grep -q 'pihole_dc_servers' "{{ pihole_ad_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert playbook targets pihole group with production guard
+      ansible.builtin.shell: |
+        grep -q 'hosts: pihole' "{{ pihole_playbook }}"
+        grep -q 'allow_production' "{{ pihole_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert inventory example defines pihole group
+      ansible.builtin.shell: |
+        grep -q '^    pihole:' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert cutover script is executable
+      ansible.builtin.stat:
+        path: "{{ pihole_cutover }}"
+      register: pihole_cutover_stat
+
+    - name: Pi-hole | assert cutover-check executable bit
+      ansible.builtin.assert:
+        that:
+          - pihole_cutover_stat.stat.executable
+
+    - name: Pi-hole | assert role is v6-only (no setupVars tasks)
+      ansible.builtin.shell: |
+        grep -q 'pihole.toml' "{{ pihole_role_tasks }}"
+        ! grep -q 'setupVars.conf' "{{ repo_root }}/roles/pihole/tasks/"*.yml
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert runbook documents etc_dnsmasq_d
+      ansible.builtin.shell: |
+        grep -q 'etc_dnsmasq_d' "{{ pihole_runbook }}"
+        grep -q 'pihole-converge.yml' "{{ pihole_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

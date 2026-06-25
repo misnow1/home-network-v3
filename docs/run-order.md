@@ -66,8 +66,9 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 5. Domain members — `domain-join.yml` on `linux:!dc`
 6. DDNS clients — `ddns-client.yml` (optional)
 7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
-8. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
-9. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
+8. Pi-hole — `pihole-converge.yml` on `pihole` hosts; manual UCG DHCP cutover — [pihole-runbook.md](pihole-runbook.md)
+9. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
+10. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
 
 ### AD migration (existing Samba domain)
 

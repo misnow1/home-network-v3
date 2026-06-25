@@ -19,13 +19,13 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 10 | Certbot DNS validation | **done** | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
 | 13 | DC replica | **done** | `dc02.lab.test` replica join; `INTEGRATION_SLICE=dc_replica`; CI nightly |
 | 17 | Cross-site DNS + IPv6 | **done** | `dc_trusted_networks`, BIND `localnets` + IPv6, multi-VLAN/remote-site docs |
+| 10+ | Pi-hole / DNS forwarders | **in progress** | Config-only Ansible role; Pi-hole → dc1/dc2; UCG DHCP — [pihole-runbook.md](pihole-runbook.md) |
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 
 ## Deferred (not forgotten)
 
 | Slice | Name | Depends on | Why deferred |
 |---|---|---|---|
-| 10+ | Pi-hole / DNS forwarders | Slice 2/6 DNS | Operational service, not provisioning core |
 | 11+ | Observability (Prometheus/Grafana) | Slices 1–5 hosts | Monitoring is separate concern |
 | 12+ | Bare-metal install (PXE/kickstart) | Slice 1 baseline | Lab uses cloud-init; prod install later |
 | 14+ | Windows provisioning | Slice 2 AD | Manual/docs only — Windows clients out of scope |

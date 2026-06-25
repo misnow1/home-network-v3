@@ -1,0 +1,5 @@
+---
+- name: Pi-hole reloaddns
+  ansible.builtin.command:
+    cmd: pihole reloaddns
+  changed_when: true

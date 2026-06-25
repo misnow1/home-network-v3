@@ -1,0 +1,24 @@
+---
+# Converge Pi-hole v6 DNS forwarding and upstream settings (config-only).
+# Requires curl/basic-install with /etc/pihole/pihole.toml — does not install Pi-hole.
+#
+# Safety: refuses production inventory unless -e allow_production=true.
+
+- name: Converge Pi-hole DNS configuration
+  hosts: pihole
+  become: true
+  pre_tasks:
+    - name: Pi-hole | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing pihole-converge against non-lab inventory without allow_production=true.
+          See docs/pihole-runbook.md.
+      tags: [always]
+
+  roles:
+    - role: pihole
+      tags: [pihole]
