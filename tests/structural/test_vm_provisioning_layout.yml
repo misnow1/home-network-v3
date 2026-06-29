@@ -1,0 +1,75 @@
+---
+# Structural tests for VM provisioning scripts (DHCP reservation workflow).
+
+- name: Structural — VM provisioning layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    vm_lib: "{{ repo_root }}/scripts/vm/vm-lib.sh"
+    vm_create: "{{ repo_root }}/scripts/vm/vm-create.sh"
+    vm_start: "{{ repo_root }}/scripts/vm/vm-start.sh"
+    inventory_set_host: "{{ repo_root }}/scripts/vm/inventory-set-host.sh"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+  tasks:
+    - name: VM | assert required script paths exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: vm_paths
+      loop:
+        - "{{ vm_lib }}"
+        - "{{ vm_create }}"
+        - "{{ vm_start }}"
+        - "{{ inventory_set_host }}"
+
+    - name: VM | assert scripts present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ vm_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: VM | assert vm-lib defines MAC and reservation helpers
+      ansible.builtin.shell: |
+        grep -q 'vm_resolve_mac' "{{ vm_lib }}"
+        grep -q 'vm_generate_mac_from_name' "{{ vm_lib }}"
+        grep -q 'vm_print_reservation_block' "{{ vm_lib }}"
+        grep -q 'vm_define_domain_from_virt_install' "{{ vm_lib }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: VM | assert vm-create supports prepare workflow flags
+      ansible.builtin.shell: |
+        grep -q '\-\-prepare' "{{ vm_create }}"
+        grep -q '\-\-wait-reservation' "{{ vm_create }}"
+        grep -q '\-\-force-boot' "{{ vm_create }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: VM | assert dry-run install uses domain.xml define path
+      ansible.builtin.shell: |
+        grep -q 'virsh --connect' "{{ vm_lib }}"
+        grep -q 'define.*DOMAIN_XML' "{{ vm_lib }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: VM | assert production hosts example documents vm_mac for DHCP bastion
+      ansible.builtin.shell: |
+        grep -q 'vm_use_dhcp: true' "{{ prod_hosts_example }}"
+        grep -q 'vm_mac' "{{ prod_hosts_example }}"
+        grep -q 'ansible_host is the intended DHCP reservation IP' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: VM | assert inventory-set-host uses --fqdn
+      ansible.builtin.shell: |
+        grep -q '\-\-fqdn' "{{ inventory_set_host }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

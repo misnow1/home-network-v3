@@ -1,0 +1,6 @@
+---
+- name: Bastion | Install apt packages
+  ansible.builtin.apt:
+    name: "{{ bastion_packages }}"
+    state: present
+  tags: [bastion_packages]

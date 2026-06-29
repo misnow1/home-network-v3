@@ -5,6 +5,11 @@ domain_name: lab.test
 domain_join_dns_servers: []
 domain_member_allow_groups: []
 
+# AD groups granted password sudo (AD password via pam_sss). AD display names are
+# lowercased to match SSSD NSS output (e.g. getent group "Domain Admins" → domain admins).
+domain_member_sudo_groups:
+  - Domain Admins
+
 sssd_ldap_id_mapping: false
 sssd_use_fully_qualified_names: false
 sssd_fall_back_homedir: /home/%u

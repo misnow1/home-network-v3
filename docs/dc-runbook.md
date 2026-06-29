@@ -235,6 +235,32 @@ integration tests, migration scripts).
 should show the **local** account. `id misnow1` after SSH should match your configured
 `samba_dc_operator_uid` / `gid`, not `HOME\misnow1` with uid `3000013`.
 
+### Operator SSH troubleshooting
+
+Symptoms after reboot or converge:
+
+| Symptom | Likely cause |
+|---|---|
+| SSH accepts your key then **Connection closed** | Missing `/etc/shadow` row for the local operator (passwd field `x` with no shadow entry). PAM account checks fail after pubkey auth. |
+| `su - misnow1` → **Authentication failure** | Expected — the account is pubkey-only (locked shadow password). From `ansible`, use `sudo -u misnow1 -i` instead. |
+
+From `ansible@<dc>`:
+
+```bash
+getent passwd misnow1
+sudo grep misnow1 /etc/passwd /etc/shadow
+sudo journalctl -u ssh -n 30 --no-pager | grep -i misnow1
+```
+
+If `/etc/shadow` has no `misnow1` line, re-run `dc-converge.yml` (operator tasks add a locked
+shadow entry) or break-glass append:
+
+```bash
+echo 'misnow1:!::0:99999:7:::' | sudo tee -a /etc/shadow
+```
+
+Then retry `ssh misnow1@<dc-ip>`.
+
 ## LDAP TLS (Slice 10)
 
 Samba AD DC ships with a self-signed LDAP certificate by default. Tools that validate

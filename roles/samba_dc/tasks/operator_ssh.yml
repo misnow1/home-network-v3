@@ -91,6 +91,12 @@
       fi
     fi
 
+    # passwd uses "x" — requires a shadow row or PAM account checks fail after pubkey auth.
+    if [ -f /etc/shadow ] && ! grep -q "^${OP_USER}:" /etc/shadow; then
+      echo "${OP_USER}:!::0:99999:7:::" >> /etc/shadow
+      CHANGED=1
+    fi
+
     if grep -q "^sudo:" /etc/group; then
       SUDO_MEMBERS="$(awk -F: '$1 == "sudo" { print $4; exit }' /etc/group)"
       case ",${SUDO_MEMBERS}," in

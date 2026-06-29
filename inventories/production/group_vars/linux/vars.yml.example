@@ -3,11 +3,17 @@
 #
 # Point domain_join_dns_servers at dc1 (e.g. 192.168.1.10 for home.2123studios.com).
 
+linux_baseline_timezone: America/New_York
+
 domain_name: home.example
 domain_join_dns_servers:
   - 203.0.113.10
 domain_member_allow_groups:
   - Domain Users
+
+# Password sudo for AD groups (default in domain_join role: Domain Admins).
+# domain_member_sudo_groups:
+#   - Domain Admins
 
 # Relay outbound cron mail through mail.home (domain_join postfix client — not on mail VM).
 mail_relay_client_enabled: true

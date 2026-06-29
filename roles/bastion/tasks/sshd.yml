@@ -1,0 +1,10 @@
+---
+- name: Bastion | Deploy sshd drop-in configuration
+  ansible.builtin.template:
+    src: 99-bastion.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-bastion.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart ssh
+  tags: [bastion_sshd]

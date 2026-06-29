@@ -1,0 +1,19 @@
+---
+bastion_packages:
+  - unattended-upgrades
+  - ufw
+  - fail2ban
+
+bastion_unattended_auto_reboot: true
+bastion_unattended_reboot_time: "03:30"
+
+bastion_fail2ban_maxretry: 5
+bastion_fail2ban_bantime: 3600
+bastion_fail2ban_findtime: 600
+bastion_fail2ban_ignoreip:
+  - 127.0.0.1/8
+  - ::1
+  - 192.168.100.0/24
+
+bastion_gssapi_strict_acceptor_check: false
+bastion_ufw_enabled: true

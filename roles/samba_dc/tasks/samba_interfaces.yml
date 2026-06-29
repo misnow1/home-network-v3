@@ -20,26 +20,68 @@
   when: samba_dc_bind_interfaces_only | bool
   tags: [samba_dns, samba_converge, samba_provision]
 
-- name: Samba DC interfaces | Write interfaces to smb.conf
-  ansible.builtin.lineinfile:
+- name: Samba DC interfaces | Remove stale interfaces lines outside [global]
+  ansible.builtin.replace:
     path: "{{ samba_dc_smb_conf }}"
-    regexp: '^\s*interfaces\s*='
-    line: "\tinterfaces = {{ samba_dc_interfaces_smb_conf_value }}"
+    regexp: '^\s*interfaces\s*=.*$'
+    replace: ''
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces_sam_ldb.stat.exists
   notify: restart samba-ad-dc
   tags: [samba_dns, samba_converge, samba_provision]
 
-- name: Samba DC interfaces | Write bind interfaces only to smb.conf
-  ansible.builtin.lineinfile:
+- name: Samba DC interfaces | Remove stale bind interfaces only lines outside [global]
+  ansible.builtin.replace:
     path: "{{ samba_dc_smb_conf }}"
-    regexp: '^\s*bind interfaces only\s*='
-    line: "\tbind interfaces only = yes"
+    regexp: '^\s*bind interfaces only\s*=.*$'
+    replace: ''
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces_sam_ldb.stat.exists
   notify: restart samba-ad-dc
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Remove misplaced interface block outside [global]
+  ansible.builtin.blockinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-interfaces"
+    state: absent
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+  notify: restart samba-ad-dc
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Configure interface binding in smb.conf [global]
+  ansible.builtin.blockinfile:
+    path: "{{ samba_dc_smb_conf }}"
+    block: |
+      interfaces = {{ samba_dc_interfaces_smb_conf_value }}
+      bind interfaces only = yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-interfaces"
+    insertafter: "^\\[global\\]"
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+  notify: restart samba-ad-dc
+  tags: [samba_dns, samba_converge, samba_provision]
+
+- name: Samba DC interfaces | Verify testparm reads interface binding from [global]
+  ansible.builtin.shell: |
+    set -euo pipefail
+    testparm -s "{{ samba_dc_smb_conf }}" 2>/dev/null \
+      | grep -qiE '^\s*bind interfaces only\s*=\s*yes'
+    testparm -s "{{ samba_dc_smb_conf }}" 2>/dev/null \
+      | grep -qF "interfaces = {{ samba_dc_interfaces_smb_conf_value }}"
+  args:
+    executable: /bin/bash
+  register: samba_dc_interfaces_testparm
+  changed_when: false
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces_sam_ldb.stat.exists
+    - not ansible_check_mode
   tags: [samba_dns, samba_converge, samba_provision]
 
 - name: Samba DC interfaces | Apply Samba restart before DNS refresh

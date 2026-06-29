@@ -103,6 +103,20 @@ Docker (`docker.io`, `docker-compose-v2`) is installed separately by the
 |---|---|
 | `bind9-dnsutils` | `nsupdate` for dynamic DNS |
 
+### Bastion (`bastion`)
+
+**Playbook:** [`playbooks/bastion.yml`](../playbooks/bastion.yml) (run `baseline.yml` + `domain-join.yml` first)  
+**Role:** [`roles/bastion`](../roles/bastion/) — variable `bastion_packages`
+
+| Package | Purpose |
+|---|---|
+| `unattended-upgrades` | Automatic security patching |
+| `ufw` | Host firewall (SSH-only inbound) |
+| `fail2ban` | sshd brute-force protection |
+
+Also deploys sshd drop-in, unattended-upgrades config, and fail2ban jail templates. See
+[bastion-runbook.md](bastion-runbook.md).
+
 ### CKA practice nodes (`cka`)
 
 **Playbook:** [`playbooks/cka-converge.yml`](../playbooks/cka-converge.yml)  
@@ -132,6 +146,7 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 |---|---|
 | DC | `linux_baseline` inline in DC playbooks |
 | Hypervisor, fileserver, domain member | `baseline.yml` → role playbook |
+| Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` |
 | CKA | `cka-converge.yml` (baseline + `cka_node`) |
 
 ## Overriding package lists

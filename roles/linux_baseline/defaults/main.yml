@@ -1,4 +1,7 @@
 ---
+# IANA timezone (e.g. America/New_York). Override in group_vars when needed.
+linux_baseline_timezone: UTC
+
 # NTP servers for chrony — override in group_vars when needed.
 chrony_ntp_servers:
   - 0.pool.ntp.org

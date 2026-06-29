@@ -11,6 +11,10 @@
   ansible.builtin.include_tasks: configure.yml
   tags: [domain_configure]
 
+- name: Configure sudo for domain groups
+  ansible.builtin.include_tasks: sudo.yml
+  tags: [domain_sudo]
+
 - name: Configure Postfix relay client
   ansible.builtin.include_tasks: postfix_relayclient.yml
   when:

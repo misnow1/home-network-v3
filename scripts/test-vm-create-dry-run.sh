@@ -33,6 +33,17 @@ main() {
   [[ -f "${seed_dir}/manifest.txt" ]] || die "missing manifest.txt"
   grep -q "vm_name=${vm_name}" "${seed_dir}/manifest.txt"
 
+  "${ROOT}/scripts/vm/vm-create.sh" -i lab --dry-run \
+    --name "${vm_name}-dhcp" \
+    --fqdn "${vm_name}-dhcp.lab.test" \
+    --dhcp \
+    --disk-gb 2
+
+  dhcp_seed_dir="$(vm_seeds_dir lab)/${vm_name}-dhcp"
+  grep -q '^vm_mac=' "${dhcp_seed_dir}/manifest.txt" \
+    || die "missing vm_mac in DHCP dry-run manifest"
+  grep -q 'network_mode=dhcp' "${dhcp_seed_dir}/manifest.txt"
+
   log_info "test-vm-create-dry-run.sh passed"
 }
 

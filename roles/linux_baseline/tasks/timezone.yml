@@ -1,0 +1,4 @@
+---
+- name: Set system timezone
+  community.general.timezone:
+    name: "{{ linux_baseline_timezone }}"

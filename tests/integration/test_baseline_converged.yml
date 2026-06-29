@@ -22,6 +22,17 @@
           - ansible_facts.services['chrony.service'].state == 'running'
         fail_msg: chrony is not running
 
+    - name: Read configured timezone
+      ansible.builtin.command: timedatectl show -p Timezone --value
+      register: baseline_timezone
+      changed_when: false
+
+    - name: Assert timezone matches baseline
+      ansible.builtin.assert:
+        that:
+          - baseline_timezone.stdout == linux_baseline_timezone
+        fail_msg: "Expected timezone {{ linux_baseline_timezone }}, got {{ baseline_timezone.stdout }}"
+
     - name: Assert openssh-server is running
       ansible.builtin.assert:
         that:

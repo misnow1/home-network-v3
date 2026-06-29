@@ -1,0 +1,21 @@
+---
+- name: Bastion | Install hardening packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [bastion_packages]
+
+- name: Bastion | Configure sshd hardening
+  ansible.builtin.include_tasks: sshd.yml
+  tags: [bastion_sshd]
+
+- name: Bastion | Configure UFW
+  ansible.builtin.include_tasks: ufw.yml
+  when: bastion_ufw_enabled | bool
+  tags: [bastion_ufw]
+
+- name: Bastion | Configure unattended-upgrades
+  ansible.builtin.include_tasks: unattended.yml
+  tags: [bastion_unattended]
+
+- name: Bastion | Configure fail2ban
+  ansible.builtin.include_tasks: fail2ban.yml
+  tags: [bastion_fail2ban]

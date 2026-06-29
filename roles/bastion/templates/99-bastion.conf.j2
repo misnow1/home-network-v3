@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Bastion sshd hardening — GSSAPI/Kerberos primary; SSH keys deferred to follow-up slice.
+
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+GSSAPIStrictAcceptorCheck {{ bastion_gssapi_strict_acceptor_check | ternary('yes', 'no') }}
+UsePAM yes

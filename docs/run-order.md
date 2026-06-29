@@ -64,11 +64,12 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 3. Hypervisors — `hypervisor.yml`, then `backup.yml`
 4. File servers — `fileserver.yml`
 5. Domain members — `domain-join.yml` on `linux:!dc`
-6. DDNS clients — `ddns-client.yml` (optional)
-7. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
-8. Pi-hole — `pihole-converge.yml` on `pihole` hosts; manual UCG DHCP cutover — [pihole-runbook.md](pihole-runbook.md)
-9. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
-10. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
+6. Bastion — `bastion.yml` on `bastion` (after domain-join) — [bastion-runbook.md](bastion-runbook.md)
+7. DDNS clients — `ddns-client.yml` (optional)
+8. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
+9. Pi-hole — `pihole-converge.yml` on `pihole` hosts; manual UCG DHCP cutover — [pihole-runbook.md](pihole-runbook.md)
+10. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
+11. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
 
 ### AD migration (existing Samba domain)
 
@@ -86,7 +87,7 @@ Swanhollow).
 8. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
 9. CentOS deferred hosts — manual `/etc/resolv.conf` only
 10. Demote old pdc — manual (after mail relay cutover)
-11. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml`
+11. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml` → `bastion.yml` (bastion hosts)
 12. Optional — `domain-leave.yml` before in-place reprovision
 
 Offline fallback when pdc is dead: **`dc-restore.yml`** (set `samba_dc_migration_mode: restore`).
