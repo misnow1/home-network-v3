@@ -1,0 +1,11 @@
+---
+# Harden domain-joined edge jump hosts (sshd/GSSAPI, UFW, unattended-upgrades, fail2ban).
+# Lab integration: scripts/test-integration.sh (member01.lab.test, INTEGRATION_SLICE=bastion).
+#
+# Prerequisites: baseline.yml + domain-join.yml. Does not run ddns-client.yml.
+
+- name: Configure bastion hosts
+  hosts: bastion
+  become: true
+  roles:
+    - role: bastion

@@ -40,12 +40,14 @@ all:
           ansible_host: 203.0.113.30
           ansible_managed: false   # CentOS — defer; reprovision to Ubuntu for fileserver.yml
 
-    ddns_clients:
+    bastion:
       hosts:
         bastion.example.home:
+          # ansible_host is the intended DHCP reservation IP when vm_use_dhcp is true.
           ansible_host: 203.0.113.40
           vm_name: bastion-example-home
           vm_use_dhcp: true
+          # vm_mac: 52:54:00:ab:cd:ef   # optional — omit to auto-generate a stable MAC from vm_name
 
     mail_relay:
       hosts:
@@ -75,7 +77,7 @@ all:
     linux:
       children:
         dc:
-        ddns_clients:
+        bastion:
         mail_relay:
         # hypervisors/fileservers excluded while CentOS deferred (apt-only roles)
 

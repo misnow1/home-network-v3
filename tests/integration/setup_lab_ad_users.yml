@@ -50,3 +50,16 @@
       register: lab_test_primary_group
       changed_when: "'Updated primary group' in lab_test_primary_group.stdout"
       failed_when: lab_test_primary_group.rc != 0
+
+    - name: Check whether Domain Admins has RFC2307 gidNumber
+      ansible.builtin.command: samba-tool group show "Domain Admins"
+      register: domain_admins_show
+      changed_when: false
+      failed_when: false
+
+    - name: Ensure Domain Admins has RFC2307 gidNumber for NSS/sudo
+      ansible.builtin.command: samba-tool group addunixattrs "Domain Admins" 512
+      when: "'gidNumber' not in domain_admins_show.stdout"
+      register: domain_admins_unix
+      changed_when: "'Added' in domain_admins_unix.stdout"
+      failed_when: domain_admins_unix.rc != 0

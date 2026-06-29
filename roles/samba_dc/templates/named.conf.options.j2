@@ -18,10 +18,16 @@ options {
     // make end-to-end validation impractical for the AD domain.
     dnssec-validation no;
 
-    // Answer on every interface so members can reach the DC by its LAN IP,
-    // but only recurse/answer for trusted networks to avoid being an open
-    // resolver (DNS amplification / cache-poisoning exposure).
+    // Answer on loopback and the DC LAN IP. Avoid listen-on { any; } so Docker
+    // bridge addresses (docker0, br-*) are not opened for DNS.
+{% if samba_dc_bind_interfaces_only | bool %}
+    listen-on {
+        127.0.0.1;
+        {{ vm_ip | default(ansible_host) }};
+    };
+{% else %}
     listen-on { any; };
+{% endif %}
     listen-on-v6 { any; };
     allow-query {
         localhost;

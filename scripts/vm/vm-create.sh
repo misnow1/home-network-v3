@@ -25,6 +25,10 @@ NESTED_VIRT=0
 NETWORK_EXPLICIT=0
 INVENTORY_FQDN=""
 DRY_RUN=0
+PREPARE=0
+WAIT_RESERVATION=0
+FORCE_BOOT=0
+RESERVE_FQDN=""
 
 usage() {
   cat <<EOF
@@ -50,11 +54,16 @@ Options:
   --nested-virt     Enable host-passthrough CPU
   --dry-run         Build disk + cloud-init seed; write install.sh and domain.xml
                     without defining the VM (for offline install on another hypervisor)
+  --prepare         Define VM with fixed MAC but do not start (reserved DHCP workflow)
+  --wait-reservation  With --prepare, pause until Enter after creating router reservation
+  --force-boot      Boot immediately even for production vm_use_dhcp inventory hosts
   -h, --help        Show this help
 
 Examples:
   $(basename "$0") -i lab dc01.lab.test
   $(basename "$0") -i production dc1.home.2123studios.com --disk-gb 20
+  $(basename "$0") -i production --prepare bastion.home.2123studios.com
+  $(basename "$0") -i production --prepare --wait-reservation bastion.home.2123studios.com
   $(basename "$0") -i production --name dc1 --fqdn dc1.home.2123studios.com --ip 192.168.1.10 --network external-default
   $(basename "$0") --name cka-cp1 --network vlan3 --dhcp --memory 4096 --vcpus 2 --disk-gb 20
   $(basename "$0") -i production --dry-run dc02.home.2123studios.com
@@ -116,6 +125,18 @@ parse_args() {
         ;;
       --dry-run)
         DRY_RUN=1
+        shift
+        ;;
+      --prepare)
+        PREPARE=1
+        shift
+        ;;
+      --wait-reservation)
+        WAIT_RESERVATION=1
+        shift
+        ;;
+      --force-boot)
+        FORCE_BOOT=1
         shift
         ;;
       -h|--help)
@@ -212,34 +233,58 @@ create_vm() {
   local vcpus="$8"
   local disk_gb="$9"
   local nested_virt="${10}"
+  local mac_profile="${11:-}"
+  local mac_fqdn="${12:-$fqdn}"
 
   require_cmd qemu-img
   require_cmd envsubst
 
-  if [[ "${DRY_RUN}" -eq 0 ]]; then
+  if [[ "${DRY_RUN}" -eq 0 && "${PREPARE}" -eq 0 ]]; then
     require_cmd virsh
     require_cmd virt-install
     vm_ensure_network_for_profile "${PROFILE}" "${net_name}" "${bridge}"
-  else
+  elif [[ "${PREPARE}" -eq 1 ]]; then
+    require_cmd virsh
+    require_cmd virt-install
+    vm_ensure_network_for_profile "${PROFILE}" "${net_name}" "${bridge}"
+  elif [[ "${DRY_RUN}" -eq 1 ]]; then
     log_info "Dry-run: skipping libvirt network checks and VM define"
   fi
 
+  if [[ "${PREPARE}" -eq 1 && "${DRY_RUN}" -eq 1 ]]; then
+    die "--prepare and --dry-run are mutually exclusive"
+  fi
+  if [[ "${WAIT_RESERVATION}" -eq 1 && "${PREPARE}" -eq 0 ]]; then
+    die "--wait-reservation requires --prepare"
+  fi
+
   "${ROOT}/scripts/vm/keys-ensure.sh" -i "${PROFILE}" >/dev/null
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
+  if [[ "${DRY_RUN}" -eq 1 || "${PREPARE}" -eq 1 ]]; then
     mkdir -p "$(vm_images_dir)" "$(vm_vms_dir "${PROFILE}")" "$(vm_seeds_dir "${PROFILE}")"
   else
     "${ROOT}/scripts/vm/dirs-ensure.sh" -i "${PROFILE}" >/dev/null
   fi
   "${ROOT}/scripts/vm/image-ensure.sh" >/dev/null
 
-  local base_image disk_path seed_iso seed_dir network_arg
+  local base_image disk_path seed_iso seed_dir network_arg vm_mac domain_xml manifest
   base_image="$(vm_cloud_image_path)"
   disk_path="$(vm_vms_dir "${PROFILE}")/${vm_name}.qcow2"
   seed_dir="$(vm_seeds_dir "${PROFILE}")/${vm_name}"
+  domain_xml="${seed_dir}/domain.xml"
+  manifest="${seed_dir}/manifest.txt"
 
   if [[ "${DRY_RUN}" -eq 0 ]]; then
     if virsh dominfo "${vm_name}" >/dev/null 2>&1; then
-      die "VM ${vm_name} already exists — run vm-destroy.sh first"
+      if [[ "${PREPARE}" -eq 1 ]]; then
+        local state
+        state="$(virsh domstate "${vm_name}" 2>/dev/null || true)"
+        if [[ "${state}" != "shut off" ]]; then
+          die "VM ${vm_name} already exists and is not shut off — run vm-destroy.sh first"
+        fi
+        log_warn "Prepare: reusing existing defined VM ${vm_name}"
+      else
+        die "VM ${vm_name} already exists — run vm-destroy.sh first"
+      fi
     fi
   elif [[ -d "${seed_dir}" && -f "${disk_path}" ]]; then
     log_warn "Dry-run: reusing existing disk and seed dir for ${vm_name}"
@@ -261,14 +306,15 @@ create_vm() {
   fi
   chmod 644 "${seed_iso}" 2>/dev/null || true
 
-  network_arg="$(vm_build_network_arg "${bridge}" "${net_name}")"
+  vm_mac="$(vm_resolve_mac "${mac_profile}" "${mac_fqdn}" "${vm_name}" "${seed_dir}")"
+  network_arg="$(vm_build_network_arg "${bridge}" "${net_name}" "${vm_mac}")"
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     vm_write_install_artifacts "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
       "${disk_path}" "${seed_iso}" "${base_image}" "${network_arg}" \
-      "${memory_mb}" "${vcpus}" "${nested_virt}" "${seed_dir}"
+      "${memory_mb}" "${vcpus}" "${nested_virt}" "${seed_dir}" "${vm_mac}"
     if [[ "${cloud_init_mode}" == "dhcp" ]]; then
-      log_info "Dry-run complete for ${vm_name} (${fqdn}, DHCP)"
+      log_info "Dry-run complete for ${vm_name} (${fqdn}, DHCP, MAC ${vm_mac})"
     else
       log_info "Dry-run complete for ${vm_name} (${fqdn} @ ${vm_ip})"
     fi
@@ -288,12 +334,42 @@ create_vm() {
   vm_build_virt_install_argv virt_argv "${vm_name}" "${disk_path}" "${seed_iso}" \
     "${network_arg}" "${memory_mb}" "${vcpus}" "${nested_virt}"
 
+  if [[ "${PREPARE}" -eq 1 ]]; then
+    if ! virsh dominfo "${vm_name}" >/dev/null 2>&1; then
+      vm_define_domain_from_virt_install "${vm_name}" "${domain_xml}" "${virt_argv[@]}"
+    else
+      log_info "Prepare: VM ${vm_name} already defined — refreshing manifest"
+    fi
+    vm_write_manifest "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
+      "${disk_path}" "${seed_iso}" "${base_image}" "${domain_xml}" "${vm_mac}" "${manifest}"
+    if [[ "${cloud_init_mode}" == "dhcp" && -n "${RESERVE_FQDN}" ]]; then
+      local reserve_ip
+      reserve_ip="$(vm_inventory_lookup "${PROFILE}" "${RESERVE_FQDN}" "ansible_host")"
+      vm_print_reservation_block "${RESERVE_FQDN}" "${vm_name}" "${vm_mac}" \
+        "${reserve_ip}" "${PROFILE}"
+      if [[ "${WAIT_RESERVATION}" -eq 1 ]]; then
+        vm_wait_for_reservation_confirm
+      fi
+    else
+      log_info "Prepared ${vm_name} (${fqdn}, MAC ${vm_mac}) — start with vm-start.sh when ready"
+    fi
+    return 0
+  fi
+
+  if [[ "${cloud_init_mode}" == "dhcp" && "${PROFILE}" == "production" \
+        && -n "${RESERVE_FQDN}" && "${FORCE_BOOT}" -eq 0 ]]; then
+    log_warn "Production DHCP host ${RESERVE_FQDN}: booting immediately may race router reservations."
+    log_warn "Prefer: $(basename "$0") -i production --prepare ${RESERVE_FQDN}"
+  fi
+
   if [[ "${cloud_init_mode}" == "dhcp" ]]; then
-    log_info "Creating VM ${vm_name} (${fqdn}, DHCP)"
+    log_info "Creating VM ${vm_name} (${fqdn}, DHCP, MAC ${vm_mac})"
   else
     log_info "Creating VM ${vm_name} (${fqdn} @ ${vm_ip})"
   fi
   virt-install "${virt_argv[@]}"
+  vm_write_manifest "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
+    "${disk_path}" "${seed_iso}" "${base_image}" "" "${vm_mac}" "${manifest}"
   log_info "VM ${vm_name} created"
 }
 
@@ -310,6 +386,7 @@ main() {
     vm_name="$(vm_inventory_lookup "${PROFILE}" "${INVENTORY_FQDN}" "vm_name")"
     net_name="$(vm_inventory_lookup "${PROFILE}" "${INVENTORY_FQDN}" "vm_network")"
     load_inventory_network_exports "${PROFILE}" "${INVENTORY_FQDN}"
+    RESERVE_FQDN="${INVENTORY_FQDN}"
 
     if vm_host_uses_dhcp "${PROFILE}" "${INVENTORY_FQDN}"; then
       cloud_mode=dhcp
@@ -317,6 +394,7 @@ main() {
     else
       cloud_mode=static
       vm_ip="$(vm_inventory_lookup "${PROFILE}" "${INVENTORY_FQDN}" "vm_ip")"
+      RESERVE_FQDN=""
     fi
 
     host_memory="$(vm_inventory_lookup_optional "${PROFILE}" "${INVENTORY_FQDN}" "vm_memory_mb")"
@@ -336,14 +414,20 @@ main() {
     fi
 
     create_vm "${vm_name}" "${INVENTORY_FQDN}" "${vm_ip}" "${cloud_mode}" "" "${net_name}" \
-      "${MEMORY_MB}" "${VCPUS}" "${host_disk_gb}" "${nested_virt_flag}"
+      "${MEMORY_MB}" "${VCPUS}" "${host_disk_gb}" "${nested_virt_flag}" \
+      "${PROFILE}" "${INVENTORY_FQDN}"
     return 0
   fi
 
+  RESERVE_FQDN=""
   resolve_adhoc_config
   resolve_adhoc_cloud_init
+  local mac_profile="" mac_fqdn="${FQDN}"
+  if vm_inventory_host_known "${PROFILE}" "${FQDN}"; then
+    mac_profile="${PROFILE}"
+  fi
   create_vm "${VM_NAME}" "${FQDN}" "${ADHOC_VM_IP}" "${ADHOC_CLOUD_MODE}" "${BRIDGE}" "${NET_NAME}" \
-    "${MEMORY_MB}" "${VCPUS}" "${DISK_GB}" "${NESTED_VIRT}"
+    "${MEMORY_MB}" "${VCPUS}" "${DISK_GB}" "${NESTED_VIRT}" "${mac_profile}" "${mac_fqdn}"
 }
 
 main "$@"

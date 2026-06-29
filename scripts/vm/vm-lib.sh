@@ -133,11 +133,61 @@ vm_ensure_libvirt_network() {
 vm_build_network_arg() {
   local bridge="${1:-}"
   local net_name="${2:-home-dc-lab}"
+  local vm_mac="${3:-}"
+  local arg=""
+
   if [[ -n "${bridge}" ]]; then
-    printf 'bridge=%s,model=virtio' "${bridge}"
+    arg="bridge=${bridge},model=virtio"
   else
-    printf 'network=%s,model=virtio' "${net_name}"
+    arg="network=${net_name},model=virtio"
   fi
+  if [[ -n "${vm_mac}" ]]; then
+    arg="${arg},mac=${vm_mac}"
+  fi
+  printf '%s' "${arg}"
+}
+
+vm_generate_mac_from_name() {
+  local vm_name="$1"
+  require_cmd python3
+  python3 - "${vm_name}" <<'PY'
+import hashlib, sys
+
+digest = hashlib.sha256(sys.argv[1].encode()).digest()
+print(f"52:54:00:{digest[0]:02x}:{digest[1]:02x}:{digest[2]:02x}")
+PY
+}
+
+vm_manifest_lookup() {
+  local manifest="$1"
+  local key="$2"
+  [[ -f "${manifest}" ]] || return 1
+  grep -E "^${key}=" "${manifest}" 2>/dev/null | head -1 | cut -d= -f2- || true
+}
+
+vm_resolve_mac() {
+  local profile="${1:-}"
+  local fqdn="${2:-}"
+  local vm_name="$3"
+  local seed_dir="$4"
+  local mac manifest
+
+  if [[ -n "${profile}" && -n "${fqdn}" ]]; then
+    mac="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_mac")"
+    if [[ -n "${mac}" ]]; then
+      printf '%s' "${mac}"
+      return 0
+    fi
+  fi
+
+  manifest="${seed_dir}/manifest.txt"
+  mac="$(vm_manifest_lookup "${manifest}" "vm_mac")"
+  if [[ -n "${mac}" ]]; then
+    printf '%s' "${mac}"
+    return 0
+  fi
+
+  vm_generate_mac_from_name "${vm_name}"
 }
 
 # Build virt-install argv (array name in caller: local -a args; vm_build_virt_install_argv args ...).
@@ -192,6 +242,7 @@ vm_write_install_artifacts() {
   local vcpus="${10}"
   local nested_virt="${11}"
   local bundle_dir="${12}"
+  local vm_mac="${13:-}"
   local -a virt_argv=()
 
   vm_build_virt_install_argv virt_argv "${vm_name}" "${disk_path}" "${seed_iso}" \
@@ -208,6 +259,18 @@ vm_write_install_artifacts() {
     nested_cpu='  --noautoconsole'
   fi
 
+  if command -v virt-install >/dev/null 2>&1; then
+    if virt-install "${virt_argv[@]}" --print-xml > "${domain_xml}" 2>/dev/null; then
+      log_info "Wrote ${domain_xml}"
+    else
+      log_warn "Could not generate domain.xml (libvirt network may be undefined on this host)"
+      rm -f "${domain_xml}"
+    fi
+  else
+    log_warn "virt-install not found — skipping domain.xml (install.sh still generated)"
+    rm -f "${domain_xml}"
+  fi
+
   {
     cat <<EOF
 #!/usr/bin/env bash
@@ -219,6 +282,7 @@ DISK_PATH="\${DISK_PATH:-${disk_path}}"
 SEED_ISO="\${SEED_ISO:-${seed_iso}}"
 BASE_IMAGE="\${BASE_IMAGE:-${base_image}}"
 LIBVIRT_DEFAULT_URI="\${LIBVIRT_DEFAULT_URI:-qemu:///system}"
+DOMAIN_XML="\${DOMAIN_XML:-${domain_xml}}"
 
 [[ -f "\${DISK_PATH}" ]] || { echo "Missing disk: \${DISK_PATH}" >&2; exit 1; }
 [[ -f "\${SEED_ISO}" ]] || { echo "Missing seed ISO: \${SEED_ISO}" >&2; exit 1; }
@@ -229,12 +293,19 @@ LIBVIRT_DEFAULT_URI="\${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 }
 
 command -v virsh >/dev/null || { echo "virsh required" >&2; exit 1; }
-command -v virt-install >/dev/null || { echo "virt-install required" >&2; exit 1; }
 
 if virsh dominfo "${vm_name}" >/dev/null 2>&1; then
   echo "VM ${vm_name} already exists — run vm-destroy.sh first" >&2
   exit 1
 fi
+
+if [[ -f "\${DOMAIN_XML}" ]]; then
+  virsh --connect "\${LIBVIRT_DEFAULT_URI}" define "\${DOMAIN_XML}"
+  virsh --connect "\${LIBVIRT_DEFAULT_URI}" start "${vm_name}"
+  exit 0
+fi
+
+command -v virt-install >/dev/null || { echo "virt-install required (no domain.xml)" >&2; exit 1; }
 
 exec virt-install \\
   --connect "\${LIBVIRT_DEFAULT_URI}" \\
@@ -253,17 +324,71 @@ EOF
   } > "${install_sh}"
   chmod 755 "${install_sh}"
 
-  if command -v virt-install >/dev/null 2>&1; then
-    if virt-install "${virt_argv[@]}" --print-xml > "${domain_xml}" 2>/dev/null; then
-      log_info "Wrote ${domain_xml}"
+  {
+    printf 'vm_name=%s\n' "${vm_name}"
+    printf 'fqdn=%s\n' "${fqdn}"
+    if [[ "${cloud_init_mode}" == "dhcp" ]]; then
+      printf 'network_mode=dhcp\n'
     else
-      log_warn "Could not generate domain.xml (libvirt network may be undefined on this host)"
-      rm -f "${domain_xml}"
+      printf 'network_mode=static\n'
+      printf 'vm_ip=%s\n' "${vm_ip}"
     fi
-  else
-    log_warn "virt-install not found — skipping domain.xml (install.sh still generated)"
-    rm -f "${domain_xml}"
-  fi
+    if [[ -n "${vm_mac}" ]]; then
+      printf 'vm_mac=%s\n' "${vm_mac}"
+    fi
+    printf 'disk_path=%s\n' "${disk_path}"
+    printf 'seed_iso=%s\n' "${seed_iso}"
+    printf 'base_image=%s\n' "${base_image}"
+    printf 'install_script=%s\n' "${install_sh}"
+    if [[ -f "${domain_xml}" ]]; then
+      printf 'domain_xml=%s\n' "${domain_xml}"
+      printf 'define_cmd=virsh define %s\n' "${domain_xml}"
+      printf 'start_cmd=virsh start %s\n' "${vm_name}"
+    fi
+    printf 'virt_install_cmd=%s\n' "${quoted_cmd}"
+    cat <<'NOTES'
+
+# Copy to target hypervisor
+# 1. Base cloud image (once per hypervisor): copy base_image or run image-ensure.sh
+# 2. Disk overlay: disk_path (qcow2 backing file must resolve on target — same path or qemu-img rebase)
+# 3. Cloud-init seed: seed_iso (and optional user-data/meta-data in the same directory)
+# 4. Run install_script on the target (uses domain.xml when present — preserves MAC)
+
+# If backing path differs on the target:
+#   qemu-img info disk_path
+#   qemu-img rebase -u -b /path/on/target/noble-server-cloudimg-amd64.img disk_path
+NOTES
+  } > "${manifest}"
+
+  log_info "Wrote ${install_sh}"
+  log_info "Wrote ${manifest}"
+}
+
+vm_define_domain_from_virt_install() {
+  local vm_name="$1"
+  local domain_xml="$2"
+  shift 2
+  local -a virt_argv=("$@")
+
+  require_cmd virsh
+  require_cmd virt-install
+
+  virt-install "${virt_argv[@]}" --print-xml > "${domain_xml}"
+  virsh define "${domain_xml}" >/dev/null
+  log_info "Defined VM ${vm_name} (not started)"
+}
+
+vm_write_manifest() {
+  local vm_name="$1"
+  local fqdn="$2"
+  local vm_ip="$3"
+  local cloud_init_mode="$4"
+  local disk_path="$5"
+  local seed_iso="$6"
+  local base_image="$7"
+  local domain_xml="$8"
+  local vm_mac="$9"
+  local manifest="${10}"
 
   {
     printf 'vm_name=%s\n' "${vm_name}"
@@ -274,31 +399,45 @@ EOF
       printf 'network_mode=static\n'
       printf 'vm_ip=%s\n' "${vm_ip}"
     fi
+    if [[ -n "${vm_mac}" ]]; then
+      printf 'vm_mac=%s\n' "${vm_mac}"
+    fi
     printf 'disk_path=%s\n' "${disk_path}"
     printf 'seed_iso=%s\n' "${seed_iso}"
     printf 'base_image=%s\n' "${base_image}"
-    printf 'install_script=%s\n' "${install_sh}"
     if [[ -f "${domain_xml}" ]]; then
       printf 'domain_xml=%s\n' "${domain_xml}"
       printf 'define_cmd=virsh define %s\n' "${domain_xml}"
+      printf 'start_cmd=virsh start %s\n' "${vm_name}"
     fi
-    printf 'virt_install_cmd=%s\n' "${quoted_cmd}"
-    cat <<'NOTES'
-
-# Copy to target hypervisor
-# 1. Base cloud image (once per hypervisor): copy base_image or run image-ensure.sh
-# 2. Disk overlay: disk_path (qcow2 backing file must resolve on target — same path or qemu-img rebase)
-# 3. Cloud-init seed: seed_iso (and optional user-data/meta-data in the same directory)
-# 4. Run install_script on the target, or: virsh define domain_xml && virsh start vm_name
-
-# If backing path differs on the target:
-#   qemu-img info disk_path
-#   qemu-img rebase -u -b /path/on/target/noble-server-cloudimg-amd64.img disk_path
-NOTES
   } > "${manifest}"
-
-  log_info "Wrote ${install_sh}"
   log_info "Wrote ${manifest}"
+}
+
+vm_print_reservation_block() {
+  local fqdn="$1"
+  local vm_name="$2"
+  local vm_mac="$3"
+  local reserve_ip="$4"
+  local profile="$5"
+
+  cat <<EOF >&2
+
+=== DHCP reservation required before first boot ===
+FQDN:     ${fqdn}
+VM:       ${vm_name}
+MAC:      ${vm_mac}
+Reserve:  ${reserve_ip}  (ansible_host from inventory)
+
+Create a DHCP reservation on your router (MAC -> IP), then start the VM:
+  ./scripts/vm/vm-start.sh -i ${profile} ${fqdn}
+
+EOF
+}
+
+vm_wait_for_reservation_confirm() {
+  log_info "Press Enter after creating the DHCP reservation (Ctrl-C to abort)..."
+  read -r _
 }
 
 vm_discover_ip() {

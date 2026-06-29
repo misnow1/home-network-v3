@@ -127,6 +127,10 @@ sudo /var/lib/libvirt/images/home-network-v3/production/seeds/dc02/install.sh
 ./scripts/vm/wait-ssh.sh -i production dc02.home.2123studios.com
 ```
 
+When `domain.xml` is present, `install.sh` runs `virsh define` + `virsh start` so the
+MAC in the XML matches the reservation you created on the router (do not re-run
+`virt-install` manually).
+
 If the backing image path differs on the target, rebase before install:
 
 ```bash

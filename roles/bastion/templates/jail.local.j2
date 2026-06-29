@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# Bastion fail2ban — sshd jail with management-network ignore list.
+
+[DEFAULT]
+ignoreip = {{ bastion_fail2ban_ignoreip | join(' ') }}
+bantime = {{ bastion_fail2ban_bantime }}
+findtime = {{ bastion_fail2ban_findtime }}
+maxretry = {{ bastion_fail2ban_maxretry }}
+
+[sshd]
+enabled = true

@@ -1,0 +1,82 @@
+---
+# Post-converge checks for bastion integration tests (member01.lab.test).
+
+- name: Integration — bastion convergence
+  hosts: all
+  gather_facts: false
+  vars:
+    lab_test_principal: "{{ lab_test_user }}@{{ lab_realm | upper }}"
+  tasks:
+    - name: Assert sshd effective configuration
+      ansible.builtin.command: sshd -T
+      register: sshd_effective
+      changed_when: false
+
+    - name: Assert sshd GSSAPI and password settings
+      ansible.builtin.assert:
+        that:
+          - sshd_effective.stdout is search('gssapiauthentication yes')
+          - sshd_effective.stdout is search('passwordauthentication no')
+          - sshd_effective.stdout is search('permitrootlogin no')
+        fail_msg: "Unexpected sshd -T output: {{ sshd_effective.stdout }}"
+
+    - name: Assert UFW is active
+      ansible.builtin.command: ufw status verbose
+      register: ufw_status
+      changed_when: false
+      failed_when: "'Status: active' not in ufw_status.stdout"
+
+    - name: Assert UFW allows OpenSSH
+      ansible.builtin.assert:
+        that:
+          - ufw_status.stdout is search('OpenSSH|22/tcp')
+        fail_msg: "OpenSSH not allowed in UFW: {{ ufw_status.stdout }}"
+
+    - name: Assert unattended-upgrades package is installed
+      ansible.builtin.command: dpkg -s unattended-upgrades
+      register: unattended_pkg
+      changed_when: false
+      failed_when: unattended_pkg.rc != 0
+
+    - name: Assert automatic reboot is enabled in unattended-upgrades config
+      ansible.builtin.shell: |
+        grep -q 'Unattended-Upgrade::Automatic-Reboot "true"' /etc/apt/apt.conf.d/50unattended-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Assert fail2ban sshd jail is active
+      ansible.builtin.command: fail2ban-client status sshd
+      register: fail2ban_sshd
+      changed_when: false
+      failed_when: fail2ban_sshd.rc != 0
+
+    - name: Obtain Kerberos ticket for lab AD user
+      ansible.builtin.shell: |
+        set -euo pipefail
+        printf '%s\n' "${KRB5_PASSWORD}" | kinit "${KRB5_PRINCIPAL}"
+        klist
+      args:
+        executable: /bin/bash
+      environment:
+        KRB5_PASSWORD: "{{ vault_test_user_password }}"
+        KRB5_PRINCIPAL: "{{ lab_test_principal }}"
+      register: kinit_result
+      changed_when: false
+      no_log: true
+      failed_when: kinit_result.rc != 0
+
+    - name: Assert GSSAPI SSH to localhost succeeds
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ssh -o BatchMode=yes \
+          -o StrictHostKeyChecking=no \
+          -o GSSAPIAuthentication=yes \
+          -o PreferredAuthentications=gssapi-with-mic \
+          -o PasswordAuthentication=no \
+          "{{ lab_test_user }}@localhost" true
+      args:
+        executable: /bin/bash
+      register: gssapi_ssh
+      changed_when: false
+      failed_when: gssapi_ssh.rc != 0

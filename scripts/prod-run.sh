@@ -66,6 +66,8 @@ main() {
 
   ansible_env() {
     export ANSIBLE_CONFIG="${ROOT}/ansible.cfg"
+    # stdout goes through tee (a pipe), so Ansible disables color unless forced.
+    export ANSIBLE_FORCE_COLOR=1
   }
   ansible_env
 

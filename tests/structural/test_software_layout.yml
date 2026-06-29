@@ -65,6 +65,8 @@
         grep -q 'github_releases.yml' "{{ baseline_tasks }}"
         grep -q 'github_release_item.yml' "{{ github_releases_task }}"
         grep -q 'shell.yml' "{{ baseline_tasks }}"
+        grep -q 'timezone.yml' "{{ baseline_tasks }}"
+        grep -q 'linux_baseline_timezone:' "{{ baseline_defaults }}"
       args:
         executable: /bin/bash
       changed_when: false

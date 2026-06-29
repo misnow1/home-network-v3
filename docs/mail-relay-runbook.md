@@ -156,6 +156,7 @@ Verify in Gmail:
 ```bash
 ${PROD} playbooks/baseline.yml --limit bastion.home.2123studios.com
 ${PROD} playbooks/domain-join.yml --limit bastion.home.2123studios.com
+${PROD} playbooks/bastion.yml --limit bastion.home.2123studios.com
 ```
 
 **Legacy CentOS hosts (kif, kvm01, etc.)** — manual `/etc/postfix/main.cf`:

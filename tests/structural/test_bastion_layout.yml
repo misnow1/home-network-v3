@@ -1,0 +1,59 @@
+---
+# Structural tests for bastion role layout.
+
+- name: Structural — bastion layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    bastion_defaults: "{{ repo_root }}/roles/bastion/defaults/main.yml"
+    bastion_tasks: "{{ repo_root }}/roles/bastion/tasks/main.yml"
+    bastion_playbook: "{{ repo_root }}/playbooks/bastion.yml"
+    bastion_runbook: "{{ repo_root }}/docs/bastion-runbook.md"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+  tasks:
+    - name: Bastion | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: bastion_paths
+      loop:
+        - "{{ bastion_defaults }}"
+        - "{{ bastion_tasks }}"
+        - "{{ repo_root }}/roles/bastion/handlers/main.yml"
+        - "{{ repo_root }}/roles/bastion/templates/99-bastion.conf.j2"
+        - "{{ repo_root }}/roles/bastion/templates/50unattended-upgrades.j2"
+        - "{{ repo_root }}/roles/bastion/templates/jail.local.j2"
+        - "{{ bastion_playbook }}"
+        - "{{ bastion_runbook }}"
+
+    - name: Bastion | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ bastion_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Bastion | assert playbook targets bastion group
+      ansible.builtin.shell: |
+        grep -q 'hosts: bastion' "{{ bastion_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Bastion | assert production hosts example defines bastion group
+      ansible.builtin.shell: |
+        grep -q '^    bastion:' "{{ prod_hosts_example }}"
+        grep -q 'bastion.example.home' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Bastion | assert defaults include unattended reboot settings
+      ansible.builtin.shell: |
+        grep -q 'bastion_unattended_auto_reboot' "{{ bastion_defaults }}"
+        grep -q 'bastion_fail2ban_maxretry' "{{ bastion_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

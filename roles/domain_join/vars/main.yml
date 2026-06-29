@@ -1,6 +1,7 @@
 ---
 # Ubuntu 24.04 LTS (Slice 3).
 domain_join_packages:
+  - sudo
   - realmd
   - sssd
   - sssd-ad

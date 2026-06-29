@@ -47,3 +47,26 @@
       changed_when: false
       no_log: true
       failed_when: kinit_result.rc != 0
+
+    - name: Assert domain sudo groups resolve via NSS
+      ansible.builtin.command: getent group {{ item }}
+      register: getent_sudo_group
+      changed_when: false
+      failed_when: getent_sudo_group.rc != 0
+      loop: "{{ domain_member_sudo_groups }}"
+
+    - name: Assert domain sudoers file passes visudo
+      ansible.builtin.command: visudo -cf /etc/sudoers.d/domain-member-groups
+      changed_when: false
+
+    - name: Read domain sudoers file
+      ansible.builtin.slurp:
+        src: /etc/sudoers.d/domain-member-groups
+      register: domain_sudoers_file
+
+    - name: Assert domain sudo rules are present for configured groups
+      ansible.builtin.assert:
+        that:
+          - item | lower | replace(' ', '\\ ') in (domain_sudoers_file.content | b64decode)
+        fail_msg: "Missing sudo rule for group {{ item }}"
+      loop: "{{ domain_member_sudo_groups }}"

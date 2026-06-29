@@ -70,7 +70,7 @@ main() {
   local key="${2:?variable key required}"
   local value
   value="$(host_var "${fqdn}" "${key}")"
-  if [[ "${key}" != "vm_ip" && "${key}" != "vm_use_dhcp" ]]; then
+  if [[ "${key}" != "vm_ip" && "${key}" != "vm_use_dhcp" && "${key}" != "vm_mac" ]]; then
     [[ -n "${value}" ]] || die "Host ${fqdn} missing inventory var ${key}"
   fi
   printf '%s' "${value}"

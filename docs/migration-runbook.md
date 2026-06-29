@@ -33,7 +33,7 @@ See also:
 | **pdc** (old) | `192.168.1.2` | Stays online until dc1 validated; demote after cutover. Also runs **internal→external mail relay** (see [Non-AD services on pdc](#non-ad-services-on-pdc-decommission-blockers)) |
 | **kvm01** | `192.168.1.21` | CentOS — manual DNS only (deferred) |
 | **kif** | `192.168.1.152` | CentOS — manual DNS only (deferred) |
-| **bastion** | TBD | Reprovision Ubuntu 24.04 → `baseline` + `domain-join` |
+| **bastion** | TBD | Reprovision Ubuntu 24.04 → `baseline` + `domain-join` + `bastion` |
 | Windows devices | few | Manual DNS to dc1 |
 
 Production DC naming: **`dc1`**, **`dc2`**, … (`dc1.home.2123studios.com`). Retire
@@ -802,8 +802,10 @@ ${PROD} playbooks/domain-leave.yml --limit bastion.home.2123studios.com
 ```bash
 ${PROD} playbooks/baseline.yml --limit bastion.home.2123studios.com
 ${PROD} playbooks/domain-join.yml --limit bastion.home.2123studios.com
-${PROD} playbooks/ddns-client.yml --limit bastion.home.2123studios.com   # optional
+${PROD} playbooks/bastion.yml --limit bastion.home.2123studios.com
 ```
+
+DDNS for bastion is handled by the UCG dhcp-script — do not run `ddns-client.yml`.
 
 ---
 
@@ -813,7 +815,7 @@ ${PROD} playbooks/ddns-client.yml --limit bastion.home.2123studios.com   # optio
 - [ ] `./scripts/migration/cutover-check.sh --phase post --remote dc1.home.2123studios.com` passes
 - [ ] All FSMO roles on dc1 (`samba-tool fsmo show`)
 - [ ] `kinit user@HOME.2123STUDIOS.COM` succeeds for domain users
-- [ ] SSH to bastion with domain credentials
+- [ ] GSSAPI SSH to bastion after `kinit` ([bastion-runbook.md](bastion-runbook.md))
 - [ ] `getent passwd` on kvm01/kif returns domain users (no rejoin)
 - [ ] DHCP clients receive dc1 as DNS ([unifi-gateway-dns.md](unifi-gateway-dns.md))
 - [ ] DDNS hook creates A/PTR after lease renew ([ddns-runbook.md](ddns-runbook.md))

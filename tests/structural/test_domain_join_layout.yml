@@ -7,6 +7,8 @@
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     join_tasks: "{{ repo_root }}/roles/domain_join/tasks/join.yml"
+    sudo_tasks: "{{ repo_root }}/roles/domain_join/tasks/sudo.yml"
+    sudo_template: "{{ repo_root }}/roles/domain_join/templates/domain-sudoers.j2"
     domain_join_playbook: "{{ repo_root }}/playbooks/domain-join.yml"
     sssd_template: "{{ repo_root }}/roles/domain_join/templates/sssd.conf.j2"
   tasks:
@@ -27,6 +29,15 @@
     - name: Domain join | assert sssd.conf enables short names
       ansible.builtin.shell: |
         grep -q 'use_fully_qualified_names' "{{ sssd_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert sudo tasks deploy domain group sudoers
+      ansible.builtin.shell: |
+        grep -q 'domain-sudoers.j2' "{{ sudo_tasks }}"
+        grep -q 'domain_member_sudo_groups' "{{ sudo_template }}"
+        grep -q 'visudo -cf' "{{ sudo_tasks }}"
       args:
         executable: /bin/bash
       changed_when: false

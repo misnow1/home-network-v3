@@ -21,6 +21,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 17 | Cross-site DNS + IPv6 | **done** | `dc_trusted_networks`, BIND `localnets` + IPv6, multi-VLAN/remote-site docs |
 | 10+ | Pi-hole / DNS forwarders | **in progress** | Config-only Ansible role; Pi-hole → dc1/dc2; UCG DHCP — [pihole-runbook.md](pihole-runbook.md) |
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
+| 18 | Bastion hardening | **done** | Edge jump host — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban — [bastion-runbook.md](bastion-runbook.md) |
 
 ## Deferred (not forgotten)
 

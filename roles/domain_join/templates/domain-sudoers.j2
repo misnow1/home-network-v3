@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Password-required sudo for AD groups — use NSS short names (SSSD lowercases them).
+{% for group in domain_member_sudo_groups %}
+%{{ group | lower | replace(' ', '\\ ') }} ALL=(ALL) ALL
+{% endfor %}
