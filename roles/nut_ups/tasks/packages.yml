@@ -1,0 +1,27 @@
+---
+- name: NUT UPS | Build package list
+  ansible.builtin.set_fact:
+    nut_ups_packages: >-
+      {{
+        nut_ups_packages_base
+        + ([nut_ups_package_snmp] if (nut_ups_devices | selectattr('driver', 'equalto', 'snmp-ups') | list | length > 0) else [])
+        + (['mailutils'] if nut_notify_enabled | bool and nut_notify_email_enabled | bool else [])
+        + (['curl'] if nut_notify_enabled | bool and nut_notify_pushover_enabled | bool else [])
+      }}
+
+- name: NUT UPS | Install packages
+  ansible.builtin.apt:
+    name: "{{ nut_ups_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: NUT UPS | Assert Postfix active when email notify enabled
+  ansible.builtin.systemd:
+    name: postfix
+  register: nut_ups_postfix_active
+  failed_when: nut_ups_postfix_active.status.ActiveState != 'active'
+  when:
+    - nut_notify_enabled | bool
+    - nut_notify_email_enabled | bool
+    - not ansible_check_mode

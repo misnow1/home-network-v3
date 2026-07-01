@@ -1,0 +1,54 @@
+---
+# kif NUT host variables — copy to vars.yml (gitignored alongside production inventory).
+#
+#   mkdir -p inventories/production/host_vars/kif.home.2123studios.com
+#   cp inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example \
+#      inventories/production/host_vars/kif.home.2123studios.com/vars.yml
+#
+# Secrets live in inventories/production/group_vars/all/vault.yml — see docs/vault-schema.md.
+
+nut_ups_mode: netserver
+nut_ups_listen_address: 192.168.1.152
+
+nut_ups_usb_vendorid: "0764"
+nut_ups_usb_productid: "0501"
+
+nut_ups_devices:
+  - name: kifups
+    driver: usbhid-ups
+    port: auto
+    description: "CP1500AVRLCDa — local rack UPS"
+    enabled: true
+    options:
+      pollinterval: 15
+      pollfreq: 30
+      ondelay: 0
+      offdelay: 20
+
+  - name: livingroomups
+    driver: snmp-ups
+    port: 192.168.1.193
+    description: "Living room CyberPower SNMP card"
+    enabled: false
+    options:
+      community: "{{ vault_nut_snmp_community_livingroom | default('public') }}"
+      snmp_version: v1
+
+nut_ups_minsupplies: 1
+
+nut_notify_email_enabled: true
+nut_notify_pushover_enabled: true
+
+nut_notify_messages:
+  onbatt:
+    subject: "[UPS] kif on battery"
+    body: "UPS kifups switched to battery power."
+  online:
+    subject: "[UPS] kif back on line power"
+    body: "UPS kifups is receiving line power again."
+  lowbatt:
+    subject: "[UPS] kif LOW BATTERY"
+    body: "UPS kifups battery is critically low; shutdown may follow."
+  commbad:
+    subject: "[UPS] kif communication lost"
+    body: "Lost communication with a monitored UPS on kif."

@@ -1,0 +1,13 @@
+---
+# Converge NUT UPS monitoring (drivers, upsd, upsmon, notifications).
+# Requires baseline.yml and mail relay client (domain-join tag domain_mail_relay) first.
+#
+# Production:
+#   ./scripts/prod-run.sh --confirm-production -- playbooks/nut-converge.yml \
+#     --limit kif.home.2123studios.com
+
+- name: Converge NUT UPS servers
+  hosts: nut_servers
+  become: true
+  roles:
+    - role: nut_ups

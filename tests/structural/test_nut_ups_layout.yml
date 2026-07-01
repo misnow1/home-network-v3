@@ -1,0 +1,62 @@
+---
+# Structural tests for nut_ups role layout.
+
+- name: Structural — nut_ups layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    nut_defaults: "{{ repo_root }}/roles/nut_ups/defaults/main.yml"
+    nut_tasks: "{{ repo_root }}/roles/nut_ups/tasks/main.yml"
+    nut_playbook: "{{ repo_root }}/playbooks/nut-converge.yml"
+    nut_runbook: "{{ repo_root }}/docs/nut-runbook.md"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+    kif_host_vars_example: >-
+      {{ repo_root }}/inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example
+  tasks:
+    - name: NUT UPS | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: nut_paths
+      loop:
+        - "{{ nut_defaults }}"
+        - "{{ nut_tasks }}"
+        - "{{ repo_root }}/roles/nut_ups/handlers/main.yml"
+        - "{{ repo_root }}/roles/nut_ups/templates/ups.conf.j2"
+        - "{{ repo_root }}/roles/nut_ups/templates/upsmon.conf.j2"
+        - "{{ repo_root }}/roles/nut_ups/templates/upssched-cmd.j2"
+        - "{{ nut_playbook }}"
+        - "{{ nut_runbook }}"
+        - "{{ kif_host_vars_example }}"
+
+    - name: NUT UPS | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ nut_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: NUT UPS | assert playbook targets nut_servers group
+      ansible.builtin.shell: |
+        grep -q 'hosts: nut_servers' "{{ nut_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NUT UPS | assert production hosts example defines nut_servers group
+      ansible.builtin.shell: |
+        grep -q '^    nut_servers:' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NUT UPS | assert defaults include device and notify keys
+      ansible.builtin.shell: |
+        grep -q 'nut_ups_devices:' "{{ nut_defaults }}"
+        grep -q 'nut_notify_pushover_enabled' "{{ nut_defaults }}"
+        grep -q 'nut_ups_allowed_drivers:' "{{ nut_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

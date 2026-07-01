@@ -1,0 +1,9 @@
+---
+- name: NUT UPS | Deploy udev rules for USB UPS
+  ansible.builtin.template:
+    src: udev-nut-ups.rules.j2
+    dest: "/etc/udev/rules.d/99-nut-ups-{{ nut_ups_usb_vendorid }}-{{ nut_ups_usb_productid }}.rules"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload udev rules

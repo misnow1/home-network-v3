@@ -1,0 +1,24 @@
+---
+- name: NUT UPS | Enable and start nut-server
+  ansible.builtin.systemd:
+    name: "{{ nut_ups_services.server }}"
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+- name: NUT UPS | Enable and start nut-driver units
+  ansible.builtin.systemd:
+    name: "nut-driver@{{ item.name }}.service"
+    enabled: true
+    state: started
+  loop: "{{ nut_ups_enabled_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not ansible_check_mode
+
+- name: NUT UPS | Enable and start nut-monitor
+  ansible.builtin.systemd:
+    name: "{{ nut_ups_services.monitor }}"
+    enabled: true
+    state: started
+  when: not ansible_check_mode

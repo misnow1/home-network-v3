@@ -1,0 +1,14 @@
+---
+nut_ups_packages_base:
+  - nut
+  - nut-server
+  - nut-client
+
+nut_ups_package_snmp: nut-snmp
+
+nut_ups_config_dir: /etc/nut
+nut_ups_run_dir: /run/nut
+
+nut_ups_services:
+  server: nut-server
+  monitor: nut-monitor

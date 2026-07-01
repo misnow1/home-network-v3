@@ -1,0 +1,13 @@
+# Ansible-managed — see roles/nut_ups/templates/upssched.conf.j2
+CMDSCRIPT {{ nut_ups_config_dir }}/upssched-cmd
+PIPEFN {{ nut_ups_run_dir }}/upssched.pipe
+LOCKFN {{ nut_ups_run_dir }}/upssched.lock
+
+AT ONBATT * START-TIMER onbatt {{ nut_notify_onbatt_delay_seconds }}
+AT ONLINE * CANCEL-TIMER onbatt
+AT ONLINE * EXECUTE online-notify
+AT TIMER onbatt EXECUTE onbatt-notify
+AT LOWBATT * EXECUTE lowbatt-notify
+AT COMMBAD * START-TIMER commbad 60
+AT COMMOK * CANCEL-TIMER commbad
+AT TIMER commbad EXECUTE commbad-notify

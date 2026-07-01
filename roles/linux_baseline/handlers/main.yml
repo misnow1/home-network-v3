@@ -4,3 +4,4 @@
     name: "{{ chrony_service_name }}"
     state: restarted
   listen: restart chrony
+  when: not ansible_check_mode

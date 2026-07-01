@@ -1,0 +1,73 @@
+# Ansible-managed UPS notification handler for upssched.
+# See roles/nut_ups/templates/upssched-cmd.j2
+
+set -eu
+
+# shellcheck source=/dev/null
+. {{ nut_ups_config_dir }}/notify-messages.env
+
+TIMESTAMP="$(date -Iseconds)"
+
+send_email() {
+  local subject="$1"
+  local body="$2"
+{% if nut_notify_email_enabled | bool %}
+  {
+    echo "Event time: ${TIMESTAMP}"
+    echo
+    printf '%s\n' "${body}"
+  } | mail -s "${subject}" "{{ nut_notify_email_recipient }}"
+{% else %}
+  logger -t upssched-cmd "email disabled: ${subject}"
+{% endif %}
+}
+
+send_pushover() {
+  local subject="$1"
+  local body="$2"
+  local priority="$3"
+{% if nut_notify_pushover_enabled | bool %}
+  # shellcheck source=/dev/null
+  . {{ nut_ups_config_dir }}/pushover.env
+  curl -fsS \
+    --connect-timeout 10 \
+    --max-time 30 \
+    -F "token=${PUSHOVER_TOKEN}" \
+    -F "user=${PUSHOVER_USER}" \
+    -F "title=${subject}" \
+    -F "message=${body} (${TIMESTAMP})" \
+    -F "priority=${priority}" \
+{% if nut_notify_pushover_sound | length > 0 %}
+    -F "sound={{ nut_notify_pushover_sound }}" \
+{% endif %}
+    https://api.pushover.net/1/messages.json >/dev/null
+{% else %}
+  logger -t upssched-cmd "pushover disabled: ${subject}"
+{% endif %}
+}
+
+notify_event() {
+  local subject="$1"
+  local body="$2"
+  local priority="$3"
+  send_email "${subject}" "${body}"
+  send_pushover "${subject}" "${body}" "${priority}"
+}
+
+case "$1" in
+  onbatt-notify)
+    notify_event "${NUT_NOTIFY_ONBATT_SUBJECT}" "${NUT_NOTIFY_ONBATT_BODY}" "{{ nut_notify_pushover_priority_onbatt }}"
+    ;;
+  online-notify)
+    notify_event "${NUT_NOTIFY_ONLINE_SUBJECT}" "${NUT_NOTIFY_ONLINE_BODY}" "{{ nut_notify_pushover_priority_online }}"
+    ;;
+  lowbatt-notify)
+    notify_event "${NUT_NOTIFY_LOWBATT_SUBJECT}" "${NUT_NOTIFY_LOWBATT_BODY}" "{{ nut_notify_pushover_priority_lowbatt }}"
+    ;;
+  commbad-notify)
+    notify_event "${NUT_NOTIFY_COMMBAD_SUBJECT}" "${NUT_NOTIFY_COMMBAD_BODY}" "{{ nut_notify_pushover_priority_commbad }}"
+    ;;
+  *)
+    logger -t upssched-cmd "Unrecognized command: $1"
+    ;;
+esac

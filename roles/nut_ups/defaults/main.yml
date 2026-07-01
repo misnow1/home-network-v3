@@ -1,0 +1,82 @@
+---
+nut_ups_enabled: true
+
+nut_ups_mode: netserver
+
+nut_ups_allow_no_device: true
+
+nut_ups_listen_address: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+
+nut_ups_acl_networks:
+  - 192.168.1.0/24
+
+nut_ups_allowed_drivers:
+  - usbhid-ups
+  - snmp-ups
+
+nut_ups_devices: []
+
+nut_ups_local_mon_user: upsmon
+nut_ups_remote_mon_user: upsmon-remote
+
+nut_ups_local_mon_password: "{{ vault_nut_ups_local_mon_password | default('') }}"
+nut_ups_remote_mon_password: "{{ vault_nut_ups_remote_mon_password | default('') }}"
+
+nut_ups_monitors: []
+
+nut_ups_minsupplies: 1
+nut_ups_shutdown_cmd: "/sbin/shutdown -h +0"
+nut_ups_finaldelay: 5
+nut_ups_deadtime: 15
+nut_ups_powerdownflag: "/etc/killpower"
+nut_ups_manage_powerdownflag: false
+
+nut_notify_enabled: true
+nut_notify_email_enabled: true
+nut_notify_pushover_enabled: false
+
+nut_notify_email_recipient: root
+nut_notify_email_from: "root@{{ ansible_fqdn | default(inventory_hostname) }}"
+nut_notify_onbatt_delay_seconds: 30
+
+nut_notify_pushover_user_key: "{{ vault_pushover_user_key | default('') }}"
+nut_notify_pushover_api_token: "{{ vault_pushover_api_token | default('') }}"
+nut_notify_pushover_priority_onbatt: 1
+nut_notify_pushover_priority_online: 0
+nut_notify_pushover_priority_lowbatt: 2
+nut_notify_pushover_priority_commbad: 1
+nut_notify_pushover_sound: ""
+
+nut_notify_messages:
+  onbatt:
+    subject: "[UPS] {{ ansible_hostname }} on battery"
+    body: >-
+      UPS power lost on {{ ansible_fqdn | default(inventory_hostname) }}.
+      The system is running on battery.
+  online:
+    subject: "[UPS] {{ ansible_hostname }} back on line power"
+    body: >-
+      UPS power restored on {{ ansible_fqdn | default(inventory_hostname) }}.
+  lowbatt:
+    subject: "[UPS] {{ ansible_hostname }} LOW BATTERY"
+    body: >-
+      UPS battery is critically low on {{ ansible_fqdn | default(inventory_hostname) }}.
+      Shutdown may follow.
+  commbad:
+    subject: "[UPS] {{ ansible_hostname }} communication lost"
+    body: >-
+      Lost communication with UPS on {{ ansible_fqdn | default(inventory_hostname) }}.
+
+nut_notify_flags:
+  ONLINE: SYSLOG+WALL+EXEC
+  ONBATT: SYSLOG+WALL+EXEC
+  LOWBATT: SYSLOG+WALL+EXEC
+  COMMOK: SYSLOG+WALL+EXEC
+  COMMBAD: SYSLOG+WALL+EXEC
+  SHUTDOWN: SYSLOG+WALL+EXEC
+  FSD: SYSLOG+WALL+EXEC
+  REPLBATT: SYSLOG+WALL+EXEC
+  NOCOMM: SYSLOG+WALL+EXEC
+
+nut_ups_usb_vendorid: ""
+nut_ups_usb_productid: ""

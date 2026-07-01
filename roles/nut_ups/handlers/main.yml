@@ -1,0 +1,30 @@
+---
+- name: Restart NUT server
+  ansible.builtin.systemd:
+    name: "{{ nut_ups_services.server }}"
+    state: restarted
+  listen: restart nut server
+  when: not ansible_check_mode
+
+- name: Restart NUT monitor
+  ansible.builtin.systemd:
+    name: "{{ nut_ups_services.monitor }}"
+    state: restarted
+  listen: restart nut monitor
+  when: not ansible_check_mode
+
+- name: Restart NUT driver units
+  ansible.builtin.systemd:
+    name: "nut-driver@{{ item.name }}.service"
+    state: restarted
+  loop: "{{ nut_ups_enabled_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  listen: restart nut drivers
+  when: not ansible_check_mode
+
+- name: Reload udev rules
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: true
+  listen: reload udev rules
+  when: not ansible_check_mode

@@ -15,7 +15,9 @@ scripts/lab/keys/lab_id_ed25519
 
 # Production inventory (real IPs and hostnames)
 inventories/production/hosts.yml
-inventories/production/host_vars/
+inventories/production/host_vars/**/vars.yml
+inventories/production/host_vars/**/vars.yaml
+!inventories/production/host_vars/**/*.example
 inventories/production/group_vars/vault.yml
 inventories/production/group_vars/all/vault.yml
 inventories/production/group_vars/all/ansible.yml

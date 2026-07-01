@@ -58,6 +58,11 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_mail_gmail_user` | 16 | Gmail address for internal mail relay SASL auth | production only |
 | `vault_mail_gmail_app_password` | 16 | Gmail app password for relay smarthost | production only |
 | `vault_mail_default_recipient` | 16 | Delivery target for root@*.home.2123studios.com | production only |
+| `vault_nut_ups_local_mon_password` | 21 | NUT upsmon master password (local shutdown) | production only |
+| `vault_nut_ups_remote_mon_password` | 21 | NUT upsmon slave password (remote netclient) | production only |
+| `vault_nut_snmp_community_livingroom` | 21 | SNMP community for livingroomups (optional) | production only |
+| `vault_pushover_user_key` | 21 | Pushover user key for UPS notifications | production only |
+| `vault_pushover_api_token` | 21 | Pushover application API token | production only |
 
 ## Recreate the lab vault
 
