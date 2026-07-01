@@ -1,0 +1,5 @@
+# Ansible-managed — see roles/nut_ups/templates/nut.conf.j2
+MODE={{ nut_ups_mode }}
+{% if nut_ups_allow_no_device | bool %}
+ALLOW_NO_DEVICE=true
+{% endif %}

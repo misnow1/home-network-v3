@@ -1,0 +1,2 @@
+# Ansible-managed — CyberPower USB UPS stable device path
+SUBSYSTEM=="usb", ATTR{idVendor}=="{{ nut_ups_usb_vendorid }}", ATTR{idProduct}=="{{ nut_ups_usb_productid }}", MODE="0664", GROUP="nut"

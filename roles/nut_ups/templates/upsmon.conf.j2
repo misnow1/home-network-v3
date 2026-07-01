@@ -1,0 +1,34 @@
+# Ansible-managed — see roles/nut_ups/templates/upsmon.conf.j2
+MINSUPPLIES {{ nut_ups_minsupplies }}
+SHUTDOWNCMD {{ nut_ups_shutdown_cmd }}
+FINALDELAY {{ nut_ups_finaldelay }}
+DEADTIME {{ nut_ups_deadtime }}
+POWERDOWNFLAG {{ nut_ups_powerdownflag }}
+
+{% if nut_ups_monitors | length > 0 %}
+{% for monitor in nut_ups_monitors %}
+MONITOR {{ monitor.ups }}@{{ monitor.host | default('localhost') }} {{ monitor.powervalue | default(1) }} {{ monitor.user | default(nut_ups_local_mon_user) }} {{ monitor.password | default(nut_ups_local_mon_password) }} {{ monitor.role | default('master') }}
+{% endfor %}
+{% else %}
+{% for device in nut_ups_enabled_devices %}
+MONITOR {{ device.name }}@localhost 1 {{ nut_ups_local_mon_user }} {{ nut_ups_local_mon_password }} master
+{% endfor %}
+{% endif %}
+
+{% if nut_notify_enabled | bool %}
+NOTIFYCMD /usr/sbin/upssched
+
+NOTIFYMSG ONLINE    "UPS %s on line power"
+NOTIFYMSG ONBATT    "UPS %s on battery"
+NOTIFYMSG LOWBATT   "UPS %s battery is low"
+NOTIFYMSG FSD       "UPS %s: forced shutdown in progress"
+NOTIFYMSG COMMOK    "Communications with UPS %s established"
+NOTIFYMSG COMMBAD   "Communications with UPS %s lost"
+NOTIFYMSG SHUTDOWN  "Auto logout and shutdown proceeding"
+NOTIFYMSG REPLBATT  "UPS %s battery needs to be replaced"
+NOTIFYMSG NOCOMM    "UPS %s is unavailable"
+
+{% for event, flags in nut_notify_flags.items() %}
+NOTIFYFLAG {{ event }} {{ flags }}
+{% endfor %}
+{% endif %}

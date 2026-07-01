@@ -24,6 +24,7 @@
       - docs/backup-runbook.md
       - docs/production-runbook.md
       - docs/migration-runbook.md
+      - docs/kif-kvm01-reimage-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml
@@ -37,6 +38,7 @@
       - docker/ddns-nsupdate/app.py
       - playbooks/mail-relay.yml
       - docs/mail-relay-runbook.md
+      - docs/nut-runbook.md
       - roles/mail_relay/tasks/main.yml
       - roles/samba_dc/tasks/dns_mail_relay.yml
       - roles/domain_join/tasks/postfix_relayclient.yml

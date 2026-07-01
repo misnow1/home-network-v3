@@ -22,6 +22,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 10+ | Pi-hole / DNS forwarders | **in progress** | Config-only Ansible role; Pi-hole → dc1/dc2; UCG DHCP — [pihole-runbook.md](pihole-runbook.md) |
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 | 18 | Bastion hardening | **done** | Edge jump host — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban — [bastion-runbook.md](bastion-runbook.md) |
+| 19 | kif/kvm01 Ubuntu reimage | **in progress** | Spare SSD cutover; md127 LVs; **netplan cleanup** (br0/br3) — [kif-kvm01-reimage-runbook.md](kif-kvm01-reimage-runbook.md) |
 
 ## Deferred (not forgotten)
 
@@ -30,7 +31,14 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 11+ | Observability (Prometheus/Grafana) | Slices 1–5 hosts | Monitoring is separate concern |
 | 12+ | Bare-metal install (PXE/kickstart) | Slice 1 baseline | Lab uses cloud-init; prod install later |
 | 14+ | Windows provisioning | Slice 2 AD | Manual/docs only — Windows clients out of scope |
-| 15+ | NFS exports | Slice 5 file server | SMB first; NFS if needed later |
+| 15+ | NFS exports | Slice 5 / kif reimage | kif exports `/home`, `/media`, `/archive` for Linux clients (kvm01); Ansible role or fileserver companion — not manual-only post-reimage |
+| 19+ | Production fileserver (kif shares) | kif reimage, Slice 5 | Extend `samba_fileserver`: `[homes]`, `[archive]`, `[shared]`, `[media]`, `[paperless]`; **wsdd**; drop legacy `[netlogon]`/`[sysvol]` if dc1/dc2 authoritative |
+| 20+ | Mac Time Machine + avahi | Production fileserver | `vfs_fruit`, avahi `_adisk._tcp` / `_device-info._tcp`; Finder discovery for personal Macs — skip stock avahi on reimage cutover |
+| 21+ | NUT / UPS (kif) | kif reimage | **in progress** — `nut_ups` role, `nut-converge.yml` — [nut-runbook.md](nut-runbook.md) |
+| 22+ | backup-libvirt automation | Slice 7 | `backup-libvirt.sh` honoring scope manifest (`offline_copy`, `snapshot`, `exclude`) |
+| 23+ | Restic scheduling + offsite | Slice 7, hypervisors | systemd timers; repos on kif `/archive/restic/`; SFTP/NAS backend; quarterly restore drill; 3-2-1 offsite copy |
+| 24+ | kif ESP/boot mirror | kif reimage (optional) | Rebuild 2×1TB pair with mirrored ESP/`/boot`; retire spare-as-OS or repurpose 512GB SSD |
+| 25+ | Hypervisor host networking | kif/kvm01 reimage, Slice 4 | Netplan/Ansible for br0 + VLAN bridges; libvirt `external-default` / `vlan3`; not Docker bridges |
 
 ## Principles
 

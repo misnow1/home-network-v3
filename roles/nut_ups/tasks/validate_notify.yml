@@ -1,0 +1,37 @@
+---
+- name: NUT UPS | Require notification channel when notify enabled
+  ansible.builtin.assert:
+    that:
+      - nut_notify_email_enabled | bool or nut_notify_pushover_enabled | bool
+    fail_msg: >-
+      nut_notify_enabled is true but both nut_notify_email_enabled and
+      nut_notify_pushover_enabled are false.
+  when: nut_notify_enabled | bool
+
+- name: NUT UPS | Require Pushover vault secrets when enabled
+  ansible.builtin.assert:
+    that:
+      - nut_notify_pushover_user_key | length > 0
+      - nut_notify_pushover_api_token | length > 0
+    fail_msg: >-
+      Set vault_pushover_user_key and vault_pushover_api_token when
+      nut_notify_pushover_enabled is true.
+  when:
+    - nut_notify_enabled | bool
+    - nut_notify_pushover_enabled | bool
+  no_log: true
+
+- name: NUT UPS | Require local monitor password
+  ansible.builtin.assert:
+    that:
+      - nut_ups_local_mon_password | length > 0
+    fail_msg: Set vault_nut_ups_local_mon_password for upsmon local master access.
+  no_log: true
+
+- name: NUT UPS | Require remote monitor password in netserver mode
+  ansible.builtin.assert:
+    that:
+      - nut_ups_remote_mon_password | length > 0
+    fail_msg: Set vault_nut_ups_remote_mon_password for remote upsmon clients.
+  when: nut_ups_mode == 'netserver'
+  no_log: true

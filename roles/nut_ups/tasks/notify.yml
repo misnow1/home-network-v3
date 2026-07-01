@@ -1,0 +1,31 @@
+---
+- name: NUT UPS | Deploy notification message strings
+  ansible.builtin.template:
+    src: notify-messages.env.j2
+    dest: "{{ nut_ups_config_dir }}/notify-messages.env"
+    owner: root
+    group: nut
+    mode: "0640"
+  when: nut_notify_enabled | bool
+
+- name: NUT UPS | Deploy Pushover credentials
+  ansible.builtin.template:
+    src: pushover.env.j2
+    dest: "{{ nut_ups_config_dir }}/pushover.env"
+    owner: root
+    group: nut
+    mode: "0600"
+  no_log: true
+  when:
+    - nut_notify_enabled | bool
+    - nut_notify_pushover_enabled | bool
+
+- name: NUT UPS | Deploy upssched-cmd notification script
+  ansible.builtin.template:
+    src: upssched-cmd.j2
+    dest: "{{ nut_ups_config_dir }}/upssched-cmd"
+    owner: root
+    group: nut
+    mode: "0750"
+  when: nut_notify_enabled | bool
+  notify: restart nut monitor

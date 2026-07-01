@@ -1,0 +1,80 @@
+---
+- name: NUT UPS | Ensure runtime directory exists
+  ansible.builtin.file:
+    path: "{{ nut_ups_run_dir }}"
+    state: directory
+    owner: root
+    group: nut
+    mode: "0775"
+
+- name: NUT UPS | Deploy nut.conf
+  ansible.builtin.template:
+    src: nut.conf.j2
+    dest: "{{ nut_ups_config_dir }}/nut.conf"
+    owner: root
+    group: nut
+    mode: "0640"
+  notify:
+    - restart nut server
+    - restart nut monitor
+
+- name: NUT UPS | Deploy ups.conf
+  ansible.builtin.template:
+    src: ups.conf.j2
+    dest: "{{ nut_ups_config_dir }}/ups.conf"
+    owner: root
+    group: nut
+    mode: "0640"
+  notify:
+    - restart nut server
+    - restart nut drivers
+
+- name: NUT UPS | Deploy upsd.conf
+  ansible.builtin.template:
+    src: upsd.conf.j2
+    dest: "{{ nut_ups_config_dir }}/upsd.conf"
+    owner: root
+    group: nut
+    mode: "0640"
+  notify: restart nut server
+
+- name: NUT UPS | Deploy upsd.users
+  ansible.builtin.template:
+    src: upsd.users.j2
+    dest: "{{ nut_ups_config_dir }}/upsd.users"
+    owner: root
+    group: nut
+    mode: "0640"
+  no_log: true
+  notify:
+    - restart nut server
+    - restart nut monitor
+
+- name: NUT UPS | Deploy upsmon.conf
+  ansible.builtin.template:
+    src: upsmon.conf.j2
+    dest: "{{ nut_ups_config_dir }}/upsmon.conf"
+    owner: root
+    group: nut
+    mode: "0640"
+  no_log: true
+  notify: restart nut monitor
+
+- name: NUT UPS | Deploy upssched.conf
+  ansible.builtin.template:
+    src: upssched.conf.j2
+    dest: "{{ nut_ups_config_dir }}/upssched.conf"
+    owner: root
+    group: nut
+    mode: "0640"
+  when: nut_notify_enabled | bool
+  notify: restart nut monitor
+
+- name: NUT UPS | Ensure powerdown flag file exists
+  ansible.builtin.file:
+    path: "{{ nut_ups_powerdownflag }}"
+    state: touch
+    owner: root
+    group: nut
+    mode: "0640"
+  when: nut_ups_manage_powerdownflag | bool

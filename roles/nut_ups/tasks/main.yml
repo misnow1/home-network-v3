@@ -1,0 +1,63 @@
+---
+- name: NUT UPS | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not nut_ups_enabled | bool
+
+- name: NUT UPS | Validate device drivers
+  ansible.builtin.assert:
+    that:
+      - item.driver in nut_ups_allowed_drivers
+    fail_msg: "UPS device {{ item.name }} uses unsupported driver {{ item.driver }}"
+  loop: "{{ nut_ups_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [nut_config]
+
+- name: NUT UPS | Compute enabled devices
+  ansible.builtin.set_fact:
+    nut_ups_enabled_devices: >-
+      {{
+        nut_ups_devices
+        | selectattr('enabled', 'defined')
+        | selectattr('enabled', 'equalto', true)
+        | list
+        + nut_ups_devices
+        | rejectattr('enabled', 'defined')
+        | list
+      }}
+  tags: [always]
+
+- name: NUT UPS | Require at least one enabled device or allow_no_device
+  ansible.builtin.assert:
+    that:
+      - nut_ups_enabled_devices | length > 0 or nut_ups_allow_no_device | bool
+    fail_msg: >-
+      No enabled UPS devices in nut_ups_devices and nut_ups_allow_no_device is false.
+  tags: [nut_config]
+
+- name: NUT UPS | Install packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [nut_packages]
+
+- name: NUT UPS | Validate notification settings
+  ansible.builtin.include_tasks: validate_notify.yml
+  tags: [nut_notify]
+
+- name: NUT UPS | Deploy configuration
+  ansible.builtin.include_tasks: config.yml
+  tags: [nut_config]
+
+- name: NUT UPS | Deploy notification scripts
+  ansible.builtin.include_tasks: notify.yml
+  tags: [nut_notify]
+
+- name: NUT UPS | Deploy udev rules
+  ansible.builtin.include_tasks: udev.yml
+  when:
+    - nut_ups_usb_vendorid | length > 0
+    - nut_ups_usb_productid | length > 0
+  tags: [nut_config]
+
+- name: NUT UPS | Enable and start services
+  ansible.builtin.include_tasks: services.yml
+  tags: [nut_services]

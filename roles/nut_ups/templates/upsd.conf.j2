@@ -1,0 +1,14 @@
+# Ansible-managed — see roles/nut_ups/templates/upsd.conf.j2
+{% if nut_ups_allow_no_device | bool %}
+ALLOW_NO_DEVICE true
+{% endif %}
+
+LISTEN 127.0.0.1 3493
+{% if nut_ups_mode == 'netserver' %}
+LISTEN {{ nut_ups_listen_address }} 3493
+{% for net in nut_ups_acl_networks %}
+ACL trusted {{ net }}
+{% endfor %}
+ACL trusted 127.0.0.1/32
+ACCEPT trusted
+{% endif %}

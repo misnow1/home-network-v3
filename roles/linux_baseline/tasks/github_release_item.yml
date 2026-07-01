@@ -11,8 +11,19 @@
       changed_when: false
       failed_when: false
 
+    - name: GitHub release | Report pending install (check mode)
+      ansible.builtin.debug:
+        msg: >-
+          Would install {{ item.name }} {{ item.version }}
+          from {{ release_url }} to {{ item.dest }}
+      when:
+        - ansible_check_mode
+        - github_release_installed.rc != 0 or item.version not in github_release_installed.stdout
+
     - name: GitHub release | Install pinned binary
-      when: github_release_installed.rc != 0 or item.version not in github_release_installed.stdout
+      when:
+        - not ansible_check_mode
+        - github_release_installed.rc != 0 or item.version not in github_release_installed.stdout
       block:
         - name: GitHub release | Create temp dir
           ansible.builtin.file:
