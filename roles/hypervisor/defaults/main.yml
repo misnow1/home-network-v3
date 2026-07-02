@@ -1,7 +1,7 @@
 ---
+hypervisor_libvirt_enabled: true
 hypervisor_libvirt_service: libvirtd
 hypervisor_libvirt_image_dir: /var/lib/libvirt/images
-hypervisor_libvirt_pool_name: default
 
 hypervisor_libvirt_packages:
   - qemu-kvm
@@ -10,9 +10,61 @@ hypervisor_libvirt_packages:
   - virtinst
   - bridge-utils
   - python3-libvirt
+  - python3-lxml
   - virt-top
   - guestfish
   - tcpdump
+
+hypervisor_libvirt_users:
+  - ansible
+
+hypervisor_libvirt_uri: qemu:///system
+
+# Host netplan (production hypervisors — disabled by default for lab nested VMs).
+hypervisor_netplan_enabled: false
+hypervisor_netplan_renderer: networkd
+hypervisor_netplan_config_file: 01-hypervisor.yaml
+hypervisor_netplan_uplink: ""
+hypervisor_netplan_optional_nics: []
+hypervisor_netplan_vlans: []
+hypervisor_netplan_bridges: {}
+# Production br0/br3 use hypervisor_netplan_uplink when interfaces are omitted:
+#   br0 -> [uplink] with dhcp4: true; br3 -> [uplink.3] with no address.
+
+# Libvirt bridge networks — set per environment (empty for lab nested hv01).
+hypervisor_libvirt_networks: []
+
+# VM storage layout under /var/lib/libvirt/images/home-network-v3/.
+hypervisor_vm_data_base: /var/lib/libvirt/images/home-network-v3
+hypervisor_vm_data_dir_owner: root
+hypervisor_vm_data_dir_mode: "0775"
+hypervisor_vm_data_dir_group: libvirt
+# Paths under hypervisor_vm_data_base (includes legacy restore layouts).
+hypervisor_vm_data_subdirs:
+  - images
+  - seeds
+  - vm
+  - lab
+  - production
+  - lab/vms
+  - lab/seeds
+  - production/vms
+  - production/seeds
+
+# Base storage pools — extend via hypervisor_libvirt_pools_extra in host_vars.
+hypervisor_libvirt_pools:
+  - name: default
+    path: "{{ hypervisor_libvirt_image_dir }}"
+    mode: "0711"
+    owner: root
+    group: root
+  - name: vms
+    path: "{{ hypervisor_vm_data_base }}/production/vms"
+    mode: "{{ hypervisor_vm_data_dir_mode }}"
+    owner: root
+    group: "{{ hypervisor_vm_data_dir_group }}"
+
+hypervisor_libvirt_pools_extra: []
 
 docker_engine_enabled: true
 

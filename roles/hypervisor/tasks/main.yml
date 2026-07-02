@@ -1,9 +1,35 @@
 ---
-- name: Install and configure libvirt
+- name: Hypervisor | Skip when libvirt stack disabled
+  ansible.builtin.meta: end_host
+  when: not hypervisor_libvirt_enabled | bool
+
+- name: Hypervisor | Configure host networking
+  ansible.builtin.include_tasks: netplan.yml
+  when: hypervisor_netplan_enabled | bool
+  tags: [hypervisor_netplan]
+
+- name: Hypervisor | Install and configure libvirt
   ansible.builtin.include_tasks: libvirt.yml
   tags: [libvirt]
 
-- name: Install and configure Docker
+- name: Hypervisor | Configure libvirt users
+  ansible.builtin.include_tasks: users.yml
+  tags: [libvirt]
+
+- name: Hypervisor | Ensure VM storage directories
+  ansible.builtin.include_tasks: directories.yml
+  tags: [libvirt]
+
+- name: Hypervisor | Configure libvirt storage pools
+  ansible.builtin.include_tasks: pools.yml
+  tags: [libvirt]
+
+- name: Hypervisor | Configure libvirt networks
+  ansible.builtin.include_tasks: networks.yml
+  tags: [hypervisor_networks]
+
+- name: Hypervisor | Install and configure Docker
   ansible.builtin.include_role:
     name: docker_engine
+  when: docker_engine_enabled | bool
   tags: [docker]

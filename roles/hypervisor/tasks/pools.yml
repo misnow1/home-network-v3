@@ -1,0 +1,37 @@
+---
+- name: Pools | Define libvirt storage pools
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
+    state: present
+    uri: "{{ hypervisor_libvirt_uri }}"
+    xml: |
+      <pool type='dir'>
+        <name>{{ item.name }}</name>
+        <target>
+          <path>{{ item.path }}</path>
+        </target>
+      </pool>
+  loop: "{{ hypervisor_libvirt_pools + hypervisor_libvirt_pools_extra }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [libvirt]
+
+- name: Pools | Activate libvirt storage pools
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
+    state: active
+    uri: "{{ hypervisor_libvirt_uri }}"
+  loop: "{{ hypervisor_libvirt_pools + hypervisor_libvirt_pools_extra }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [libvirt]
+
+- name: Pools | Enable autostart for libvirt storage pools
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
+    autostart: true
+    uri: "{{ hypervisor_libvirt_uri }}"
+  loop: "{{ hypervisor_libvirt_pools + hypervisor_libvirt_pools_extra }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [libvirt]

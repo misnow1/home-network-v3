@@ -1,0 +1,61 @@
+network:
+  version: 2
+  renderer: {{ hypervisor_netplan_renderer }}
+  ethernets:
+    {{ hypervisor_netplan_uplink }}:
+      dhcp4: false
+      dhcp6: false
+{% for nic in hypervisor_netplan_optional_nics %}
+    {{ nic }}:
+      optional: true
+      dhcp4: false
+      dhcp6: false
+{% endfor %}
+{% if hypervisor_netplan_vlans | length > 0 %}
+  vlans:
+{% for vlan in hypervisor_netplan_vlans %}
+    {{ vlan.link }}.{{ vlan.id }}:
+      id: {{ vlan.id }}
+      link: {{ vlan.link }}
+{% endfor %}
+{% endif %}
+{% if hypervisor_netplan_bridges | length > 0 %}
+  bridges:
+{% for bridge_name, bridge in hypervisor_netplan_bridges.items() %}
+    {{ bridge_name }}:
+{% if bridge.interfaces is defined %}
+      interfaces: {{ bridge.interfaces | to_json }}
+{% elif bridge_name == 'br0' %}
+      interfaces: {{ [hypervisor_netplan_uplink] | to_json }}
+{% elif bridge_name == 'br3' %}
+      interfaces: {{ [hypervisor_netplan_uplink ~ '.3'] | to_json }}
+{% else %}
+      interfaces: {{ bridge.interfaces | default([]) | to_json }}
+{% endif %}
+{% if bridge.addresses is defined and bridge.addresses | length > 0 %}
+      addresses: {{ bridge.addresses | to_json }}
+{% endif %}
+{% if bridge.dhcp4 is defined %}
+      dhcp4: {{ bridge.dhcp4 | lower }}
+{% endif %}
+{% if bridge.dhcp6 is defined %}
+      dhcp6: {{ bridge.dhcp6 | lower }}
+{% endif %}
+{% if bridge.routes is defined and bridge.routes | length > 0 %}
+      routes:
+{% for route in bridge.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{% endfor %}
+{% endif %}
+{% if bridge.nameservers is defined %}
+      nameservers:
+{% if bridge.nameservers.addresses is defined %}
+        addresses: {{ bridge.nameservers.addresses | to_json }}
+{% endif %}
+{% if bridge.nameservers.search is defined %}
+        search: {{ bridge.nameservers.search | to_json }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}

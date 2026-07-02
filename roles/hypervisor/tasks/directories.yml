@@ -1,0 +1,62 @@
+---
+- name: Directories | Ensure libvirt images directory exists
+  ansible.builtin.file:
+    path: "{{ hypervisor_libvirt_image_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0711"
+  tags: [libvirt]
+
+- name: Directories | Ensure VM data base directory exists
+  ansible.builtin.file:
+    path: "{{ hypervisor_vm_data_base }}"
+    state: directory
+    owner: "{{ hypervisor_vm_data_dir_owner }}"
+    group: "{{ hypervisor_vm_data_dir_group }}"
+    mode: "{{ hypervisor_vm_data_dir_mode }}"
+  tags: [libvirt]
+
+- name: Directories | Ensure VM data subdirectories exist
+  ansible.builtin.file:
+    path: "{{ hypervisor_vm_data_base }}/{{ item }}"
+    state: directory
+    owner: "{{ hypervisor_vm_data_dir_owner }}"
+    group: "{{ hypervisor_vm_data_dir_group }}"
+    mode: "{{ hypervisor_vm_data_dir_mode }}"
+  loop: "{{ hypervisor_vm_data_subdirs }}"
+  loop_control:
+    label: "{{ hypervisor_vm_data_base }}/{{ item }}"
+  tags: [libvirt]
+
+- name: Directories | Find all VM data directories
+  ansible.builtin.find:
+    paths: "{{ hypervisor_vm_data_base }}"
+    file_type: directory
+    recurse: true
+  register: hypervisor_vm_data_tree
+  tags: [libvirt]
+
+- name: Directories | Normalize VM data directory ownership
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ hypervisor_vm_data_dir_owner }}"
+    group: "{{ hypervisor_vm_data_dir_group }}"
+    mode: "{{ hypervisor_vm_data_dir_mode }}"
+  loop: "{{ hypervisor_vm_data_tree.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  tags: [libvirt]
+
+- name: Directories | Ensure libvirt pool directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0711') }}"
+  loop: "{{ hypervisor_libvirt_pools + hypervisor_libvirt_pools_extra }}"
+  loop_control:
+    label: "{{ item.name }}: {{ item.path }}"
+  tags: [libvirt]

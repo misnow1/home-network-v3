@@ -6,12 +6,51 @@
   gather_facts: false
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
-    libvirt_defaults: "{{ repo_root }}/roles/hypervisor/defaults/main.yml"
+    hypervisor_role: "{{ repo_root }}/roles/hypervisor"
+    libvirt_defaults: "{{ hypervisor_role }}/defaults/main.yml"
     hypervisor_playbook: "{{ repo_root }}/playbooks/hypervisor.yml"
+    fileserver_playbook: "{{ repo_root }}/playbooks/fileserver.yml"
   tasks:
-    - name: Hypervisor | assert libvirt packages include python3-libvirt
+    - name: Hypervisor | assert libvirt packages include python3-libvirt and python3-lxml
       ansible.builtin.shell: |
-        grep -q python3-libvirt "{{ libvirt_defaults }}"
+        grep -q python3-libvirt "{{ libvirt_defaults }}" &&
+        grep -q python3-lxml "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert hypervisor_libvirt_users in defaults
+      ansible.builtin.shell: |
+        grep -q hypervisor_libvirt_users "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert task files exist
+      ansible.builtin.stat:
+        path: "{{ hypervisor_role }}/tasks/{{ item }}"
+      register: hypervisor_task_file
+      failed_when: not hypervisor_task_file.stat.exists
+      loop:
+        - netplan.yml
+        - users.yml
+        - directories.yml
+        - pools.yml
+        - networks.yml
+
+    - name: Hypervisor | assert templates exist
+      ansible.builtin.stat:
+        path: "{{ hypervisor_role }}/templates/{{ item }}"
+      register: hypervisor_template
+      failed_when: not hypervisor_template.stat.exists
+      loop:
+        - netplan.yaml.j2
+        - libvirt-bridge-network.xml.j2
+
+    - name: Hypervisor | assert community.libvirt used for pools and networks
+      ansible.builtin.shell: |
+        grep -q 'community.libvirt.virt_pool' "{{ hypervisor_role }}/tasks/pools.yml" &&
+        grep -q 'community.libvirt.virt_net' "{{ hypervisor_role }}/tasks/networks.yml"
       args:
         executable: /bin/bash
       changed_when: false
@@ -26,6 +65,14 @@
     - name: Hypervisor | assert playbook targets hypervisors group
       ansible.builtin.shell: |
         grep -q 'hosts: hypervisors' "{{ hypervisor_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert fileserver playbook includes gated hypervisor role
+      ansible.builtin.shell: |
+        grep -q 'role: hypervisor' "{{ fileserver_playbook }}" &&
+        grep -q 'hypervisor_libvirt_enabled' "{{ fileserver_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false

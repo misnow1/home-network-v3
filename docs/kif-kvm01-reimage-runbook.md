@@ -107,9 +107,15 @@ CentOS/NM today mixes **Docker** bridges (`br-*`, `docker0`), stale inactive pro
 
 Re-run `inventory-capture.sh` to refresh `config/network/` (nmcli, routes, `bridge.conf`).
 
-### Target netplan (kif — adjust IP/gateway/DNS)
+### Target netplan (Ansible-managed)
 
-`/etc/netplan/01-hypervisor.yaml`:
+Production hypervisors use `dhcp4: true` on **br0** (DHCP reservations on the router).
+Host L3, gateway, and DNS come from DHCP. **br3** has no address — libvirt VLAN 3 only.
+
+Per-host uplink NIC (`hypervisor_netplan_uplink`) and bridge layout are in
+[`group_vars/hypervisors/`](../inventories/production/group_vars/hypervisors/vars.yml.example).
+
+Example rendered shape:
 
 ```yaml
 network:
@@ -119,15 +125,6 @@ network:
     ens5f0np0:
       dhcp4: false
       dhcp6: false
-    ens5f1np1:
-      optional: true
-      dhcp4: false
-    eno1:
-      optional: true
-      dhcp4: false
-    eno2:
-      optional: true
-      dhcp4: false
   vlans:
     ens5f0np0.3:
       id: 3
@@ -135,18 +132,16 @@ network:
   bridges:
     br0:
       interfaces: [ens5f0np0]
-      addresses: [192.168.1.152/24]
-      routes:
-        - to: default
-          via: 192.168.1.1
+      dhcp4: true
+      dhcp6: false
       nameservers:
-        addresses: [192.168.1.10, 192.168.1.11]
+        search: [home.2123studios.com]
     br3:
       interfaces: [ens5f0np0.3]
       dhcp4: false
 ```
 
-`netplan apply` → verify `ip -br addr`, gateway ping, VLAN 3 VM DHCP.
+`netplan apply` → verify `ip -br addr` on br0 (DHCP lease), gateway ping, VLAN 3 VM DHCP.
 
 ### Libvirt (restore from staging `libvirt/networks/*.xml`)
 
@@ -196,6 +191,19 @@ sudo lvremove kif2/kif2-root
 
 ## Phase 5 — Ansible converge
 
+Copy host_vars from examples before converge:
+
+- [`inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example`](../inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example)
+- [`inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example`](../inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example)
+
+**kif pre-converge:** remove stale netplan drop-ins (especially any file enabling `dhcp4`
+on the uplink NIC). The hypervisor role deploys `/etc/netplan/01-hypervisor.yaml` only.
+
+**kif libvirt:** kif is in the `hypervisors` group — run `hypervisor.yml` directly.
+`fileserver.yml` also includes the hypervisor role when `hypervisor_libvirt_enabled`
+(from `group_vars/hypervisors`). The role defines `external-default` and `vlan3`
+but does **not** remove legacy `public-bridge` — migrate attached VMs manually if needed.
+
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 ${PROD} playbooks/baseline.yml --limit kvm01.example.home
@@ -209,7 +217,17 @@ ${PROD} playbooks/nut-converge.yml --limit kif.example.home
 ${PROD} playbooks/fileserver.yml --limit kif.example.home --check
 ```
 
-Remove `ansible_managed: false` from production inventory when ready.
+Partial hypervisor on kif:
+
+```bash
+${PROD} playbooks/fileserver.yml --limit kif.example.home \
+  --tags libvirt,hypervisor_netplan,hypervisor_networks
+```
+
+See [`hypervisor-runbook.md`](hypervisor-runbook.md) for role variables.
+
+Remove `ansible_managed: false` from production inventory when ready (see
+[`hosts.yml.example`](../inventories/production/hosts.yml.example)).
 
 ## Post-reimage (ROADMAP deferred)
 
@@ -222,7 +240,7 @@ Remove `ansible_managed: false` from production inventory when ready.
 | 22+ | backup-libvirt.sh |
 | 23+ | Restic timers + offsite |
 | 24+ | Optional ESP/boot mirror on 2×1TB SSDs |
-| 25+ | Hypervisor host netplan (Ansible) | br0 + br3 + libvirt network defs |
+| 25+ | Hypervisor host netplan (Ansible) | **in progress** — [`hypervisor` role](../roles/hypervisor/); br0 + br3 + `external-default` / `vlan3` |
 
 ## Scripts
 

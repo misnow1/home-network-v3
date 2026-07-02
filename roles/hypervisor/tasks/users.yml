@@ -1,0 +1,16 @@
+---
+- name: Libvirt | Add hypervisor users to libvirt group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: libvirt
+    append: true
+  loop: "{{ hypervisor_libvirt_users }}"
+  tags: [libvirt]
+
+- name: Libvirt | Add hypervisor users to kvm group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: kvm
+    append: true
+  loop: "{{ hypervisor_libvirt_users }}"
+  tags: [libvirt]

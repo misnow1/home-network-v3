@@ -19,6 +19,7 @@
         that:
           - ansible_facts.services['docker.service'].state == 'running'
         fail_msg: docker is not running
+      when: docker_engine_enabled | default(true) | bool
 
     - name: Assert nested KVM device is available
       ansible.builtin.stat:
@@ -39,12 +40,15 @@
       changed_when: false
       failed_when: virsh_list.rc != 0
 
-    - name: Assert default libvirt pool is active
-      ansible.builtin.command: virsh pool-info {{ hypervisor_libvirt_pool_name }}
+    - name: Assert configured libvirt pools are active
+      ansible.builtin.command: virsh pool-info {{ item.name }}
       register: pool_info
       become: true
       changed_when: false
       failed_when: pool_info.rc != 0
+      loop: "{{ hypervisor_libvirt_pools + hypervisor_libvirt_pools_extra | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
 
     - name: Assert ansible user is in libvirt group
       ansible.builtin.command: id -nG ansible
@@ -57,6 +61,7 @@
       register: ansible_groups
       changed_when: false
       failed_when: "'docker' not in ansible_groups.stdout.split()"
+      when: docker_engine_enabled | default(true) | bool
 
     - name: Run hello-world container
       ansible.builtin.command: docker run --rm hello-world
@@ -64,3 +69,64 @@
       become: true
       changed_when: false
       failed_when: docker_hello.rc != 0
+      when: docker_engine_enabled | default(true) | bool
+
+    - name: Assert netplan bridges exist when host networking enabled
+      ansible.builtin.command: ip -br link show {{ item }}
+      register: bridge_link
+      become: true
+      changed_when: false
+      failed_when: bridge_link.rc != 0 or 'UP' not in bridge_link.stdout
+      loop: "{{ hypervisor_netplan_bridges.keys() | list }}"
+      when: hypervisor_netplan_enabled | default(false) | bool
+
+    - name: Assert br0 has expected static address when configured
+      ansible.builtin.command: ip -br addr show br0
+      register: br0_addr
+      become: true
+      changed_when: false
+      failed_when: item not in br0_addr.stdout
+      loop: "{{ hypervisor_netplan_bridges.br0.addresses | default([]) }}"
+      when:
+        - hypervisor_netplan_enabled | default(false) | bool
+        - hypervisor_netplan_bridges.br0 is defined
+        - hypervisor_netplan_bridges.br0.addresses is defined
+        - hypervisor_netplan_bridges.br0.addresses | length > 0
+
+    - name: Assert br0 has a global IPv4 address when using DHCP
+      ansible.builtin.shell: ip -4 -o addr show dev br0 scope global | awk '{print $4}'
+      register: br0_dhcp_addr
+      become: true
+      changed_when: false
+      failed_when: br0_dhcp_addr.stdout | trim | length == 0
+      when:
+        - hypervisor_netplan_enabled | default(false) | bool
+        - hypervisor_netplan_bridges.br0 is defined
+        - hypervisor_netplan_bridges.br0.dhcp4 | default(false) | bool
+
+    - name: Assert br0 DNS search domain when configured
+      ansible.builtin.command: resolvectl domain br0
+      register: br0_search_domain
+      become: true
+      changed_when: false
+      failed_when: item not in br0_search_domain.stdout
+      loop: "{{ hypervisor_netplan_bridges.br0.nameservers.search | default([]) }}"
+      when:
+        - hypervisor_netplan_enabled | default(false) | bool
+        - hypervisor_netplan_bridges.br0 is defined
+        - hypervisor_netplan_bridges.br0.nameservers.search is defined
+        - hypervisor_netplan_bridges.br0.nameservers.search | length > 0
+
+    - name: Assert configured libvirt networks are active
+      ansible.builtin.command: virsh net-info {{ item.name }}
+      register: net_info
+      become: true
+      changed_when: false
+      failed_when: >-
+        net_info.rc != 0 or
+        'Active:         yes' not in net_info.stdout or
+        'Autostart:      yes' not in net_info.stdout
+      loop: "{{ hypervisor_libvirt_networks }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: hypervisor_libvirt_networks | length > 0
