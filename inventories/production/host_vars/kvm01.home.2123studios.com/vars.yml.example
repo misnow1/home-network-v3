@@ -1,0 +1,18 @@
+---
+# kvm01 hypervisor host variables — copy to vars.yml (gitignored alongside production inventory).
+#
+#   mkdir -p inventories/production/host_vars/kvm01.home.2123studios.com
+#   cp inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example \
+#      inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml
+#
+# Apply after Ubuntu 24.04 reimage: baseline.yml → hypervisor.yml → backup.yml
+# Shared hypervisor settings: inventories/production/group_vars/hypervisors/vars.yml
+
+hypervisor_netplan_uplink: enp5s0
+hypervisor_netplan_optional_nics:
+  - enp6s0
+  - enp7s0f3u5
+  - wlp4s0
+
+# Backup scope — declare docker volumes and VM disks as needed (Slice 7).
+# backup_libvirt_vms: []

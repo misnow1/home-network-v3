@@ -1,0 +1,41 @@
+---
+- name: Networks | Assert bridge devices exist for libvirt networks
+  ansible.builtin.command: ip link show {{ item.bridge }}
+  register: hypervisor_bridge_check
+  changed_when: false
+  failed_when: hypervisor_bridge_check.rc != 0
+  loop: "{{ hypervisor_libvirt_networks }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.bridge }}"
+  tags: [hypervisor_networks]
+
+- name: Networks | Define libvirt bridge networks
+  community.libvirt.virt_net:
+    name: "{{ item.name }}"
+    state: present
+    uri: "{{ hypervisor_libvirt_uri }}"
+    xml: "{{ lookup('template', 'libvirt-bridge-network.xml.j2') }}"
+  loop: "{{ hypervisor_libvirt_networks }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [hypervisor_networks]
+
+- name: Networks | Activate libvirt bridge networks
+  community.libvirt.virt_net:
+    name: "{{ item.name }}"
+    state: active
+    uri: "{{ hypervisor_libvirt_uri }}"
+  loop: "{{ hypervisor_libvirt_networks }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [hypervisor_networks]
+
+- name: Networks | Enable autostart for libvirt bridge networks
+  community.libvirt.virt_net:
+    name: "{{ item.name }}"
+    autostart: true
+    uri: "{{ hypervisor_libvirt_uri }}"
+  loop: "{{ hypervisor_libvirt_networks }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [hypervisor_networks]

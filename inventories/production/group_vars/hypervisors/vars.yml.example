@@ -1,6 +1,35 @@
 ---
 # Hypervisor + backup client settings — copy to vars.yml and customize.
 
+hypervisor_libvirt_enabled: true
+hypervisor_netplan_enabled: true
+
+hypervisor_libvirt_users:
+  - ansible
+  - misnow1
+
+hypervisor_libvirt_networks:
+  - name: external-default
+    bridge: br0
+  - name: vlan3
+    bridge: br3
+
+hypervisor_netplan_vlans:
+  - id: 3
+    link: "{{ hypervisor_netplan_uplink }}"
+
+# br0 uses DHCP (router reservations); br3 is bridge-only for libvirt VLAN 3.
+# Interfaces are derived from hypervisor_netplan_uplink in the netplan template.
+hypervisor_netplan_bridges:
+  br0:
+    dhcp4: true
+    dhcp6: true
+    nameservers:
+      search:
+        - "{{ vm_dns_search | default('home.2123studios.com') }}"
+  br3:
+    dhcp4: false
+
 backup_restic_repository: /var/lib/restic/prod-backup
 backup_restic_password_file: /root/.restic-password
 backup_scope_path: /etc/ansible-managed/backup_scope.yml

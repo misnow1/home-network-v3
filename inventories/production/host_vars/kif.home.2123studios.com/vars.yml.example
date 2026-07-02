@@ -52,3 +52,16 @@ nut_notify_messages:
   commbad:
     subject: "[UPS] kif communication lost"
     body: "Lost communication with a monitored UPS on kif."
+
+# Hypervisor — host-specific uplink NIC and pools (bridges in group_vars/hypervisors).
+hypervisor_netplan_uplink: ens5f0np0
+hypervisor_netplan_optional_nics:
+  - ens5f1np1
+  - eno1
+  - eno2
+hypervisor_libvirt_pools_extra:
+  - name: boot
+    path: /var/lib/libvirt/boot
+    mode: "0711"
+    owner: root
+    group: root

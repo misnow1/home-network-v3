@@ -7,3 +7,6 @@
   become: true
   roles:
     - role: samba_fileserver
+    - role: hypervisor
+      when: hypervisor_libvirt_enabled | default(false) | bool
+      tags: [libvirt, hypervisor_netplan, hypervisor_networks, docker]

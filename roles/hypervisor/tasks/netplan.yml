@@ -1,0 +1,38 @@
+---
+- name: Netplan | Require uplink when netplan enabled
+  ansible.builtin.assert:
+    that:
+      - hypervisor_netplan_uplink | length > 0
+    fail_msg: hypervisor_netplan_uplink must be set when hypervisor_netplan_enabled is true
+  tags: [hypervisor_netplan]
+
+- name: Netplan | List existing netplan files
+  ansible.builtin.find:
+    paths: /etc/netplan
+    patterns: "*.yaml,*.yml"
+    file_type: file
+  register: hypervisor_netplan_existing
+  tags: [hypervisor_netplan]
+
+- name: Netplan | Warn about unmanaged netplan files
+  ansible.builtin.debug:
+    msg: >-
+      Unmanaged netplan file {{ item.path }} — remove conflicting drop-ins
+      (especially dhcp4 on {{ hypervisor_netplan_uplink }}) before converge.
+  loop: "{{ hypervisor_netplan_existing.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - hypervisor_netplan_existing.files | length > 0
+    - hypervisor_netplan_config_file not in item.path
+  tags: [hypervisor_netplan]
+
+- name: Netplan | Deploy hypervisor netplan configuration
+  ansible.builtin.template:
+    src: netplan.yaml.j2
+    dest: "/etc/netplan/{{ hypervisor_netplan_config_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: apply netplan
+  tags: [hypervisor_netplan]
