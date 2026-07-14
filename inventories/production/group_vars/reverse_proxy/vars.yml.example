@@ -1,0 +1,109 @@
+---
+# Reverse proxy host group variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/reverse_proxy/vars.yml.example \
+#      inventories/production/group_vars/reverse_proxy/vars.yml
+#
+# This reproduces the legacy bastion-el9 nginx layout on the Ubuntu bastion.
+# Issue the SAN certificate first with playbooks/certbot.yml (the reverse_proxy
+# host is in the certbot group; certbot_domains below must cover every FQDN).
+
+# --- Certbot SAN certificate (DNS-01 via Dreamhost) --------------------------
+certbot_enabled: true
+certbot_provider: dreamhost_dns
+certbot_email: you@2123studios.com
+certbot_staging: true   # flip false after a successful staging dry-run
+certbot_deploy_hook_reload_samba: false
+certbot_deploy_hook_reload_nginx: true
+# First entry becomes the /etc/letsencrypt/live/<name> lineage.
+certbot_domains:
+  - auth.2123studios.com
+  - bastion.2123studios.com
+  - guacamole.2123studios.com
+  - kif.2123studios.com
+  - paperless.2123studios.com
+  - plex.2123studios.com
+
+# --- Reverse proxy -----------------------------------------------------------
+reverse_proxy_enabled: true
+reverse_proxy_authelia_url: http://kif.home.2123studios.com:9191
+# All vhosts share the SAN cert lineage (matches certbot_domains[0]).
+reverse_proxy_cert_name: auth.2123studios.com
+
+reverse_proxy_sites:
+  # Authelia portal — the auth service itself (no forward-auth on itself).
+  - name: auth.2123studios.com
+    server_names:
+      - auth.2123studios.com
+    locations:
+      - path: /
+        proxy_pass: http://kif.home.2123studios.com:9191
+      - path: "= /api/verify"
+        proxy_pass: http://kif.home.2123studios.com:9191
+        include_proxy_snippet: false
+      - path: /api/authz/
+        proxy_pass: http://kif.home.2123studios.com:9191
+        include_proxy_snippet: false
+
+  # Guacamole — protected by Authelia.
+  - name: guacamole.2123studios.com
+    server_names:
+      - guacamole.2123studios.com
+    locations:
+      - path: "= /"
+        return: "301 /guacamole/"
+      - path: /guacamole
+        proxy_pass: http://kif.home.2123studios.com:4080/guacamole
+        auth_required: true
+
+  # Paperless — websocket backend, Authelia currently disabled (matches legacy).
+  - name: paperless.2123studios.com
+    server_names:
+      - paperless.2123studios.com
+    locations:
+      - path: /
+        proxy_pass: http://kif.home.2123studios.com:8000
+        websocket: true
+
+  # Plex — https upstream with keepalive; bespoke tuning via escape hatches.
+  - name: plex.2123studios.com
+    server_names:
+      - plex.2123studios.com
+    gzip: true
+    client_max_body_size: 100M
+    upstreams:
+      - name: plex_backend
+        servers:
+          - 192.168.1.152:32400
+        keepalive: 32
+    extra_server_config: |
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Sec-WebSocket-Extensions $http_sec_websocket_extensions;
+      proxy_set_header Sec-WebSocket-Key $http_sec_websocket_key;
+      proxy_set_header Sec-WebSocket-Version $http_sec_websocket_version;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_redirect off;
+      proxy_buffering off;
+    locations:
+      - path: /
+        include_proxy_snippet: false
+        proxy_pass: https://plex_backend
+
+  # Bastion/kif landing — transmission (Authelia) + guacamole passthrough.
+  - name: bastion.2123studios.com
+    server_names:
+      - bastion.2123studios.com
+      - kif.2123studios.com
+    locations:
+      - path: /transmission
+        proxy_pass: http://kif.home.2123studios.com:9091/transmission
+        auth_required: true
+        extra_config: |
+          proxy_pass_header X-Transmission-Session-Id;
+      - path: /guacamole
+        proxy_pass: http://kif.home.2123studios.com:4080/guacamole

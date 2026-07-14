@@ -1,0 +1,24 @@
+---
+- name: MDADM monitor | Build package list
+  ansible.builtin.set_fact:
+    mdadm_monitor_install_packages: >-
+      {{
+        mdadm_monitor_packages
+        + (mdadm_monitor_mail_packages if mdadm_monitor_email_enabled | bool else [])
+      }}
+
+- name: MDADM monitor | Install packages
+  ansible.builtin.apt:
+    name: "{{ mdadm_monitor_install_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: MDADM monitor | Assert Postfix active when email enabled
+  ansible.builtin.systemd:
+    name: postfix
+  register: mdadm_monitor_postfix_active
+  failed_when: mdadm_monitor_postfix_active.status.ActiveState != 'active'
+  when:
+    - mdadm_monitor_email_enabled | bool
+    - not ansible_check_mode

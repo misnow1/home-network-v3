@@ -9,6 +9,11 @@ chrony_ntp_servers:
   - 2.pool.ntp.org
   - 3.pool.ntp.org
 
+# pyenv — git checkout (not apt). Off by default; enable per host/group. Bump version deliberately.
+linux_baseline_pyenv_enabled: false
+linux_baseline_pyenv_version: "2.7.3"
+linux_baseline_pyenv_root: /usr/local/lib/pyenv
+
 # Binaries installed from GitHub releases (not apt). Bump version deliberately.
 linux_baseline_github_releases:
   - name: fzf
@@ -16,4 +21,15 @@ linux_baseline_github_releases:
     repo: junegunn/fzf
     binary: fzf
     dest: /usr/local/bin/fzf
+    mode: "0755"
+  - name: uv
+    version: "0.11.26"
+    repo: astral-sh/uv
+    tag_prefix: ""
+    asset: "uv-{{ 'x86_64' if ansible_architecture == 'x86_64' else ansible_architecture }}-unknown-linux-gnu.tar.gz"
+    extract_subdir: "uv-{{ 'x86_64' if ansible_architecture == 'x86_64' else ansible_architecture }}-unknown-linux-gnu"
+    binaries:
+      - uv
+      - uvx
+    dest_dir: /usr/local/bin
     mode: "0755"

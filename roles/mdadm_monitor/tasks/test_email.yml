@@ -1,0 +1,39 @@
+---
+- name: MDADM monitor | Read active arrays from /proc/mdstat
+  ansible.builtin.slurp:
+    src: /proc/mdstat
+  register: mdadm_monitor_mdstat
+  when:
+    - mdadm_monitor_email_enabled | bool
+    - not ansible_check_mode
+
+- name: MDADM monitor | Parse active array devices
+  ansible.builtin.set_fact:
+    mdadm_monitor_active_arrays: >-
+      {{
+        (mdadm_monitor_mdstat.content | b64decode).splitlines()
+        | select('match', '^md[0-9]+')
+        | map('regex_search', '^(?P<name>md[0-9]+)', '\g<name>')
+        | list
+      }}
+  when:
+    - mdadm_monitor_email_enabled | bool
+    - not ansible_check_mode
+    - mdadm_monitor_mdstat is defined
+
+- name: MDADM monitor | Assert at least one active array before test email
+  ansible.builtin.assert:
+    that:
+      - mdadm_monitor_active_arrays | default([]) | length > 0
+    fail_msg: >-
+      mdadm_monitor_email_enabled is true but no active md arrays found in /proc/mdstat.
+  when:
+    - mdadm_monitor_email_enabled | bool
+    - not ansible_check_mode
+
+- name: MDADM monitor | Send test email via mdadm monitor
+  ansible.builtin.command: mdadm --monitor --scan --test --oneshot
+  changed_when: false
+  when:
+    - mdadm_monitor_email_enabled | bool
+    - not ansible_check_mode

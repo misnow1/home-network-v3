@@ -1,0 +1,20 @@
+---
+mdadm_monitor_enabled: false
+
+mdadm_monitor_email_enabled: true
+mdadm_monitor_mailaddr: root
+
+# Ubuntu 24.04 periodic scrubs via mdcheck_start|continue timers (requires AUTOCHECK=true).
+mdadm_monitor_autocheck: true
+
+mdadm_monitor_packages:
+  - mdadm
+
+mdadm_monitor_mail_packages:
+  - mailutils
+
+mdadm_monitor_systemd_units:
+  - mdmonitor.service
+  - mdcheck_start.timer
+  - mdcheck_continue.timer
+  - mdmonitor-oneshot.timer

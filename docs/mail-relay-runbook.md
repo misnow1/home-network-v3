@@ -28,7 +28,11 @@ root@kif.home.2123studios.com  →  root-kif@2123studios.com  (envelope)
 ```
 
 Root mail delivery is centralized on the relay (`virtual_alias_maps`) — retire per-host
-`/root/.forward` files once aliases are verified.
+`/root/.forward` files once aliases are verified. The alias regex matches `root@` at the
+apex domain (`root@home.2123studios.com`, produced by clients whose Postfix `myorigin` is
+`$mydomain`) as well as any host under it (`root@kif.home.2123studios.com`); both rewrite
+to `vault_mail_default_recipient`. Without the apex case, mail is relayed verbatim to Gmail,
+which bounces it (`NXDOMAIN` — `home.2123studios.com` has no public MX).
 
 ## Prerequisites
 

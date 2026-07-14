@@ -14,6 +14,10 @@
     shell_task: "{{ repo_root }}/roles/linux_baseline/tasks/shell.yml"
     zsh_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/zsh/zshrc.d/99-fzf.zsh"
     bash_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/bash.bashrc.d/99-fzf.sh"
+    zsh_pyenv_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/zsh/zshrc.d/99-pyenv.zsh"
+    bash_pyenv_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/bash.bashrc.d/99-pyenv.sh"
+    zsh_uv_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/zsh/zshrc.d/99-uv.zsh"
+    bash_uv_dropin: "{{ repo_root }}/roles/linux_baseline/files/etc/bash.bashrc.d/99-uv.sh"
     samba_defaults: "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
     software_doc: "{{ repo_root }}/docs/software.md"
   tasks:
@@ -30,6 +34,10 @@
         - "{{ shell_task }}"
         - "{{ zsh_dropin }}"
         - "{{ bash_dropin }}"
+        - "{{ zsh_pyenv_dropin }}"
+        - "{{ bash_pyenv_dropin }}"
+        - "{{ zsh_uv_dropin }}"
+        - "{{ bash_uv_dropin }}"
         - "{{ software_doc }}"
 
     - name: Software | assert paths present
@@ -55,7 +63,23 @@
       ansible.builtin.shell: |
         grep -q 'linux_baseline_github_releases:' "{{ baseline_defaults }}"
         grep -q 'name: fzf' "{{ baseline_defaults }}"
+        grep -q 'name: uv' "{{ baseline_defaults }}"
+        grep -q 'linux_baseline_pyenv_enabled: false' "{{ baseline_defaults }}"
+        grep -q 'linux_baseline_pyenv_version:' "{{ baseline_defaults }}"
         grep -q 'version:' "{{ baseline_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Software | assert pyenv build packages are listed
+      ansible.builtin.shell: |
+        grep -q 'linux_baseline_pyenv_build_packages:' "{{ baseline_vars }}"
+        grep -q 'build-essential' "{{ baseline_vars }}"
+        grep -q 'pkg-config' "{{ baseline_vars }}"
+        grep -q 'libssl-dev' "{{ baseline_vars }}"
+        grep -q 'libreadline-dev' "{{ baseline_vars }}"
+        grep -q 'libffi-dev' "{{ baseline_vars }}"
+        grep -q 'libzstd-dev' "{{ baseline_vars }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -63,6 +87,8 @@
     - name: Software | assert baseline tasks wire github releases and shell drop-ins
       ansible.builtin.shell: |
         grep -q 'github_releases.yml' "{{ baseline_tasks }}"
+        grep -q 'pyenv.yml' "{{ baseline_tasks }}"
+        grep -q 'linux_baseline_pyenv_enabled' "{{ baseline_tasks }}"
         grep -q 'github_release_item.yml' "{{ github_releases_task }}"
         grep -q 'shell.yml' "{{ baseline_tasks }}"
         grep -q 'timezone.yml' "{{ baseline_tasks }}"

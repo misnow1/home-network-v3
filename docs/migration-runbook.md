@@ -807,6 +807,22 @@ ${PROD} playbooks/bastion.yml --limit bastion.home.2123studios.com
 
 DDNS for bastion is handled by the UCG dhcp-script — do not run `ddns-client.yml`.
 
+### Reverse proxy cutover (bastion-el9 nginx)
+
+The legacy `bastion-el9` also hosted the public nginx reverse proxy (Authelia + Guacamole,
+Paperless, Plex, Transmission). Reproduce it on the Ubuntu bastion with the `reverse_proxy`
+role after the steps above:
+
+```bash
+# Add bastion to the reverse_proxy and certbot groups; populate
+# inventories/production/group_vars/reverse_proxy/vars.yml (see the .example).
+${PROD} playbooks/certbot.yml --limit bastion.home.2123studios.com -e allow_production=true
+${PROD} playbooks/reverse-proxy.yml --limit bastion.home.2123studios.com -e allow_production=true
+```
+
+Cut over the public DNS / port-forward to the new host once validation passes. See
+[reverse-proxy-runbook.md](reverse-proxy-runbook.md).
+
 ---
 
 ## Phase 3 — Validation checklist

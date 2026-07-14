@@ -1,0 +1,22 @@
+---
+# Lab reverse proxy fixture for the reverse_proxy integration slice.
+# Backends are loopback IPs so `nginx -t` never needs DNS, and TLS uses a
+# throwaway self-signed cert so no certbot run is required in the lab.
+
+reverse_proxy_enabled: true
+reverse_proxy_bootstrap_selfsigned: true
+reverse_proxy_authelia_url: http://127.0.0.1:9191
+reverse_proxy_cert_name: member01.lab.test
+
+reverse_proxy_sites:
+  - name: proxy-lab
+    server_names:
+      - member01.lab.test
+    client_max_body_size: 25M
+    locations:
+      - path: /
+        proxy_pass: http://127.0.0.1:8080
+      - path: /secure
+        proxy_pass: http://127.0.0.1:8080
+        auth_required: true
+        websocket: true

@@ -1,0 +1,8 @@
+---
+# cka-sim baseline overrides — copy to vars.yml (gitignored alongside production inventory).
+#
+#   mkdir -p inventories/production/host_vars/cka-sim.home.2123studios.com
+#   cp inventories/production/host_vars/cka-sim.home.2123studios.com/vars.yml.example \
+#      inventories/production/host_vars/cka-sim.home.2123studios.com/vars.yml
+
+linux_baseline_pyenv_enabled: true

@@ -1,2 +1,4 @@
 # {{ ansible_managed }}
-/^root@.+\.home\.2123studios\.com$/    {{ mail_relay_default_recipient }}
+# Match root@ at the apex domain (root@home.2123studios.com, from clients whose
+# myorigin is $mydomain) as well as any host under it (root@kif.home...).
+/^root@(.+\.)?home\.2123studios\.com$/    {{ mail_relay_default_recipient }}

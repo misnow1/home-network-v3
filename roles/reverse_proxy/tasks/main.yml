@@ -1,0 +1,60 @@
+---
+- name: Reverse proxy | Validate site definitions
+  ansible.builtin.assert:
+    that:
+      - reverse_proxy_sites | length > 0
+      - reverse_proxy_sites | selectattr('name', 'undefined') | list | length == 0
+      - reverse_proxy_sites | selectattr('server_names', 'undefined') | list | length == 0
+    fail_msg: >-
+      reverse_proxy_sites must be a non-empty list; each site requires a
+      'name' and 'server_names'. See docs/reverse-proxy-runbook.md.
+  tags: [reverse_proxy]
+
+- name: Reverse proxy | Compute default certificate lineage
+  ansible.builtin.set_fact:
+    reverse_proxy_effective_cert_name: >-
+      {{
+        reverse_proxy_cert_name
+        if (reverse_proxy_cert_name | length > 0)
+        else reverse_proxy_sites[0].server_names[0]
+      }}
+  tags: [reverse_proxy]
+
+- name: Reverse proxy | Collect certificate lineages in use
+  ansible.builtin.set_fact:
+    reverse_proxy_cert_names: >-
+      {{
+        reverse_proxy_sites
+        | map(attribute='cert_name', default=reverse_proxy_effective_cert_name)
+        | unique
+        | list
+      }}
+  tags: [reverse_proxy]
+
+- name: Reverse proxy | Install packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [reverse_proxy, reverse_proxy_packages]
+
+- name: Reverse proxy | Deploy shared configuration and snippets
+  ansible.builtin.include_tasks: config.yml
+  tags: [reverse_proxy, reverse_proxy_config]
+
+- name: Reverse proxy | Ensure certificate material is present
+  ansible.builtin.include_tasks: certs.yml
+  tags: [reverse_proxy, reverse_proxy_certs]
+
+- name: Reverse proxy | Render proxied sites
+  ansible.builtin.include_tasks: sites.yml
+  tags: [reverse_proxy, reverse_proxy_sites]
+
+- name: Reverse proxy | Configure UFW
+  ansible.builtin.include_tasks: ufw.yml
+  when: reverse_proxy_manage_ufw | bool
+  tags: [reverse_proxy, reverse_proxy_ufw]
+
+- name: Reverse proxy | Enable and start nginx
+  ansible.builtin.service:
+    name: "{{ reverse_proxy_service }}"
+    state: started
+    enabled: true
+  tags: [reverse_proxy]

@@ -1,0 +1,38 @@
+---
+# Configure the nginx + Authelia reverse proxy on edge proxy hosts.
+# Lab integration: scripts/test-integration.sh (member01.lab.test, INTEGRATION_SLICE=reverse_proxy).
+#
+# Prerequisites: baseline.yml + domain-join.yml + bastion.yml, and a TLS
+# certificate issued by playbooks/certbot.yml covering every proxied FQDN
+# (unless reverse_proxy_bootstrap_selfsigned is enabled for lab use).
+#
+# Safety: refuses production inventory unless -e allow_production=true.
+
+- name: Configure reverse proxy hosts
+  hosts: reverse_proxy
+  become: true
+  pre_tasks:
+    - name: Reverse proxy | refuse production inventory without opt-in
+      ansible.builtin.assert:
+        that:
+          - >-
+            inventory_dir is search('/lab')
+            or (allow_production | default(false) | bool)
+        fail_msg: >-
+          Refusing reverse-proxy against non-lab inventory without allow_production=true.
+          See docs/reverse-proxy-runbook.md.
+      tags: [always]
+
+    - name: Reverse proxy | require reverse_proxy_enabled in group_vars
+      ansible.builtin.assert:
+        that:
+          - reverse_proxy_enabled | default(false) | bool
+        fail_msg: >-
+          Enable reverse_proxy_enabled in host or group_vars before running
+          playbooks/reverse-proxy.yml. See docs/reverse-proxy-runbook.md.
+      tags: [always]
+
+  roles:
+    - role: reverse_proxy
+      tags: [reverse_proxy]
+      when: reverse_proxy_enabled | default(false) | bool

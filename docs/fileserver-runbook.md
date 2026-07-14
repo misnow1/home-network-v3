@@ -67,6 +67,56 @@ See [sssd-config.md](sssd-config.md) for the member-server (sssd) vs file-server
 ## Apply order
 
 1. `baseline.yml` — chrony before Kerberos
-2. `fileserver.yml` — packages, DNS, smb.conf, domain join, winbind NSS/PAM, share
+2. `domain-join.yml --tags domain_mail_relay` — Postfix relay client (production kif only; prerequisite for MD/NUT email)
+3. `fileserver.yml` — Samba AD member when `fileserver_samba_enabled: true`; optional `mdadm_monitor` when enabled
 
 DC hosts (`dc` group) are excluded — they never run `samba_fileserver`.
+
+### kif (hand-maintained Samba)
+
+kif uses `fileserver_samba_enabled: false` in host_vars. The pre-reimage config at
+`/archive/pre-reimage-kif-2026-06-29/samba/smb.conf` defines `[homes]`, `[archive]`,
+`[shared]`, `[media]`, and `[paperless]` — not the lab single-share template. ROADMAP **19+**
+will Ansible-manage those shares.
+
+`fileserver.yml` on kif runs only `mdadm_monitor` (and hypervisor when tagged). It does **not**
+deploy `smb.conf`.
+
+**Recovery** if smb.conf was overwritten:
+
+```bash
+sudo cp /archive/pre-reimage-kif-2026-06-29/samba/smb.conf /etc/samba/smb.conf
+sudo testparm -s
+sudo systemctl restart smbd nmbd winbind
+```
+
+## MD array monitoring (optional)
+
+When `mdadm_monitor_enabled: true` (production kif), [`fileserver.yml`](../playbooks/fileserver.yml) also runs the [`mdadm_monitor`](../roles/mdadm_monitor/) role.
+
+| Component | Purpose |
+|---|---|
+| **mdadm** | RAID tools and monitor daemon |
+| **mdmonitor** | Continuous failure/degradation alerts |
+| **mdcheck timers** | Ubuntu 24.04 periodic scrubs (`mdcheck_start`, `mdcheck_continue`) |
+| **mdmonitor-oneshot** | Daily poll for newly degraded arrays |
+| **MAILADDR root** | Alerts relay through Postfix → `mail.home.2123studios.com` → vault recipient |
+
+**Prerequisites:** Postfix relay client must be active before `fileserver.yml` (same as NUT). On kif (winbind, not full domain-join):
+
+```bash
+./scripts/prod-run.sh --confirm-production -- playbooks/domain-join.yml \
+  --limit kif.home.2123studios.com --tags domain_mail_relay
+```
+
+Lab `nas01` leaves `mdadm_monitor_enabled` at default `false` (no RAID).
+
+**Verification:**
+
+```bash
+systemctl status mdmonitor mdcheck_start.timer mdcheck_continue.timer mdmonitor-oneshot.timer
+cat /proc/mdstat
+grep MAILADDR /etc/mdadm/mdadm.conf
+```
+
+Each `fileserver.yml` converge on a RAID host sends a mdadm test email (`TestMessage`) to verify the relay chain end-to-end.

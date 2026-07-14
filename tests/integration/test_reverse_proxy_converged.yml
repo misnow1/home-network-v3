@@ -1,0 +1,61 @@
+---
+# Post-converge checks for reverse_proxy integration tests (member01.lab.test).
+
+- name: Integration — reverse proxy convergence
+  hosts: reverse_proxy
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert nginx is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['nginx.service'].state == 'running'
+        fail_msg: nginx is not running
+
+    - name: Validate nginx configuration
+      ansible.builtin.command:
+        cmd: nginx -t
+      changed_when: false
+
+    - name: Stat rendered configuration files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: rp_files
+      loop:
+        - /etc/nginx/conf.d/proxy-lab.conf
+        - /etc/nginx/conf.d/ssl_params.conf
+        - /etc/nginx/conf.d/00-default-redirect.conf
+        - /etc/nginx/snippets/proxy.conf
+        - /etc/nginx/snippets/authelia-location.conf
+        - /etc/nginx/snippets/authelia-authrequest.conf
+        - /etc/letsencrypt/live/member01.lab.test/fullchain.pem
+
+    - name: Assert rendered files exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing expected file: {{ item.item }}"
+      loop: "{{ rp_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Assert vhost renders the Authelia auth-request wiring
+      ansible.builtin.command:
+        cmd: grep -q 'authelia-authrequest.conf' /etc/nginx/conf.d/proxy-lab.conf
+      changed_when: false
+
+    - name: Assert UFW is active
+      ansible.builtin.command: ufw status verbose
+      register: rp_ufw_status
+      changed_when: false
+      failed_when: "'Status: active' not in rp_ufw_status.stdout"
+
+    - name: Assert UFW allows HTTP and HTTPS
+      ansible.builtin.assert:
+        that:
+          - rp_ufw_status.stdout is search('80/tcp')
+          - rp_ufw_status.stdout is search('443/tcp')
+        fail_msg: "HTTP/HTTPS not allowed in UFW: {{ rp_ufw_status.stdout }}"

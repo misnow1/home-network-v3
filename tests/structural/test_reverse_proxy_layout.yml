@@ -1,0 +1,86 @@
+---
+# Structural tests for the reverse_proxy role layout.
+
+- name: Structural — reverse proxy layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    rp_defaults: "{{ repo_root }}/roles/reverse_proxy/defaults/main.yml"
+    rp_tasks: "{{ repo_root }}/roles/reverse_proxy/tasks/main.yml"
+    rp_playbook: "{{ repo_root }}/playbooks/reverse-proxy.yml"
+    rp_runbook: "{{ repo_root }}/docs/reverse-proxy-runbook.md"
+    rp_example: "{{ repo_root }}/inventories/production/group_vars/reverse_proxy/vars.yml.example"
+    certbot_defaults: "{{ repo_root }}/roles/certbot/defaults/main.yml"
+    certbot_hook: "{{ repo_root }}/roles/certbot/templates/reload-services.sh.j2"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+  tasks:
+    - name: Reverse proxy | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: rp_paths
+      loop:
+        - "{{ rp_defaults }}"
+        - "{{ rp_tasks }}"
+        - "{{ repo_root }}/roles/reverse_proxy/vars/main.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/handlers/main.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/tasks/config.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/tasks/certs.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/tasks/sites.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/tasks/ufw.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/site.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/proxy.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/ssl_params.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/authelia-location.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/authelia-authrequest.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/default-redirect.conf.j2"
+        - "{{ rp_playbook }}"
+        - "{{ rp_runbook }}"
+        - "{{ rp_example }}"
+
+    - name: Reverse proxy | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ rp_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Reverse proxy | assert playbook targets group with production safety
+      ansible.builtin.shell: |
+        grep -q 'hosts: reverse_proxy' "{{ rp_playbook }}"
+        grep -q 'allow_production' "{{ rp_playbook }}"
+        grep -q 'reverse_proxy_enabled' "{{ rp_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Reverse proxy | assert defaults expose key knobs
+      ansible.builtin.shell: |
+        grep -q 'reverse_proxy_enabled:' "{{ rp_defaults }}"
+        grep -q 'reverse_proxy_authelia_url:' "{{ rp_defaults }}"
+        grep -q 'reverse_proxy_sites:' "{{ rp_defaults }}"
+        grep -q 'reverse_proxy_require_cert:' "{{ rp_defaults }}"
+        grep -q 'reverse_proxy_bootstrap_selfsigned:' "{{ rp_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Reverse proxy | assert certbot nginx reload hook is wired
+      ansible.builtin.shell: |
+        grep -q 'certbot_deploy_hook_reload_nginx' "{{ certbot_defaults }}"
+        grep -q 'certbot_deploy_hook_reload_nginx' "{{ certbot_hook }}"
+        grep -q 'reload nginx' "{{ certbot_hook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Reverse proxy | assert production example defines the group and certbot membership
+      ansible.builtin.shell: |
+        grep -q '^    reverse_proxy:' "{{ prod_hosts_example }}"
+        grep -q 'reverse_proxy_authelia_url' "{{ rp_example }}"
+        grep -q 'certbot_domains' "{{ rp_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

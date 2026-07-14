@@ -25,15 +25,33 @@ Also applied inline by `dc-bootstrap.yml`, `dc-replica-join.yml`, `dc-restore.ym
 | `net-tools`, `iproute2`, `dnsutils` | Network diagnostics (`ip`, `dig`, legacy `ifconfig`) |
 | `less`, `rsync`, `tmux` | File transfer and terminal multiplexing |
 
-### GitHub releases
+**pyenv build deps** (`linux_baseline_pyenv_build_packages`, only when
+`linux_baseline_pyenv_enabled: true`): toolchain (`make`, `build-essential`, `pkg-config`,
+`patch`), OpenSSL/zlib/bzip2/lzma/zstd (`libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `liblzma-dev`,
+`libzstd-dev`, `xz-utils`), readline/ncurses/sqlite/ffi (`libreadline-dev`, `libncursesw5-dev`,
+`libsqlite3-dev`, `libffi-dev`), plus `tk-dev`, `libxml2-dev`, and `libxmlsec1-dev` for optional
+modules. `curl` and `git` come from the baseline list above. See the
+[pyenv suggested build environment](https://github.com/pyenv/pyenv/wiki#suggested-build-environment).
 
-| Binary | Version pin | Install path |
-|---|---|---|
-| `fzf` | `0.60.3` (see `linux_baseline_github_releases`) | `/usr/local/bin/fzf` |
+### GitHub releases and git checkouts
+
+| Tool | Version pin | Install path | Default |
+|---|---|---|---|
+| `fzf` | `0.60.3` (see `linux_baseline_github_releases`) | `/usr/local/bin/fzf` | all `linux` hosts |
+| `uv`, `uvx` | `0.11.26` (see `linux_baseline_github_releases`) | `/usr/local/bin/` | all `linux` hosts |
+| `pyenv` | `2.7.3` (see `linux_baseline_pyenv_version`) | `/usr/local/lib/pyenv` | off (`linux_baseline_pyenv_enabled: false`) |
 
 Ubuntu apt ships an older fzf; the role installs upstream and deploys shell drop-ins in
-`/etc/zsh/zshrc.d/` and `/etc/bash.bashrc.d/`. The `ansible` automation user stays on
-bash; drop-ins apply to any interactive shell.
+`/etc/zsh/zshrc.d/` and `/etc/bash.bashrc.d/` for fzf, pyenv (when enabled), and uv. The
+`ansible` automation user stays on bash; drop-ins apply to any interactive shell.
+
+**pyenv** is cloned from GitHub with build dependencies when enabled so `pyenv install` works out
+of the box. Drop-ins set `PYENV_ROOT` and run `pyenv init` for shims, completion, and version
+switching. Enable per host or group — production currently sets
+`linux_baseline_pyenv_enabled: true` on `cka-sim.home.2123studios.com` only.
+
+**uv** is installed from upstream GitHub releases; drop-ins enable shell completions via
+`uv generate-shell-completion`.
 
 ## Role-specific packages
 
@@ -73,13 +91,22 @@ Docker (`docker.io`, `docker-compose-v2`) is installed separately by the
 ### File servers (`fileservers`)
 
 **Playbook:** [`playbooks/fileserver.yml`](../playbooks/fileserver.yml) (run `baseline.yml` first)  
-**Role:** [`roles/samba_fileserver`](../roles/samba_fileserver/) — variable `fileserver_packages`
+**Roles:** [`roles/samba_fileserver`](../roles/samba_fileserver/), optional [`roles/mdadm_monitor`](../roles/mdadm_monitor/)
 
 | Package | Purpose |
 |---|---|
 | `samba`, `winbind` | SMB member server |
 | `libnss-winbind`, `libpam-winbind` | NSS/PAM integration |
 | `krb5-user`, `smbclient` | Kerberos and SMB client |
+
+When `mdadm_monitor_enabled: true` (e.g. kif):
+
+| Package | Purpose |
+|---|---|
+| `mdadm` | Software RAID tools and monitor |
+| `mailutils` | Send mdadm alert mail to `root` (relays via Postfix) |
+
+Postfix relay client is a prerequisite — applied via `domain-join.yml --tags domain_mail_relay`, not by `fileserver.yml`.
 
 ### Domain-joined members (`linux:!dc`)
 
@@ -117,6 +144,22 @@ Docker (`docker.io`, `docker-compose-v2`) is installed separately by the
 Also deploys sshd drop-in, unattended-upgrades config, and fail2ban jail templates. See
 [bastion-runbook.md](bastion-runbook.md).
 
+### Reverse proxy (`reverse_proxy`)
+
+**Playbook:** [`playbooks/reverse-proxy.yml`](../playbooks/reverse-proxy.yml) (run `baseline.yml` + `domain-join.yml` + `bastion.yml` + `certbot.yml` first)  
+**Role:** [`roles/reverse_proxy`](../roles/reverse_proxy/) — variable `reverse_proxy_packages`
+
+| Package | Purpose |
+|---|---|
+| `nginx` | Edge reverse proxy / TLS termination |
+
+Typically colocated on the bastion host. Serves data-driven, TLS-protected virtual hosts
+that proxy to Docker containers (on `kif`) and other LAN backends, with optional Authelia
+forward-auth per location. TLS uses a single Let's Encrypt SAN certificate issued by the
+[`certbot`](../roles/certbot/) role (DNS-01 via Dreamhost) and reloaded through the certbot
+deploy hook (`certbot_deploy_hook_reload_nginx`). See
+[reverse-proxy-runbook.md](reverse-proxy-runbook.md).
+
 ### CKA practice nodes (`cka`)
 
 **Playbook:** [`playbooks/cka-converge.yml`](../playbooks/cka-converge.yml)  
@@ -147,6 +190,7 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 | DC | `linux_baseline` inline in DC playbooks |
 | Hypervisor, fileserver, domain member | `baseline.yml` → role playbook |
 | Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` |
+| Reverse proxy | `baseline.yml` → `domain-join.yml` → `bastion.yml` → `certbot.yml` → `reverse-proxy.yml` |
 | CKA | `cka-converge.yml` (baseline + `cka_node`) |
 
 ## Overriding package lists
@@ -160,3 +204,10 @@ linux_baseline_packages: "{{ linux_baseline_packages | default([]) }}"
 ```
 
 Prefer appending via inventory rather than forking role defaults when possible.
+
+Enable pyenv on a specific host:
+
+```yaml
+# inventories/production/host_vars/cka-sim.home.2123studios.com/vars.yml
+linux_baseline_pyenv_enabled: true
+```

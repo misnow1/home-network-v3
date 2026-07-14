@@ -3,6 +3,15 @@ domain_name: lab.test
 
 fileserver_dns_servers: []
 
+# When false, the role does not touch /etc/resolv.conf. Also skipped when
+# fileserver_dns_servers is empty, so the role never writes a nameserver-less
+# resolv.conf or clobbers a working systemd-resolved symlink.
+fileserver_manage_resolv_conf: true
+
+# When false, samba_fileserver role is skipped (playbook when:). Use on hosts with
+# hand-maintained smb.conf until production multi-share support lands (ROADMAP 19+).
+fileserver_samba_enabled: true
+
 fileserver_idmap_ad_range: "10000-999999"
 fileserver_idmap_tdb_range: "2000-9999"
 fileserver_share_name: labshare

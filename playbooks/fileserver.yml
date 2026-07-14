@@ -7,6 +7,10 @@
   become: true
   roles:
     - role: samba_fileserver
+      when: fileserver_samba_enabled | default(true) | bool
+    - role: mdadm_monitor
+      when: mdadm_monitor_enabled | default(false) | bool
+      tags: [mdadm_monitor]
     - role: hypervisor
       when: hypervisor_libvirt_enabled | default(false) | bool
       tags: [libvirt, hypervisor_netplan, hypervisor_networks, docker]

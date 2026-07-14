@@ -1,0 +1,78 @@
+---
+# Reverse proxy (nginx + Authelia forward-auth) role defaults.
+# See docs/reverse-proxy-runbook.md for the full site schema and examples.
+
+reverse_proxy_enabled: false
+
+# Authelia forward-auth backend. Leave empty to disable auth wiring entirely.
+# Example: http://kif.home.2123studios.com:9191
+reverse_proxy_authelia_url: ""
+reverse_proxy_authelia_authz_path: /api/authz/auth-request
+
+# Let's Encrypt lineage name (directory under /etc/letsencrypt/live/).
+# Defaults to the first proxied site's first server_name when unset.
+# Issue the certificate with the certbot role (playbooks/certbot.yml) first.
+reverse_proxy_cert_name: ""
+
+# When true, the role refuses to render vhosts until the referenced
+# certificate lineage exists (run playbooks/certbot.yml first).
+reverse_proxy_require_cert: true
+
+# Lab/dev convenience: generate a throwaway self-signed certificate for any
+# missing lineage so nginx -t passes without certbot. Never enable in production.
+reverse_proxy_bootstrap_selfsigned: false
+reverse_proxy_selfsigned_days: 365
+
+# DNS resolvers used for runtime upstream name resolution (variable proxy_pass).
+reverse_proxy_resolvers:
+  - 192.168.1.18
+  - 192.168.1.22
+reverse_proxy_resolver_timeout: 10s
+
+# Networks trusted to set X-Forwarded-For (Authelia trusted proxies).
+reverse_proxy_trusted_proxies:
+  - 192.168.0.0/16
+  - fe80::/16
+
+# HSTS header applied to each TLS vhost (per-site override via `hsts`).
+reverse_proxy_hsts_enabled: true
+reverse_proxy_hsts_max_age: 63072000
+
+# TLS tuning (Mozilla intermediate).
+reverse_proxy_ssl_protocols: TLSv1.2 TLSv1.3
+reverse_proxy_ssl_ciphers: >-
+  ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
+reverse_proxy_ssl_dhparam_bits: 2048
+reverse_proxy_ssl_session_timeout: 1h
+reverse_proxy_ssl_session_cache: shared:SSL:5m
+
+# Manage UFW rules for HTTP/HTTPS on the proxy host.
+reverse_proxy_manage_ufw: true
+
+# Redirect plain HTTP (port 80) to HTTPS via a catch-all default server.
+reverse_proxy_http_redirect: true
+
+# List of proxied sites. Each item:
+#   name:            (required) identifier + conf file basename
+#   server_names:    (required) list of server_name values
+#   cert_name:       (optional) override reverse_proxy_cert_name for this site
+#   hsts:            (optional) bool, default reverse_proxy_hsts_enabled
+#   gzip:            (optional) bool, default false
+#   client_max_body_size: (optional) e.g. "100M"
+#   authelia_location:    (optional) bool; force-include the Authelia authz
+#                         endpoint. Auto-enabled when any location needs auth.
+#   upstreams:       (optional) list of nginx upstream{} blocks:
+#                       - name: plex_backend
+#                         servers: ["192.168.1.152:32400"]
+#                         keepalive: 32
+#                         extra: "<raw directives>"
+#   extra_server_config:  (optional) raw directives at server scope (escape hatch)
+#   locations:       (required) list of location blocks:
+#                       path:            (required) e.g. "/", "= /", "/guacamole"
+#                       proxy_pass:      (optional) upstream URL to proxy_pass
+#                       return:          (optional) e.g. "301 /guacamole/"
+#                       auth_required:   (optional) bool, default false
+#                       websocket:       (optional) bool, default false
+#                       include_proxy_snippet: (optional) bool, default true
+#                       extra_config:    (optional) raw directives inside location
+reverse_proxy_sites: []

@@ -1,0 +1,8 @@
+---
+- name: MDADM monitor | Enable and start systemd units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ mdadm_monitor_systemd_units }}"
+  when: not ansible_check_mode

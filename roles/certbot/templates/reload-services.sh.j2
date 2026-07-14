@@ -17,6 +17,14 @@ if systemctl is-active --quiet postfix; then
 fi
 {% endif %}
 
+{% if certbot_deploy_hook_reload_nginx | bool %}
+if systemctl is-active --quiet nginx; then
+  if nginx -t 2>/dev/null; then
+    systemctl reload nginx
+  fi
+fi
+{% endif %}
+
 {% if certbot_deploy_hook_ddns_nginx_tls | bool %}
 if [[ -d "{{ certbot_deploy_hook_ddns_install_root }}" ]]; then
   (
