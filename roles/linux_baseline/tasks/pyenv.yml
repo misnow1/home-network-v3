@@ -1,0 +1,12 @@
+---
+- name: Pyenv | Install Python build dependencies
+  ansible.builtin.apt:
+    name: "{{ linux_baseline_pyenv_build_packages }}"
+    state: present
+
+- name: Pyenv | Install pinned release
+  ansible.builtin.git:
+    repo: https://github.com/pyenv/pyenv.git
+    dest: "{{ linux_baseline_pyenv_root }}"
+    version: "v{{ linux_baseline_pyenv_version }}"
+    depth: 1

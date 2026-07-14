@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Shared TLS parameters (Mozilla intermediate).
+
+ssl_protocols {{ reverse_proxy_ssl_protocols }};
+ssl_ecdh_curve X25519:prime256v1:secp384r1;
+ssl_ciphers {{ reverse_proxy_ssl_ciphers }};
+ssl_prefer_server_ciphers off;
+
+ssl_session_timeout {{ reverse_proxy_ssl_session_timeout }};
+ssl_session_cache {{ reverse_proxy_ssl_session_cache }};
+
+ssl_stapling on;
+ssl_stapling_verify on;
+
+ssl_dhparam {{ reverse_proxy_dhparam_path }};

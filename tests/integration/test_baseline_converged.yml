@@ -60,3 +60,43 @@
         that:
           - linux_baseline_github_releases | selectattr('name', 'equalto', 'fzf') | map(attribute='version') | first in baseline_fzf_version.stdout
         fail_msg: "fzf version mismatch: {{ baseline_fzf_version.stdout }}"
+
+    - name: Assert pyenv is installed
+      ansible.builtin.command: pyenv --version
+      register: baseline_pyenv_version
+      changed_when: false
+      failed_when: baseline_pyenv_version.rc != 0
+      when: linux_baseline_pyenv_enabled | default(false) | bool
+
+    - name: Assert pyenv version matches pinned release
+      ansible.builtin.assert:
+        that:
+          - linux_baseline_pyenv_version in baseline_pyenv_version.stdout
+        fail_msg: "pyenv version mismatch: {{ baseline_pyenv_version.stdout }}"
+      when: linux_baseline_pyenv_enabled | default(false) | bool
+
+    - name: Assert pyenv is not installed when disabled
+      ansible.builtin.command: pyenv --version
+      register: baseline_pyenv_absent
+      changed_when: false
+      failed_when: false
+      when: not (linux_baseline_pyenv_enabled | default(false) | bool)
+
+    - name: Assert pyenv absent on hosts with pyenv disabled
+      ansible.builtin.assert:
+        that:
+          - baseline_pyenv_absent.rc != 0
+        fail_msg: "pyenv should not be installed when linux_baseline_pyenv_enabled is false"
+      when: not (linux_baseline_pyenv_enabled | default(false) | bool)
+
+    - name: Assert uv is on PATH
+      ansible.builtin.command: uv --version
+      register: baseline_uv_version
+      changed_when: false
+      failed_when: baseline_uv_version.rc != 0
+
+    - name: Assert uv version matches pinned release
+      ansible.builtin.assert:
+        that:
+          - linux_baseline_github_releases | selectattr('name', 'equalto', 'uv') | map(attribute='version') | first in baseline_uv_version.stdout
+        fail_msg: "uv version mismatch: {{ baseline_uv_version.stdout }}"

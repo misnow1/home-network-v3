@@ -7,6 +7,12 @@
 #
 # Secrets live in inventories/production/group_vars/all/vault.yml — see docs/vault-schema.md.
 
+# kif keeps hand-restored smb.conf ([homes], [archive], [media], etc.) until ROADMAP 19+.
+# Restore from /archive/pre-reimage-kif-2026-06-29/samba/smb.conf if Ansible overwrote it.
+fileserver_samba_enabled: false
+
+mdadm_monitor_enabled: true
+
 nut_ups_mode: netserver
 nut_ups_listen_address: 192.168.1.152
 

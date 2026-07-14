@@ -3,6 +3,11 @@
   ansible.builtin.include_tasks: packages.yml
   tags: [packages]
 
+- name: Install pyenv
+  ansible.builtin.include_tasks: pyenv.yml
+  when: linux_baseline_pyenv_enabled | bool
+  tags: [packages]
+
 - name: Install GitHub release binaries
   ansible.builtin.include_tasks: github_releases.yml
   tags: [packages]

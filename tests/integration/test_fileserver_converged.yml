@@ -74,3 +74,30 @@
         SMB_PASSWORD: "{{ vault_test_user_password }}"
       changed_when: false
       no_log: true
+
+    - name: MDADM monitor | gather service facts when enabled
+      ansible.builtin.service_facts:
+      when: mdadm_monitor_enabled | default(false) | bool
+
+    - name: MDADM monitor | assert mdmonitor is running when enabled
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['mdmonitor.service'].state == 'running'
+        fail_msg: mdmonitor is not running
+      when: mdadm_monitor_enabled | default(false) | bool
+
+    - name: MDADM monitor | assert scrub timers are active when enabled
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['mdcheck_start.timer'].state == 'running'
+          - ansible_facts.services['mdcheck_continue.timer'].state == 'running'
+          - ansible_facts.services['mdmonitor-oneshot.timer'].state == 'running'
+        fail_msg: mdadm scrub/monitor timers are not active
+      when: mdadm_monitor_enabled | default(false) | bool
+
+    - name: MDADM monitor | assert MAILADDR is configured when enabled
+      ansible.builtin.command: grep -E '^MAILADDR ' /etc/mdadm/mdadm.conf
+      register: mdadm_monitor_mailaddr
+      changed_when: false
+      failed_when: mdadm_monitor_mailaddr.rc != 0
+      when: mdadm_monitor_enabled | default(false) | bool

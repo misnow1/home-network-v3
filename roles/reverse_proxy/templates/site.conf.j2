@@ -1,0 +1,85 @@
+#jinja2: trim_blocks:True, lstrip_blocks:True
+{% set cert_name = site.cert_name | default(reverse_proxy_effective_cert_name) %}
+{% set hsts = site.hsts | default(reverse_proxy_hsts_enabled) %}
+{% set ns = namespace(auth=site.authelia_location | default(false)) %}
+{% for loc in site.locations %}
+{% if loc.auth_required | default(false) %}
+{% set ns.auth = true %}
+{% endif %}
+{% endfor %}
+{% set authelia_include = ns.auth and (reverse_proxy_authelia_url | length > 0) %}
+# {{ ansible_managed }}
+# Reverse proxy vhost for {{ site.name }} ({{ site.server_names | join(', ') }}).
+{% for up in site.upstreams | default([]) %}
+
+upstream {{ up.name }} {
+{% for backend in up.servers %}
+    server {{ backend }};
+{% endfor %}
+{% if up.keepalive is defined %}
+    keepalive {{ up.keepalive }};
+{% endif %}
+{% if up.extra is defined %}
+    {{ up.extra | indent(4) }}
+{% endif %}
+}
+{% endfor %}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    server_name {{ site.server_names | join(' ') }};
+
+    ssl_certificate {{ reverse_proxy_letsencrypt_live }}/{{ cert_name }}/fullchain.pem;
+    ssl_certificate_key {{ reverse_proxy_letsencrypt_live }}/{{ cert_name }}/privkey.pem;
+{% if hsts %}
+
+    add_header Strict-Transport-Security "max-age={{ reverse_proxy_hsts_max_age }}" always;
+{% endif %}
+{% if site.gzip | default(false) %}
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_min_length 1000;
+    gzip_types text/plain text/css text/xml application/xml text/javascript application/x-javascript image/svg+xml application/json;
+{% endif %}
+{% if site.client_max_body_size is defined %}
+
+    client_max_body_size {{ site.client_max_body_size }};
+{% endif %}
+{% if authelia_include %}
+
+    include {{ reverse_proxy_snippets_dir }}/authelia-location.conf;
+{% endif %}
+{% if site.extra_server_config is defined %}
+
+    {{ site.extra_server_config | indent(4) }}
+{% endif %}
+{% for loc in site.locations %}
+
+    location {{ loc.path }} {
+{% if loc.return is defined %}
+        return {{ loc.return }};
+{% else %}
+{% if loc.include_proxy_snippet | default(true) %}
+        include {{ reverse_proxy_snippets_dir }}/proxy.conf;
+{% endif %}
+{% if (loc.auth_required | default(false)) and authelia_include %}
+        include {{ reverse_proxy_snippets_dir }}/authelia-authrequest.conf;
+{% endif %}
+{% if loc.websocket | default(false) %}
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+{% endif %}
+{% if loc.extra_config is defined %}
+        {{ loc.extra_config | indent(8) }}
+{% endif %}
+{% if loc.proxy_pass is defined %}
+        proxy_pass {{ loc.proxy_pass }};
+{% endif %}
+{% endif %}
+    }
+{% endfor %}
+}

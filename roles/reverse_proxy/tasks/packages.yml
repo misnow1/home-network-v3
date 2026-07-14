@@ -1,0 +1,8 @@
+---
+- name: Reverse proxy | Install nginx packages
+  ansible.builtin.apt:
+    name: "{{ reverse_proxy_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [reverse_proxy_packages]

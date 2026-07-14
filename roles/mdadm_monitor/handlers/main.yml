@@ -1,0 +1,19 @@
+---
+- name: Restart mdmonitor
+  ansible.builtin.systemd:
+    name: mdmonitor.service
+    state: restarted
+  listen: restart mdmonitor
+  when: not ansible_check_mode
+
+- name: Reload udev rules
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: true
+  listen: reload udev rules
+  when: not ansible_check_mode
+
+- name: Trigger udev
+  ansible.builtin.command: udevadm trigger
+  changed_when: true
+  listen: reload udev rules
+  when: not ansible_check_mode

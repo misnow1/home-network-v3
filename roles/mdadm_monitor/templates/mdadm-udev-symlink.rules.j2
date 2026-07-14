@@ -1,0 +1,3 @@
+# {{ ansible_managed }}
+# mdmonitor expects /dev/md/<name> symlinks; arrays may only appear as /dev/mdX.
+SUBSYSTEM=="block", ACTION=="add|change", ENV{MD_UUID}=="{{ mdadm_monitor_array.uuid }}", SYMLINK+="md/{{ mdadm_monitor_array.name }}"

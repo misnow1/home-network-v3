@@ -1,0 +1,21 @@
+---
+- name: Reverse proxy | Render proxied site vhosts
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: "{{ reverse_proxy_conf_dir }}/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ reverse_proxy_sites }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.name }}"
+  vars:
+    site: "{{ item }}"
+  notify: reload nginx
+
+- name: Reverse proxy | Validate full nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+  when: not ansible_check_mode

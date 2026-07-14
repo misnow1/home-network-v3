@@ -136,6 +136,37 @@ run_bastion_integration() {
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
 }
 
+run_reverse_proxy_integration() {
+  provision_lab_dc
+
+  log_info "Integration VM lifecycle for member ${LAB_HOST} (slice=reverse_proxy)"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
+  "${ROOT}/scripts/lab/vm-create.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/wait-ssh.sh" "${LAB_HOST}"
+
+  log_info "Converging baseline on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/baseline.yml --limit "${LAB_HOST}"
+
+  log_info "Joining domain on ${LAB_HOST}"
+  run_ansible_playbook "${ROOT}" playbooks/domain-join.yml --limit "${LAB_HOST}"
+
+  log_info "Converging bastion on ${LAB_HOST} (UFW baseline)"
+  run_ansible_playbook "${ROOT}" playbooks/bastion.yml --limit "${LAB_HOST}"
+
+  log_info "Converging reverse proxy on ${LAB_HOST} (first run)"
+  run_ansible_playbook "${ROOT}" playbooks/reverse-proxy.yml --limit "${LAB_HOST}"
+
+  log_info "Converging reverse proxy on ${LAB_HOST} (idempotency check)"
+  assert_ansible_playbook_idempotent "${ROOT}" playbooks/reverse-proxy.yml --limit "${LAB_HOST}"
+
+  log_info "Running reverse proxy convergence assertions"
+  run_ansible_playbook "${ROOT}" tests/integration/test_reverse_proxy_converged.yml --limit "${LAB_HOST}"
+
+  log_info "Destroying integration test VMs"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}"
+  "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_DC_HOST}"
+}
+
 run_hypervisor_integration() {
   log_info "Integration VM lifecycle for ${LAB_HOST} (slice=hypervisor)"
   "${ROOT}/scripts/lab/vm-destroy.sh" "${LAB_HOST}" || true
@@ -360,6 +391,9 @@ main() {
       ;;
     bastion)
       run_bastion_integration
+      ;;
+    reverse_proxy)
+      run_reverse_proxy_integration
       ;;
     hypervisor)
       run_hypervisor_integration

@@ -31,5 +31,6 @@ certbot_dreamhost_validation_resolvers:
 certbot_dreamhost_verbose: false
 certbot_deploy_hook_reload_samba: true
 certbot_deploy_hook_reload_postfix: false
+certbot_deploy_hook_reload_nginx: false
 certbot_deploy_hook_ddns_install_root: "{{ ddns_nsupdate_install_root | default('/opt/ddns-nsupdate') }}"
 certbot_deploy_hook_ddns_nginx_tls: "{{ ddns_nsupdate_nginx_tls | default(false) }}"

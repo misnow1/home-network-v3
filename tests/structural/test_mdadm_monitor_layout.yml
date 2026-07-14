@@ -1,0 +1,84 @@
+---
+# Structural tests for mdadm_monitor role layout.
+
+- name: Structural — mdadm monitor layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    mdadm_monitor_defaults: "{{ repo_root }}/roles/mdadm_monitor/defaults/main.yml"
+    mdadm_monitor_packages: "{{ repo_root }}/roles/mdadm_monitor/tasks/packages.yml"
+    mdadm_monitor_config: "{{ repo_root }}/roles/mdadm_monitor/tasks/config.yml"
+    mdadm_monitor_udev: "{{ repo_root }}/roles/mdadm_monitor/tasks/udev.yml"
+    mdadm_monitor_test: "{{ repo_root }}/roles/mdadm_monitor/tasks/test_email.yml"
+    mdadm_monitor_udev_template: "{{ repo_root }}/roles/mdadm_monitor/templates/mdadm-udev-symlink.rules.j2"
+    fileserver_playbook: "{{ repo_root }}/playbooks/fileserver.yml"
+  tasks:
+    - name: MDADM monitor | assert role paths exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: mdadm_monitor_paths
+      loop:
+        - "{{ mdadm_monitor_defaults }}"
+        - "{{ mdadm_monitor_packages }}"
+        - "{{ mdadm_monitor_config }}"
+        - "{{ mdadm_monitor_udev }}"
+        - "{{ mdadm_monitor_test }}"
+        - "{{ mdadm_monitor_udev_template }}"
+        - "{{ repo_root }}/roles/mdadm_monitor/tasks/systemd.yml"
+        - "{{ repo_root }}/roles/mdadm_monitor/handlers/main.yml"
+
+    - name: MDADM monitor | assert all role files present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing {{ item.item }}"
+      loop: "{{ mdadm_monitor_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: MDADM monitor | assert default disabled
+      ansible.builtin.shell: |
+        grep -q 'mdadm_monitor_enabled: false' "{{ mdadm_monitor_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: MDADM monitor | assert Postfix active check when email enabled
+      ansible.builtin.shell: |
+        grep -q 'Assert Postfix active when email enabled' "{{ mdadm_monitor_packages }}"
+        grep -q 'mdadm_monitor_postfix_active.status.ActiveState' "{{ mdadm_monitor_packages }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: MDADM monitor | assert MAILADDR configuration
+      ansible.builtin.shell: |
+        grep -q 'MAILADDR' "{{ mdadm_monitor_config }}"
+        grep -q 'AUTOCHECK=' "{{ mdadm_monitor_config }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: MDADM monitor | assert udev template uses array uuid symlink
+      ansible.builtin.shell: |
+        grep -q 'MD_UUID' "{{ mdadm_monitor_udev_template }}"
+        grep -q 'SYMLINK+=' "{{ mdadm_monitor_udev_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: MDADM monitor | assert test email task uses mdadm monitor test
+      ansible.builtin.shell: |
+        grep -q 'mdadm --monitor --scan --test --oneshot' "{{ mdadm_monitor_test }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: MDADM monitor | assert fileserver playbook wires role
+      ansible.builtin.shell: |
+        grep -q 'role: mdadm_monitor' "{{ fileserver_playbook }}"
+        grep -q 'mdadm_monitor_enabled' "{{ fileserver_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

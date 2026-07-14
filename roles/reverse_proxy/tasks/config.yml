@@ -1,0 +1,79 @@
+---
+- name: Reverse proxy | Ensure nginx directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ reverse_proxy_conf_dir }}"
+    - "{{ reverse_proxy_snippets_dir }}"
+    - "{{ reverse_proxy_ssl_dir }}"
+
+- name: Reverse proxy | Remove distro default site
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/sites-enabled/default
+  notify: reload nginx
+
+- name: Reverse proxy | Generate dhparam file
+  ansible.builtin.command:
+    cmd: >-
+      openssl dhparam -out {{ reverse_proxy_dhparam_path }}
+      {{ reverse_proxy_ssl_dhparam_bits }}
+  args:
+    creates: "{{ reverse_proxy_dhparam_path }}"
+  notify: reload nginx
+
+- name: Reverse proxy | Enforce dhparam permissions
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_dhparam_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reverse proxy | Deploy TLS parameters snippet
+  ansible.builtin.template:
+    src: ssl_params.conf.j2
+    dest: "{{ reverse_proxy_conf_dir }}/ssl_params.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Reverse proxy | Deploy proxy snippet
+  ansible.builtin.template:
+    src: proxy.conf.j2
+    dest: "{{ reverse_proxy_snippets_dir }}/proxy.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Reverse proxy | Deploy Authelia forward-auth snippets
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ reverse_proxy_snippets_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: authelia-location.conf.j2
+      dest: authelia-location.conf
+    - src: authelia-authrequest.conf.j2
+      dest: authelia-authrequest.conf
+  when: reverse_proxy_authelia_url | length > 0
+  notify: reload nginx
+
+- name: Reverse proxy | Deploy HTTP-to-HTTPS redirect default server
+  ansible.builtin.template:
+    src: default-redirect.conf.j2
+    dest: "{{ reverse_proxy_conf_dir }}/00-default-redirect.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: reverse_proxy_http_redirect | bool
+  notify: reload nginx

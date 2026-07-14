@@ -35,6 +35,7 @@
     - name: File server | assert playbook targets fileservers group
       ansible.builtin.shell: |
         grep -q 'hosts: fileservers' "{{ fileserver_playbook }}"
+        grep -q 'fileserver_samba_enabled' "{{ fileserver_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false

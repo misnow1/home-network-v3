@@ -1,0 +1,15 @@
+---
+- name: Validate nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  register: reverse_proxy_nginx_validate
+  changed_when: false
+  listen: reload nginx
+  when: not ansible_check_mode
+
+- name: Reload nginx
+  ansible.builtin.service:
+    name: "{{ reverse_proxy_service }}"
+    state: reloaded
+  listen: reload nginx
+  when: not ansible_check_mode

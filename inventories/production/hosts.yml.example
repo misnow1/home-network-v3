@@ -53,6 +53,12 @@ all:
           vm_use_dhcp: true
           # vm_mac: 52:54:00:ab:cd:ef   # optional — omit to auto-generate a stable MAC from vm_name
 
+    # Edge nginx + Authelia reverse proxy. Typically the bastion host.
+    # Site definitions live in group_vars/reverse_proxy/vars.yml.
+    reverse_proxy:
+      hosts:
+        bastion.example.home:
+
     mail_relay:
       hosts:
         mail.example.home:
@@ -77,6 +83,9 @@ all:
       children:
         dc:
         mail_relay:
+      hosts:
+        # Reverse proxy needs a SAN cert for every proxied FQDN (DNS-01 Dreamhost).
+        bastion.example.home:
 
     linux:
       children:
@@ -85,6 +94,13 @@ all:
         mail_relay:
         hypervisors:
         fileservers:
+        linux_members:
+
+    linux_members:
+      hosts:
+        cka-sim.example.home:
+          ansible_host: 203.0.113.141
+          ansible_managed: true
 
     # Tracked for migration checklists — not targeted by default playbooks
     deferred:

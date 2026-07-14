@@ -1,0 +1,24 @@
+---
+- name: MDADM monitor | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not mdadm_monitor_enabled | bool
+
+- name: MDADM monitor | Install packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [mdadm_monitor_packages]
+
+- name: MDADM monitor | Configure mdadm
+  ansible.builtin.include_tasks: config.yml
+  tags: [mdadm_monitor_config]
+
+- name: MDADM monitor | Deploy udev symlink rules
+  ansible.builtin.include_tasks: udev.yml
+  tags: [mdadm_monitor_udev]
+
+- name: MDADM monitor | Enable systemd units
+  ansible.builtin.include_tasks: systemd.yml
+  tags: [mdadm_monitor_systemd]
+
+- name: MDADM monitor | Send test email
+  ansible.builtin.include_tasks: test_email.yml
+  tags: [mdadm_monitor_test]

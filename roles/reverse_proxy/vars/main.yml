@@ -1,0 +1,12 @@
+---
+# Reverse proxy role internal constants (Ubuntu/Debian layout).
+
+reverse_proxy_packages:
+  - nginx
+
+reverse_proxy_conf_dir: /etc/nginx/conf.d
+reverse_proxy_snippets_dir: /etc/nginx/snippets
+reverse_proxy_ssl_dir: /etc/nginx/ssl
+reverse_proxy_dhparam_path: /etc/nginx/ssl/dhparam.pem
+reverse_proxy_letsencrypt_live: /etc/letsencrypt/live
+reverse_proxy_service: nginx

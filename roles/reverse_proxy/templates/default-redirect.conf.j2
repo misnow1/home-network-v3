@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Catch-all HTTP server: redirect everything to HTTPS.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

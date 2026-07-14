@@ -1,0 +1,24 @@
+---
+- name: MDADM monitor | Set MAILADDR in mdadm.conf
+  ansible.builtin.lineinfile:
+    path: /etc/mdadm/mdadm.conf
+    regexp: '^#?MAILADDR\s'
+    line: "MAILADDR {{ mdadm_monitor_mailaddr }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart mdmonitor
+  when: mdadm_monitor_email_enabled | bool
+  tags: [mdadm_monitor_config]
+
+- name: MDADM monitor | Enable AUTOCHECK in /etc/default/mdadm
+  ansible.builtin.lineinfile:
+    path: /etc/default/mdadm
+    regexp: '^AUTOCHECK='
+    line: "AUTOCHECK={{ 'true' if mdadm_monitor_autocheck | bool else 'false' }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [mdadm_monitor_config]

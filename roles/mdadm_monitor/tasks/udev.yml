@@ -1,0 +1,50 @@
+---
+- name: MDADM monitor | Scan mdadm arrays
+  ansible.builtin.command: mdadm --detail --scan
+  register: mdadm_monitor_scan
+  changed_when: false
+  failed_when: false
+
+- name: MDADM monitor | Build array facts from scan output
+  ansible.builtin.set_fact:
+    mdadm_monitor_arrays: >-
+      {{
+        mdadm_monitor_arrays | default([])
+        + [{
+          'device': item.split()[1],
+          'name': item.split()[1] | basename,
+          'uuid': (item | regex_search('UUID=\S+')).split('=')[1]
+        }]
+      }}
+  loop: "{{ mdadm_monitor_scan.stdout_lines | select('match', '^ARRAY ') | list }}"
+  loop_control:
+    label: "{{ item.split()[1] | default(item) }}"
+  when:
+    - item.split() | length >= 2
+    - (item | regex_search('UUID=\S+')) is not none
+
+- name: MDADM monitor | Check /dev/md symlinks exist
+  ansible.builtin.stat:
+    path: "/dev/md/{{ item.name }}"
+  register: mdadm_monitor_symlink_stat
+  loop: "{{ mdadm_monitor_arrays | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: mdadm_monitor_arrays | default([]) | length > 0
+
+- name: MDADM monitor | Deploy udev rules for missing symlinks
+  ansible.builtin.template:
+    src: mdadm-udev-symlink.rules.j2
+    dest: "/etc/udev/rules.d/99-mdadm-monitor-{{ item.item.name }}.rules"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    mdadm_monitor_array: "{{ item.item }}"
+  loop: "{{ mdadm_monitor_symlink_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  notify: reload udev rules
+  when:
+    - mdadm_monitor_arrays | default([]) | length > 0
+    - not item.stat.exists | default(false)

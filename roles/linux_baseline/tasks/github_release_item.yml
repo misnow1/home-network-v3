@@ -1,12 +1,15 @@
 ---
 - name: GitHub release | Install release binary
   vars:
-    release_asset: "{{ item.name }}-{{ item.version }}-linux_amd64.tar.gz"
-    release_url: "https://github.com/{{ item.repo }}/releases/download/v{{ item.version }}/{{ release_asset }}"
+    release_tag: "{{ (item.tag_prefix | default('v')) ~ item.version }}"
+    release_asset: "{{ item.asset | default(item.name ~ '-' ~ item.version ~ '-linux_amd64.tar.gz') }}"
+    release_url: "https://github.com/{{ item.repo }}/releases/download/{{ release_tag }}/{{ release_asset }}"
     release_tmpdir: "/tmp/ansible-github-release-{{ item.name }}-{{ item.version }}"
+    release_version_cmd: "{{ item.dest_dir | default(item.dest | dirname) }}/{{ (item.binaries | default([item.binary]))[0] }}"
+    release_extract_dir: "{{ item.extract_subdir | default('') }}"
   block:
     - name: GitHub release | Check installed version
-      ansible.builtin.command: "{{ item.dest }} --version"
+      ansible.builtin.command: "{{ release_version_cmd }} --version"
       register: github_release_installed
       changed_when: false
       failed_when: false
@@ -15,7 +18,7 @@
       ansible.builtin.debug:
         msg: >-
           Would install {{ item.name }} {{ item.version }}
-          from {{ release_url }} to {{ item.dest }}
+          from {{ release_url }} to {{ item.dest_dir | default(item.dest) }}
       when:
         - ansible_check_mode
         - github_release_installed.rc != 0 or item.version not in github_release_installed.stdout
@@ -43,12 +46,15 @@
             dest: "{{ release_tmpdir }}"
             remote_src: true
 
-        - name: GitHub release | Install binary
+        - name: GitHub release | Install binaries
           ansible.builtin.copy:
-            src: "{{ release_tmpdir }}/{{ item.binary }}"
-            dest: "{{ item.dest }}"
+            src: "{{ release_tmpdir ~ '/' ~ release_extract_dir ~ '/' ~ binary_name if release_extract_dir else release_tmpdir ~ '/' ~ binary_name }}"
+            dest: "{{ item.dest_dir | default(item.dest | dirname) }}/{{ binary_name }}"
             mode: "{{ item.mode }}"
             remote_src: true
+          loop: "{{ item.binaries | default([item.binary]) }}"
+          loop_control:
+            loop_var: binary_name
 
       always:
         - name: GitHub release | Remove temp dir

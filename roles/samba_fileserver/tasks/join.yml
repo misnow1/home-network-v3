@@ -11,6 +11,8 @@
   # follow: false replaces the systemd-resolved stub symlink with a static
   # file so AD DNS persists across reboots. Netplan/resolver integration for
   # production is documented in docs/production-runbook.md (static resolv.conf for now).
+  # Guarded so an empty fileserver_dns_servers never yields a nameserver-less
+  # resolv.conf (would break DNS) or clobbers a working systemd-resolved symlink.
   ansible.builtin.copy:
     dest: /etc/resolv.conf
     follow: false
@@ -23,6 +25,9 @@
     owner: root
     group: root
     mode: "0644"
+  when:
+    - fileserver_manage_resolv_conf | bool
+    - fileserver_dns_servers | length > 0
   tags: [fileserver_join]
 
 - name: File server | Deploy smb.conf before domain join

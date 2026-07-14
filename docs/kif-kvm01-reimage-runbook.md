@@ -9,7 +9,7 @@ See [ROADMAP.md](ROADMAP.md) slice **19** (active) and deferred **15+–24+** fo
 
 | Host | Services | Post-reimage playbooks |
 |---|---|---|
-| **kif** | NFS, Samba AD member (winbind), Docker, libvirt, NUT, wsdd | `baseline.yml` → `fileserver.yml` + manual NFS/NUT/wsdd until roles land |
+| **kif** | NFS, Samba AD member (winbind), Docker, libvirt, NUT, wsdd, mdadm monitor | `baseline.yml` → `domain-join.yml` (mail relay tag) → `nut-converge.yml` → `fileserver.yml` + manual NFS/wsdd until roles land |
 | **kvm01** | libvirt hypervisor, integration tests | `baseline.yml` → `hypervisor.yml` → `backup.yml` |
 
 **kif uses winbind, not sssd** — do not run `domain-join.yml` on kif.
@@ -170,14 +170,14 @@ For `--bridge br3` mode: `allow br3` in `/etc/qemu/bridge.conf`.
 - NFS exports (`/home`, `/media`, `/archive`)
 - Samba + winbind (restore from staging `samba/`)
 - wsdd
-- NUT (`upsc -l` shows both UPS)
+- NUT (`upsc kifups ups.status`; see [nut-runbook.md](nut-runbook.md))
 - Docker compose under `/srv/docker`
 
 **Validation gates:**
 
 - [ ] kvm01: NFS home mount, `getent passwd` AD users
 - [ ] Windows: `\\KIF\media`, `\\KIF\homes`
-- [ ] `upsc` both UPS units
+- [x] `upsc kifups` (livingroomups SNMP deferred)
 - [ ] Docker stacks (paperless, guacamole, plex, …)
 - [ ] `br0` reachable; `br3` VLAN 3 VMs get DHCP; libvirt networks on correct bridges
 
@@ -213,7 +213,12 @@ ${PROD} playbooks/backup.yml --limit kvm01.example.home
 ${PROD} playbooks/baseline.yml --limit kif.example.home
 ${PROD} playbooks/domain-join.yml --limit kif.example.home --tags domain_mail_relay
 ${PROD} playbooks/nut-converge.yml --limit kif.example.home
-# Restore smb.conf manually first, then:
+
+# kif host_vars set fileserver_samba_enabled: false — Ansible does not manage smb.conf yet.
+# If fileserver.yml was run before that guard, restore the pre-reimage config:
+#   sudo cp /archive/pre-reimage-kif-2026-06-29/samba/smb.conf /etc/samba/smb.conf
+#   sudo testparm -s
+#   sudo systemctl restart smbd nmbd winbind
 ${PROD} playbooks/fileserver.yml --limit kif.example.home --check
 ```
 
@@ -236,7 +241,7 @@ Remove `ansible_managed: false` from production inventory when ready (see
 | 15+ | NFS exports Ansible role |
 | 19+ | kif custom Samba shares + wsdd in `samba_fileserver` |
 | 20+ | Mac Time Machine + avahi |
-| 21+ | NUT Ansible role | **in progress** — [nut-runbook.md](nut-runbook.md) |
+| 21 | NUT Ansible role | **done** — [nut-runbook.md](nut-runbook.md) |
 | 22+ | backup-libvirt.sh |
 | 23+ | Restic timers + offsite |
 | 24+ | Optional ESP/boot mirror on 2×1TB SSDs |

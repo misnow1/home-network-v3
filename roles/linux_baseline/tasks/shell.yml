@@ -26,3 +26,41 @@
     src: etc/bash.bashrc.d/99-fzf.sh
     dest: /etc/bash.bashrc.d/99-fzf.sh
     mode: "0644"
+
+- name: Install zsh pyenv drop-in
+  ansible.builtin.copy:
+    src: etc/zsh/zshrc.d/99-pyenv.zsh
+    dest: /etc/zsh/zshrc.d/99-pyenv.zsh
+    mode: "0644"
+  when: linux_baseline_pyenv_enabled | bool
+
+- name: Remove zsh pyenv drop-in
+  ansible.builtin.file:
+    path: /etc/zsh/zshrc.d/99-pyenv.zsh
+    state: absent
+  when: not (linux_baseline_pyenv_enabled | bool)
+
+- name: Install zsh uv drop-in
+  ansible.builtin.copy:
+    src: etc/zsh/zshrc.d/99-uv.zsh
+    dest: /etc/zsh/zshrc.d/99-uv.zsh
+    mode: "0644"
+
+- name: Install bash pyenv drop-in
+  ansible.builtin.copy:
+    src: etc/bash.bashrc.d/99-pyenv.sh
+    dest: /etc/bash.bashrc.d/99-pyenv.sh
+    mode: "0644"
+  when: linux_baseline_pyenv_enabled | bool
+
+- name: Remove bash pyenv drop-in
+  ansible.builtin.file:
+    path: /etc/bash.bashrc.d/99-pyenv.sh
+    state: absent
+  when: not (linux_baseline_pyenv_enabled | bool)
+
+- name: Install bash uv drop-in
+  ansible.builtin.copy:
+    src: etc/bash.bashrc.d/99-uv.sh
+    dest: /etc/bash.bashrc.d/99-uv.sh
+    mode: "0644"

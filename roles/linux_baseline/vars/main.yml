@@ -21,5 +21,30 @@ linux_baseline_packages:
   - rsync
   - tmux
 
+# Build deps for `pyenv install` (Ubuntu 24.04).
+# Source: https://github.com/pyenv/pyenv/wiki#suggested-build-environment
+linux_baseline_pyenv_build_packages:
+  # Toolchain
+  - make
+  - build-essential  # gcc, g++, make, libc-dev
+  - pkg-config
+  - patch
+  # Compression and crypto
+  - libssl-dev
+  - zlib1g-dev
+  - libbz2-dev
+  - liblzma-dev
+  - libzstd-dev
+  - xz-utils
+  # Readline, ncurses, sqlite, ffi
+  - libreadline-dev
+  - libncursesw5-dev
+  - libsqlite3-dev
+  - libffi-dev
+  # Tk, XML (optional modules; pyenv wiki recommends for a complete build)
+  - tk-dev
+  - libxml2-dev
+  - libxmlsec1-dev
+
 chrony_service_name: chrony
 chrony_config_path: /etc/chrony/chrony.conf
