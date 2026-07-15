@@ -71,3 +71,14 @@ hypervisor_libvirt_pools_extra:
     mode: "0711"
     owner: root
     group: root
+
+# Libvirt storage — only /var/lib/libvirt/images on a dedicated LV (kif2/libvirt-images).
+hypervisor_libvirt_volume_group: kif2
+hypervisor_libvirt_data_volumes:
+  - { lv: libvirt-images, mount: /var/lib/libvirt/images, size: 500G }
+
+# Docker workload storage — dedicated LVs on kif2 (see docs/kif-kvm01-reimage-runbook.md).
+docker_engine_volume_group: kif2
+docker_engine_data_volumes:
+  - { lv: docker, mount: /srv/docker, size: 50G }
+  - { lv: docker-volumes, mount: /var/lib/docker/volumes, size: 200G }

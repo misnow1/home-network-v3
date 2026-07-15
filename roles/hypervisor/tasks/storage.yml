@@ -1,0 +1,67 @@
+---
+- name: Hypervisor libvirt storage | Assert volume group is set
+  ansible.builtin.assert:
+    that:
+      - hypervisor_libvirt_volume_group | length > 0
+    fail_msg: >-
+      hypervisor_libvirt_data_volumes is set but hypervisor_libvirt_volume_group is empty.
+      Set hypervisor_libvirt_volume_group in host_vars for this hypervisor host.
+
+- name: Hypervisor libvirt storage | Assert each volume declares a size
+  ansible.builtin.assert:
+    that:
+      - item.size is defined
+      - item.size | string | length > 0
+    fail_msg: >-
+      hypervisor_libvirt_data_volumes entry {{ item.lv | default('?') }} must declare size
+      (used when the LV does not yet exist).
+  loop: "{{ hypervisor_libvirt_data_volumes }}"
+  loop_control:
+    label: "{{ item.lv | default('?') }}"
+
+- name: Hypervisor libvirt storage | Install lvm2
+  ansible.builtin.apt:
+    name: lvm2
+    state: present
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Activate volume group
+  ansible.builtin.command:
+    argv:
+      - vgchange
+      - -ay
+      - "{{ hypervisor_libvirt_volume_group }}"
+  register: hypervisor_libvirt_vgchange
+  changed_when: false
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Ensure parent directory for each mount
+  ansible.builtin.file:
+    path: "{{ item.mount | dirname }}"
+    state: directory
+    mode: "0711"
+  loop: "{{ hypervisor_libvirt_data_volumes }}"
+  loop_control:
+    label: "{{ item.mount | dirname }}"
+  when: item.mount | dirname != item.mount
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Prepare each data volume
+  ansible.builtin.include_tasks: storage_volume.yml
+  loop: "{{ hypervisor_libvirt_data_volumes }}"
+  loop_control:
+    loop_var: volume
+    label: "{{ volume.lv }}"
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Assert mounts are active before libvirt starts
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --target
+      - "{{ item.mount }}"
+  loop: "{{ hypervisor_libvirt_data_volumes }}"
+  loop_control:
+    label: "{{ item.mount }}"
+  changed_when: false
+  tags: [hypervisor_storage]

@@ -33,10 +33,35 @@
       failed_when: not hypervisor_task_file.stat.exists
       loop:
         - netplan.yml
+        - storage.yml
+        - storage_volume.yml
         - users.yml
         - directories.yml
         - pools.yml
         - networks.yml
+
+    - name: Hypervisor | assert defaults define libvirt storage variables
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_libvirt_volume_group' "{{ libvirt_defaults }}" &&
+        grep -q 'hypervisor_libvirt_data_volumes' "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert storage is gated on data_volumes length
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_libvirt_data_volumes | length > 0' "{{ hypervisor_role }}/tasks/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert storage uses LVM and mount modules
+      ansible.builtin.shell: |
+        grep -q 'community.general.lvol' "{{ hypervisor_role }}/tasks/storage_volume.yml" &&
+        grep -q 'ansible.posix.mount' "{{ hypervisor_role }}/tasks/storage_volume.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Hypervisor | assert templates exist
       ansible.builtin.stat:

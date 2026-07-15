@@ -1,0 +1,68 @@
+---
+# Structural tests for docker_engine role layout.
+
+- name: Structural — docker_engine layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    docker_engine_role: "{{ repo_root }}/roles/docker_engine"
+    docker_engine_main: "{{ docker_engine_role }}/tasks/main.yml"
+  tasks:
+    - name: Docker engine | assert task files exist
+      ansible.builtin.stat:
+        path: "{{ docker_engine_role }}/tasks/{{ item }}"
+      register: docker_engine_task_file
+      failed_when: not docker_engine_task_file.stat.exists
+      loop:
+        - main.yml
+        - repo.yml
+        - storage.yml
+        - storage_volume.yml
+        - install.yml
+        - nvidia.yml
+        - daemon.yml
+
+    - name: Docker engine | assert template and handlers exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: docker_engine_asset
+      failed_when: not docker_engine_asset.stat.exists
+      loop:
+        - "{{ docker_engine_role }}/templates/daemon.json.j2"
+        - "{{ docker_engine_role }}/templates/docker.sources.j2"
+        - "{{ docker_engine_role }}/templates/nvidia-container-toolkit.list.j2"
+        - "{{ docker_engine_role }}/handlers/main.yml"
+
+    - name: Docker engine | assert defaults define storage and NVIDIA variables
+      ansible.builtin.shell: |
+        grep -q 'docker_engine_data_volumes' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_volume_group' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_nvidia_runtime' "{{ docker_engine_role }}/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Docker engine | assert defaults use Docker CE from the official repo
+      ansible.builtin.shell: |
+        grep -q 'docker-ce' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_apt_key_url' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_conflicting_packages' "{{ docker_engine_role }}/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Docker engine | assert storage is gated on data_volumes length
+      ansible.builtin.shell: |
+        grep -q 'docker_engine_data_volumes | length > 0' "{{ docker_engine_main }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Docker engine | assert storage uses LVM and mount modules
+      ansible.builtin.shell: |
+        grep -q 'community.general.lvol' "{{ docker_engine_role }}/tasks/storage_volume.yml" &&
+        grep -q 'ansible.posix.mount' "{{ docker_engine_role }}/tasks/storage_volume.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false

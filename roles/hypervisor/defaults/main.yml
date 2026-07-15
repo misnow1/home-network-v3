@@ -20,6 +20,14 @@ hypervisor_libvirt_users:
 
 hypervisor_libvirt_uri: qemu:///system
 
+# Opt-in LVM-backed libvirt storage. Empty list = libvirt on the root FS (lab hv01).
+# Assumes the VG already exists; LVs are created only when missing and existing
+# filesystems are never reformatted. Set VG + volumes in host_vars per host.
+hypervisor_libvirt_volume_group: ""
+hypervisor_libvirt_data_volumes: []
+hypervisor_libvirt_data_volume_fstype: xfs
+hypervisor_libvirt_data_volume_opts: "defaults 0 2"
+
 # Host netplan (production hypervisors — disabled by default for lab nested VMs).
 hypervisor_netplan_enabled: false
 hypervisor_netplan_renderer: networkd

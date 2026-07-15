@@ -1,0 +1,25 @@
+---
+# Ubuntu's docker.io/containerd conflict with Docker CE's containerd.io. Remove them
+# first (data under /var/lib/docker is preserved) so the CE package set can install.
+- name: Docker engine | Remove conflicting distro Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_engine_conflicting_packages }}"
+    state: absent
+    purge: false
+  when: docker_engine_remove_conflicting | bool
+  tags: [docker_engine]
+
+- name: Docker engine | Install packages
+  ansible.builtin.apt:
+    name: "{{ docker_engine_packages }}"
+    state: present
+  tags: [docker_engine]
+
+- name: Docker engine | Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_engine_users }}"
+  when: docker_engine_users | length > 0
+  tags: [docker_engine]

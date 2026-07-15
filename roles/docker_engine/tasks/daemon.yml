@@ -1,0 +1,21 @@
+---
+- name: Docker engine | Deploy daemon.json
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+  tags: [docker_engine]
+
+- name: Docker engine | Enable and start docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [docker_engine]
+
+- name: Docker engine | Flush handlers before finish
+  ansible.builtin.meta: flush_handlers
