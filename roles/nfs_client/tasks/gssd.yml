@@ -1,0 +1,9 @@
+---
+- name: NFS client | Enable rpc-gssd for Kerberos mounts
+  ansible.builtin.service:
+    name: rpc-gssd
+    enabled: true
+    state: started
+  when:
+    - nfs_client_krb5 | bool
+    - not ansible_check_mode

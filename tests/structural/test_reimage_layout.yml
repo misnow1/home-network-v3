@@ -46,6 +46,21 @@
       ansible.builtin.command: grep -F 'reimage_capture_kif_services' "{{ capture_script }}"
       changed_when: false
 
+    - name: Reimage | assert capture script copies autofs config
+      ansible.builtin.command: grep -F 'auto.home' "{{ reimage_lib }}"
+      changed_when: false
+
+    - name: Reimage | assert ubuntu autoinstall builder exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/reimage/ubuntu-autoinstall/build-user-data.sh"
+      register: autoinstall_builder
+
+    - name: Reimage | assert autoinstall builder executable
+      ansible.builtin.assert:
+        that:
+          - autoinstall_builder.stat.exists
+          - autoinstall_builder.stat.executable
+
     - name: Reimage | assert ROADMAP documents slice 19
       ansible.builtin.command: grep -F 'kif/kvm01 Ubuntu reimage' "{{ repo_root }}/docs/ROADMAP.md"
       changed_when: false

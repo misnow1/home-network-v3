@@ -1,0 +1,59 @@
+---
+# Structural tests for nfs_client role layout.
+
+- name: Structural — nfs_client layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    nfs_defaults: "{{ repo_root }}/roles/nfs_client/defaults/main.yml"
+    nfs_tasks: "{{ repo_root }}/roles/nfs_client/tasks/main.yml"
+    nfs_playbook: "{{ repo_root }}/playbooks/nfs-client.yml"
+    nfs_runbook: "{{ repo_root }}/docs/nfs-client-runbook.md"
+    hypervisors_example: "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example"
+  tasks:
+    - name: NFS client | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: nfs_paths
+      loop:
+        - "{{ nfs_defaults }}"
+        - "{{ nfs_tasks }}"
+        - "{{ repo_root }}/roles/nfs_client/handlers/main.yml"
+        - "{{ repo_root }}/roles/nfs_client/templates/auto.home.j2"
+        - "{{ repo_root }}/roles/nfs_client/templates/auto.master.d-home.j2"
+        - "{{ nfs_playbook }}"
+        - "{{ nfs_runbook }}"
+
+    - name: NFS client | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ nfs_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: NFS client | assert playbook targets linux members
+      ansible.builtin.shell: |
+        grep -q 'hosts: "linux:!dc"' "{{ nfs_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NFS client | assert defaults include boot-safe mount variables
+      ansible.builtin.shell: |
+        grep -q 'nfs_client_soft_timeo' "{{ nfs_defaults }}"
+        grep -q 'nfs_client_sec' "{{ nfs_defaults }}"
+        grep -q 'nofail' "{{ repo_root }}/roles/nfs_client/tasks/mounts.yml"
+        grep -q 'x-systemd.automount' "{{ repo_root }}/roles/nfs_client/tasks/mounts.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NFS client | assert hypervisors example enables nfs client
+      ansible.builtin.shell: |
+        grep -q 'nfs_client_enabled: true' "{{ hypervisors_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

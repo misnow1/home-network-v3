@@ -1,0 +1,13 @@
+---
+- name: Restart autofs
+  ansible.builtin.service:
+    name: autofs
+    state: restarted
+  listen: restart autofs
+  when: not ansible_check_mode
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: reload systemd
+  when: not ansible_check_mode

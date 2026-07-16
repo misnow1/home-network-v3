@@ -1,0 +1,10 @@
+---
+- name: NFS client | Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: NFS client | Install packages
+  ansible.builtin.apt:
+    name: "{{ nfs_client_packages }}"
+    state: present

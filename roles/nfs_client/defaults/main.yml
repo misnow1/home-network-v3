@@ -1,0 +1,30 @@
+---
+# NFS client for domain-joined Linux members mounting kif (or nfs_client_server).
+
+nfs_client_enabled: false
+
+nfs_client_server: kif.home.2123studios.com
+
+# Kerberos NFS (requires domain join + rpc-gssd before mounts work).
+nfs_client_krb5: true
+nfs_client_sec: krb5i
+
+nfs_client_nfsvers: "4.1"
+
+# soft + timeo/retrans — fail I/O when server is down instead of hanging indefinitely.
+nfs_client_soft_timeo: 600
+nfs_client_soft_retrans: 2
+
+nfs_client_homedir_autofs: true
+nfs_client_homedir_map: /home
+nfs_client_homedir_remote_prefix: /home
+
+# Static exports via fstab + systemd automount (boot-safe when server is down).
+nfs_client_static_mounts:
+  - path: /archive
+    remote: /archive
+  - path: /media
+    remote: /media
+
+# Boot: nofail + automount; access: soft (see docs/nfs-client-runbook.md).
+# Composed in tasks/templates from the variables above.

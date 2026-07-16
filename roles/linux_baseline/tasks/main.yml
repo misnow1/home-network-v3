@@ -27,3 +27,8 @@
 - name: Apply chrony time sync
   ansible.builtin.include_tasks: chrony.yml
   tags: [chrony]
+
+- name: Relocate ansible user home off NFS /home
+  ansible.builtin.include_tasks: ansible_user.yml
+  when: linux_baseline_ansible_user_enabled | bool
+  tags: [ansible_user]

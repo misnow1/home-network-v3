@@ -257,6 +257,27 @@ Uplink and optional NICs are set in
 
 ## Phase 3b — Parallel Ubuntu install (kvm01, same NVMe)
 
+### Autoinstall USB (recommended)
+
+Automates **ansible** user, **prod SSH key**, and **sudo**; **storage is manual** in the
+installer UI so **`cs/libvirt` is never formatted**.
+
+```bash
+./scripts/vm/keys-ensure.sh -i production
+# Mount VFAT partition labeled CIDATA on the installer USB:
+./scripts/reimage/ubuntu-autoinstall/build-user-data.sh \
+  --profile kvm01 --hostname kvm01 \
+  --libvirt-uuid d1b341d8-01bd-4ecb-8545-8bc441826a59 \
+  -o /mnt/CIDATA
+```
+
+See [scripts/reimage/ubuntu-autoinstall/README.md](../scripts/reimage/ubuntu-autoinstall/README.md).
+Boot Server ISO + CIDATA; at **storage**, format **`cs/ubuntu-root`** only; leave
+**`cs/libvirt`** unformatted (mount `/var/lib/libvirt` without format if desired).
+Reboot manually when install completes.
+
+### Manual installer (fallback)
+
 **Installer rules (USB media on `sda`):**
 
 - Hostname: **`kvm01.home.2123studios.com`**
@@ -330,6 +351,7 @@ but does **not** remove legacy `public-bridge` — migrate attached VMs manually
 PROD='./scripts/prod-run.sh --confirm-production --'
 ${PROD} playbooks/baseline.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/domain-join.yml --limit kvm01.home.2123studios.com
+${PROD} playbooks/nfs-client.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/hypervisor.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/backup.yml --limit kvm01.home.2123studios.com
 

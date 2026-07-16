@@ -66,6 +66,7 @@ or `dc-restore.yml` (offline backup) instead of step 2 — see
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind |
 | 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
+| 8n | `linux:!dc` (opt-in) | `nfs-client.yml` | After domain-join when `nfs_client_enabled` — [nfs-client-runbook.md](nfs-client-runbook.md) |
 | 9 | `bastion` | `bastion.yml` | Edge hardening (after domain-join) — [bastion-runbook.md](bastion-runbook.md) |
 | 10 | `ddns_clients` | `ddns-client.yml` | Optional GSS-TSIG update clients |
 

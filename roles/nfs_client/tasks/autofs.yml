@@ -1,0 +1,29 @@
+---
+- name: NFS client | Deploy autofs master drop-in for homedirs
+  ansible.builtin.template:
+    src: auto.master.d-home.j2
+    dest: /etc/auto.master.d/home-nfs.autofs
+    owner: root
+    group: root
+    mode: "0644"
+  when: nfs_client_homedir_autofs | bool
+  notify: restart autofs
+
+- name: NFS client | Deploy auto.home
+  ansible.builtin.template:
+    src: auto.home.j2
+    dest: /etc/auto.home
+    owner: root
+    group: root
+    mode: "0644"
+  when: nfs_client_homedir_autofs | bool
+  notify: restart autofs
+
+- name: NFS client | Enable and start autofs
+  ansible.builtin.service:
+    name: autofs
+    enabled: true
+    state: started
+  when:
+    - nfs_client_homedir_autofs | bool
+    - not ansible_check_mode

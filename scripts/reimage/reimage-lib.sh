@@ -106,6 +106,9 @@ reimage_capture_config_common() {
   local staging="$1"
   cp -a /etc/fstab "${staging}/config/" 2>/dev/null || true
   cp -a /etc/exports "${staging}/config/" 2>/dev/null || true
+  cp -a /etc/auto.master "${staging}/config/" 2>/dev/null || true
+  cp -a /etc/auto.home "${staging}/config/" 2>/dev/null || true
+  cp -a /etc/auto.misc "${staging}/config/" 2>/dev/null || true
   cp -a /etc/cron.d "${staging}/config/" 2>/dev/null || true
   cp -a /etc/cron.daily "${staging}/config/" 2>/dev/null || true
   reimage_capture_network "${staging}"

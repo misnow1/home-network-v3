@@ -1,0 +1,19 @@
+---
+- name: NFS client | Install packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [nfs_client, nfs_client_packages]
+
+- name: NFS client | Configure rpc-gssd
+  ansible.builtin.include_tasks: gssd.yml
+  when: nfs_client_krb5 | bool
+  tags: [nfs_client, nfs_client_gssd]
+
+- name: NFS client | Configure autofs homedirs
+  ansible.builtin.include_tasks: autofs.yml
+  when: nfs_client_homedir_autofs | bool
+  tags: [nfs_client, nfs_client_autofs]
+
+- name: NFS client | Configure static export mounts
+  ansible.builtin.include_tasks: mounts.yml
+  when: nfs_client_static_mounts | length > 0
+  tags: [nfs_client, nfs_client_mounts]

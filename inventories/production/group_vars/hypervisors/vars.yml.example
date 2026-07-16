@@ -12,6 +12,9 @@ hypervisor_libvirt_users:
   - ansible
   - misnow1
 
+# Kerberos NFS from kif — run playbooks/nfs-client.yml after domain-join.yml.
+nfs_client_enabled: true
+
 hypervisor_libvirt_networks:
   - name: external-default
     bridge: br0
