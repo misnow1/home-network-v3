@@ -26,7 +26,12 @@ hypervisor_libvirt_uri: qemu:///system
 hypervisor_libvirt_volume_group: ""
 hypervisor_libvirt_data_volumes: []
 hypervisor_libvirt_data_volume_fstype: xfs
-hypervisor_libvirt_data_volume_opts: "defaults 0 2"
+# fstab fields 4/5/6 (options, dump, passno) are passed separately to
+# ansible.posix.mount — opts must NOT embed dump/passno or the module escapes the
+# spaces (\040), producing an invalid options field that fails to mount at boot.
+hypervisor_libvirt_data_volume_opts: defaults
+hypervisor_libvirt_data_volume_dump: "0"
+hypervisor_libvirt_data_volume_passno: "2"
 
 # Host netplan (production hypervisors — disabled by default for lab nested VMs).
 hypervisor_netplan_enabled: false

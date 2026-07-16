@@ -10,6 +10,7 @@
 - name: Hypervisor libvirt storage | Set LV device path
   ansible.builtin.set_fact:
     _libvirt_lv_dev: "/dev/{{ hypervisor_libvirt_volume_group }}/{{ volume.lv }}"
+  tags: [hypervisor_storage]
 
 - name: Hypervisor libvirt storage | Resolve canonical LV device path
   ansible.builtin.command:
@@ -42,14 +43,17 @@
   when: _libvirt_lv_fstype.rc != 0
   tags: [hypervisor_storage]
 
-- name: Hypervisor libvirt storage | Check whether mount path is already in use
+- name: Hypervisor libvirt storage | Check whether the LV is already mounted at target
   ansible.builtin.command:
     argv:
+      # --mountpoint (exact) not --target: --target walks up to an ancestor mount,
+      # so an unmounted target falsely reports the root FS as its source (rc 0),
+      # which skips the fresh mount and fails the expected-LV assert below.
       - findmnt
       - -n
       - -o
       - SOURCE
-      - --target
+      - --mountpoint
       - "{{ volume.mount }}"
   register: _libvirt_mount_source
   failed_when: false
@@ -87,5 +91,7 @@
     src: "{{ _libvirt_lv_dev }}"
     fstype: "{{ volume.fstype | default(hypervisor_libvirt_data_volume_fstype) }}"
     opts: "{{ volume.opts | default(hypervisor_libvirt_data_volume_opts) }}"
+    dump: "{{ volume.dump | default(hypervisor_libvirt_data_volume_dump) }}"
+    passno: "{{ volume.passno | default(hypervisor_libvirt_data_volume_passno) }}"
     state: "{{ 'present' if _libvirt_mount_source.rc == 0 else 'mounted' }}"
   tags: [hypervisor_storage]
