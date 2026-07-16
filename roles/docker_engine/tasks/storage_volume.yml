@@ -1,0 +1,99 @@
+---
+- name: Docker engine storage | Create logical volume if missing
+  community.general.lvol:
+    vg: "{{ docker_engine_volume_group }}"
+    lv: "{{ volume.lv }}"
+    size: "{{ volume.size }}"
+    state: present
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Set LV device path
+  ansible.builtin.set_fact:
+    _docker_lv_dev: "/dev/{{ docker_engine_volume_group }}/{{ volume.lv }}"
+
+- name: Docker engine storage | Resolve canonical LV device path
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ _docker_lv_dev }}"
+  register: _docker_lv_dev_resolved
+  changed_when: false
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Check for existing filesystem on LV
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - -o
+      - value
+      - -s
+      - TYPE
+      - "{{ _docker_lv_dev }}"
+  register: _docker_lv_fstype
+  failed_when: false
+  changed_when: false
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Create filesystem when LV is blank
+  community.general.filesystem:
+    fstype: "{{ volume.fstype | default(docker_engine_data_volume_fstype) }}"
+    dev: "{{ _docker_lv_dev }}"
+  when: _docker_lv_fstype.rc != 0
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Check whether mount path is already in use
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - SOURCE
+      - --target
+      - "{{ volume.mount }}"
+  register: _docker_mount_source
+  failed_when: false
+  changed_when: false
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Resolve canonical path of existing mount source
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ _docker_mount_source.stdout }}"
+  register: _docker_mount_source_resolved
+  when: _docker_mount_source.rc == 0
+  changed_when: false
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Assert existing mount uses the expected LV
+  ansible.builtin.assert:
+    that:
+      - _docker_mount_source_resolved.stdout == _docker_lv_dev_resolved.stdout
+    fail_msg: >-
+      {{ volume.mount }} is mounted from {{ _docker_mount_source.stdout }}
+      ({{ _docker_mount_source_resolved.stdout }}), expected
+      {{ _docker_lv_dev }} ({{ _docker_lv_dev_resolved.stdout }}).
+  when: _docker_mount_source.rc == 0
+  tags: [docker_engine_storage]
+
+# When the LV is already mounted at the target (assert above confirmed it is the
+# expected device), only ensure the fstab entry — state: mounted would rewrite the
+# fstab line and remount, which fails on a busy path. Mount fresh otherwise.
+- name: Docker engine storage | Mount volume
+  ansible.posix.mount:
+    path: "{{ volume.mount }}"
+    src: "{{ _docker_lv_dev }}"
+    fstype: "{{ volume.fstype | default(docker_engine_data_volume_fstype) }}"
+    opts: "{{ volume.opts | default(docker_engine_data_volume_opts) }}"
+    state: "{{ 'present' if _docker_mount_source.rc == 0 else 'mounted' }}"
+  tags: [docker_engine_storage]
+
+- name: Docker engine storage | Ensure compose root directory exists
+  ansible.builtin.file:
+    path: "{{ volume.mount }}"
+    state: directory
+    mode: "0755"
+  when: volume.mount == '/srv/docker'
+  tags: [docker_engine_storage]

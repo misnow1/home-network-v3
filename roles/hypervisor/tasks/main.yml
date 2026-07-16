@@ -8,6 +8,11 @@
   when: hypervisor_netplan_enabled | bool
   tags: [hypervisor_netplan]
 
+- name: Hypervisor | Prepare dedicated libvirt storage
+  ansible.builtin.include_tasks: storage.yml
+  when: hypervisor_libvirt_data_volumes | length > 0
+  tags: [libvirt, hypervisor_storage]
+
 - name: Hypervisor | Install and configure libvirt
   ansible.builtin.include_tasks: libvirt.yml
   tags: [libvirt]

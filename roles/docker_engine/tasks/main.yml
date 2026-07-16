@@ -1,28 +1,29 @@
 ---
-- name: Docker engine | Install packages
-  ansible.builtin.apt:
-    name: "{{ docker_engine_packages }}"
-    state: present
+- name: Docker engine | Prepare dedicated storage
+  ansible.builtin.include_tasks: storage.yml
+  when:
+    - docker_engine_enabled | bool
+    - docker_engine_data_volumes | length > 0
+  tags: [docker_engine, docker_engine_storage]
+
+- name: Docker engine | Configure Docker apt repository
+  ansible.builtin.include_tasks: repo.yml
   when: docker_engine_enabled | bool
   tags: [docker_engine]
 
-- name: Docker engine | Enable and start docker
-  ansible.builtin.service:
-    name: docker
-    state: started
-    enabled: true
-  when:
-    - docker_engine_enabled | bool
-    - not ansible_check_mode
+- name: Docker engine | Install packages
+  ansible.builtin.include_tasks: install.yml
+  when: docker_engine_enabled | bool
   tags: [docker_engine]
 
-- name: Docker engine | Add users to docker group
-  ansible.builtin.user:
-    name: "{{ item }}"
-    groups: docker
-    append: true
-  loop: "{{ docker_engine_users }}"
+- name: Docker engine | Configure NVIDIA container runtime
+  ansible.builtin.include_tasks: nvidia.yml
   when:
     - docker_engine_enabled | bool
-    - docker_engine_users | length > 0
+    - docker_engine_nvidia_runtime != 'false'
+  tags: [docker_engine, docker_engine_nvidia]
+
+- name: Docker engine | Configure daemon and service
+  ansible.builtin.include_tasks: daemon.yml
+  when: docker_engine_enabled | bool
   tags: [docker_engine]

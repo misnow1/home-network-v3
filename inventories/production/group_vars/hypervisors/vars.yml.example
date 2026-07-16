@@ -4,6 +4,10 @@
 hypervisor_libvirt_enabled: true
 hypervisor_netplan_enabled: true
 
+# Must be set here (not just the hypervisor role default): include_role loads
+# docker_engine's own default (false) which would otherwise shadow it and skip Docker.
+docker_engine_enabled: true
+
 hypervisor_libvirt_users:
   - ansible
   - misnow1

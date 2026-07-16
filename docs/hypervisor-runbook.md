@@ -33,7 +33,7 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | **libvirt** | `qemu-kvm`, libvirtd, storage pools, optional bridge networks |
 | **Python deps** | `python3-libvirt`, `python3-lxml` (required by `community.libvirt` on the host) |
 | **netplan** | Host `br0` + VLAN bridges (production only, when enabled) |
-| **Docker** | `docker.io` + Compose v2 plugin (optional, default on) |
+| **Docker** | Docker CE (`docker-ce` + compose plugin) from Docker's apt repo (optional, default on) |
 | **Groups** | `hypervisor_libvirt_users` added to `libvirt` and `kvm` groups |
 
 ## Role variables (high level)
@@ -47,7 +47,53 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_pools` | `default`, `vms` | Base dir pools |
 | `hypervisor_libvirt_pools_extra` | `[]` | Host-specific pools (e.g. kif `boot`) |
 | `hypervisor_libvirt_users` | `[ansible]` | Users in `libvirt`/`kvm` groups |
+| `hypervisor_libvirt_volume_group` | `""` | LVM VG name (required when `data_volumes` set) |
+| `hypervisor_libvirt_data_volumes` | `[]` | Opt-in libvirt mounts: `lv`, `mount`, `size` per entry |
 | `docker_engine_enabled` | `true` | Include `docker_engine` role |
+
+### Libvirt storage host profiles
+
+`hypervisor_libvirt_data_volumes` is opt-in — set only in `host_vars` for production
+hypervisors with dedicated libvirt LVs. Empty list (default) keeps libvirt on the root
+filesystem (lab `hv01`).
+
+| Profile | Example hosts | `hypervisor_libvirt_data_volumes` |
+|---|---|---|
+| **Root FS** | hv01.lab.test | `[]` (default) |
+| **Whole libvirt tree** | kvm01 | `cs/libvirt` → `/var/lib/libvirt` |
+| **Images only** | kif | `kif2/libvirt-images` → `/var/lib/libvirt/images` |
+
+Workload hosts mount libvirt paths from dedicated LVs **before** libvirt packages install
+and `libvirtd` starts. LVs are created only when missing; existing filesystems are never
+reformatted. See [`roles/hypervisor`](../roles/hypervisor/) and host_vars examples for
+kvm01 and kif.
+
+### Docker host profiles
+
+`docker_engine_enabled` and dedicated Docker LVM storage are **independent**. Set storage
+only in `host_vars` for compose/workload hosts — never in `group_vars/dc` or
+`group_vars/hypervisors`.
+
+| Profile | Example hosts | `docker_engine_data_volumes` |
+|---|---|---|
+| **Lightweight docker** | dc01 (DDNS API) | `[]` (default) — Docker on root FS |
+| **Docker workload** | kif, kvm01 | host_vars: VG + `docker` / `docker-volumes` LVs |
+| **Hypervisor lab** | hv01.lab.test | `[]` — integration tests only |
+| **Future compose host** | TBD | Same as workload — add `host_vars` when provisioned |
+
+### `docker_engine` role variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `docker_engine_volume_group` | `""` | LVM VG name (required when `data_volumes` set) |
+| `docker_engine_data_volumes` | `[]` | Opt-in mounts: `lv`, `mount`, `size` per entry |
+| `docker_engine_nvidia_runtime` | `auto` | `auto` / `true` / `false` — Container Toolkit |
+| `docker_engine_nvidia_install_driver` | `false` | Run `ubuntu-drivers install --gpgpu` (kvm01) |
+
+Workload hosts mount `/srv/docker` and `/var/lib/docker/volumes` from separate LVs before
+Docker starts. LVs are created only when missing; existing filesystems are never
+reformatted. See [`roles/docker_engine`](../roles/docker_engine/) and
+[`host_vars/kvm01.../vars.yml.example`](../inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example).
 
 Production bridge networks and netplan (including DHCP on br0 and DNS search domain on
 br0 via `vm_dns_search`) are set in
@@ -74,10 +120,12 @@ those groups.
 ### Production kvm01
 
 1. `baseline.yml`
-2. `hypervisor.yml` — netplan, libvirt pools/networks, Docker
-3. `backup.yml`
+2. `domain-join.yml` — realmd + sssd (after Ubuntu reimage)
+3. `hypervisor.yml` — netplan, libvirt pools/networks, Docker
+4. `backup.yml`
 
-See [`host_vars/kvm01.../vars.yml.example`](../inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example).
+See [`host_vars/kvm01.../vars.yml.example`](../inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example) and
+[`kif-kvm01-reimage-runbook.md`](kif-kvm01-reimage-runbook.md) for VM restore after hypervisor converge.
 
 ### Production kif (hypervisor + fileserver)
 

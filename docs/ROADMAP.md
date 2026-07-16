@@ -23,7 +23,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — see [mail-relay-runbook.md](mail-relay-runbook.md) |
 | 18 | Bastion hardening | **done** | Edge jump host — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban — [bastion-runbook.md](bastion-runbook.md) |
 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth; replaces bastion-el9 nginx — [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
-| 19 | kif/kvm01 Ubuntu reimage | **in progress** | Spare SSD cutover; md127 LVs; **netplan cleanup** (br0/br3) — [kif-kvm01-reimage-runbook.md](kif-kvm01-reimage-runbook.md) |
+| 19 | kif/kvm01 Ubuntu reimage | **in progress** | kif spare SSD + md127 LVs **done** (ubuntu-vg stale LVs in burn-in); kvm01 Tier-1 capture **done** (2026-07-15); maintenance window + Ubuntu install remain — [kif-kvm01-reimage-runbook.md](kif-kvm01-reimage-runbook.md) |
 | 21 | NUT / UPS (kif) | **done** | `nut_ups` role, `nut-converge.yml`; kifups monitored on kif — [nut-runbook.md](nut-runbook.md) |
 
 ## Deferred (not forgotten)

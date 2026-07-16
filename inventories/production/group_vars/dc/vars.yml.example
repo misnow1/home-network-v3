@@ -33,6 +33,7 @@ samba_dc_reverse_zones:
   - 1.168.192.in-addr.arpa
 
 docker_engine_enabled: true
+# DDNS only — do not set docker_engine_data_volumes on DCs (Docker stays on root FS).
 ddns_nsupdate_enabled: true
 # ddns_nsupdate_manage_ufw: true
 # ddns_nsupdate_ufw_allow_cidrs:

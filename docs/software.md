@@ -85,8 +85,17 @@ switching. Enable per host or group — production currently sets
 | `guestfish` | Offline disk image inspection |
 | `tcpdump` | Bridge/VLAN traffic debugging |
 
-Docker (`docker.io`, `docker-compose-v2`) is installed separately by the
+Docker CE (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`,
+`docker-compose-plugin`) is installed from Docker's official apt repo by the
 [`docker_engine`](../roles/docker_engine/) role when `docker_engine_enabled: true`.
+The role also removes Ubuntu's conflicting `docker.io`/`containerd` packages
+(data under `/var/lib/docker` is preserved).
+
+On **docker workload** hosts (kif, kvm01), the same role optionally installs `lvm2`,
+creates/mounts dedicated LVs, and deploys `/etc/docker/daemon.json` (log rotation). When an
+NVIDIA GPU is detected (or forced on), it also installs `nvidia-container-toolkit` and
+registers the `nvidia` container runtime. **DCs** run Docker for DDNS only — they keep the
+default empty `docker_engine_data_volumes` and stay on the root filesystem.
 
 ### File servers (`fileservers`)
 

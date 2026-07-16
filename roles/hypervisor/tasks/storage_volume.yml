@@ -1,0 +1,91 @@
+---
+- name: Hypervisor libvirt storage | Create logical volume if missing
+  community.general.lvol:
+    vg: "{{ hypervisor_libvirt_volume_group }}"
+    lv: "{{ volume.lv }}"
+    size: "{{ volume.size }}"
+    state: present
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Set LV device path
+  ansible.builtin.set_fact:
+    _libvirt_lv_dev: "/dev/{{ hypervisor_libvirt_volume_group }}/{{ volume.lv }}"
+
+- name: Hypervisor libvirt storage | Resolve canonical LV device path
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ _libvirt_lv_dev }}"
+  register: _libvirt_lv_dev_resolved
+  changed_when: false
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Check for existing filesystem on LV
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - -o
+      - value
+      - -s
+      - TYPE
+      - "{{ _libvirt_lv_dev }}"
+  register: _libvirt_lv_fstype
+  failed_when: false
+  changed_when: false
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Create filesystem when LV is blank
+  community.general.filesystem:
+    fstype: "{{ volume.fstype | default(hypervisor_libvirt_data_volume_fstype) }}"
+    dev: "{{ _libvirt_lv_dev }}"
+  when: _libvirt_lv_fstype.rc != 0
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Check whether mount path is already in use
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - SOURCE
+      - --target
+      - "{{ volume.mount }}"
+  register: _libvirt_mount_source
+  failed_when: false
+  changed_when: false
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Resolve canonical path of existing mount source
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ _libvirt_mount_source.stdout }}"
+  register: _libvirt_mount_source_resolved
+  when: _libvirt_mount_source.rc == 0
+  changed_when: false
+  tags: [hypervisor_storage]
+
+- name: Hypervisor libvirt storage | Assert existing mount uses the expected LV
+  ansible.builtin.assert:
+    that:
+      - _libvirt_mount_source_resolved.stdout == _libvirt_lv_dev_resolved.stdout
+    fail_msg: >-
+      {{ volume.mount }} is mounted from {{ _libvirt_mount_source.stdout }}
+      ({{ _libvirt_mount_source_resolved.stdout }}), expected
+      {{ _libvirt_lv_dev }} ({{ _libvirt_lv_dev_resolved.stdout }}).
+  when: _libvirt_mount_source.rc == 0
+  tags: [hypervisor_storage]
+
+# When the LV is already mounted at the target (assert above confirmed it is the
+# expected device), only ensure the fstab entry — state: mounted would rewrite the
+# fstab line and remount, which fails on a busy libvirt path. Mount fresh otherwise.
+- name: Hypervisor libvirt storage | Mount volume
+  ansible.posix.mount:
+    path: "{{ volume.mount }}"
+    src: "{{ _libvirt_lv_dev }}"
+    fstype: "{{ volume.fstype | default(hypervisor_libvirt_data_volume_fstype) }}"
+    opts: "{{ volume.opts | default(hypervisor_libvirt_data_volume_opts) }}"
+    state: "{{ 'present' if _libvirt_mount_source.rc == 0 else 'mounted' }}"
+  tags: [hypervisor_storage]

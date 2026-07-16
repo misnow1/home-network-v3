@@ -14,5 +14,20 @@ hypervisor_netplan_optional_nics:
   - enp7s0f3u5
   - wlp4s0
 
+# Libvirt storage — whole /var/lib/libvirt on a dedicated LV. Do NOT reformat the
+# retained cs/libvirt filesystem; size is only used if the LV is missing.
+hypervisor_libvirt_volume_group: cs
+hypervisor_libvirt_data_volumes:
+  - { lv: libvirt, mount: /var/lib/libvirt, size: 1T }
+
+# Docker workload storage — tune sizes against `vgs cs` free extents before first converge.
+docker_engine_volume_group: cs
+docker_engine_data_volumes:
+  - { lv: docker, mount: /srv/docker, size: 50G }
+  - { lv: docker-volumes, mount: /var/lib/docker/volumes, size: 200G }
+
+# RTX 3050 — install driver on reimage; toolkit auto-detects the GPU.
+docker_engine_nvidia_install_driver: true
+
 # Backup scope — declare docker volumes and VM disks as needed (Slice 7).
 # backup_libvirt_vms: []

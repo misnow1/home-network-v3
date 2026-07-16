@@ -1,8 +1,50 @@
 ---
 docker_engine_enabled: false
 
+# Docker CE from Docker's official apt repo (https://docs.docker.com/engine/install/ubuntu/).
 docker_engine_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Docker CE apt repo + signing key. Managed by tasks/repo.yml before install.
+docker_engine_apt_key_url: https://download.docker.com/linux/ubuntu/gpg
+docker_engine_apt_repo_channel: stable
+# Maps ansible architecture to Debian multiarch name for the Docker apt repo.
+docker_engine_deb_arch: >-
+  {{ 'amd64' if ansible_facts['architecture'] | default('x86_64') == 'x86_64'
+     else ansible_facts['architecture'] | default('amd64') }}
+
+# Remove Ubuntu's distro Docker packages that conflict with Docker CE
+# (containerd vs containerd.io). Data under /var/lib/docker is preserved.
+docker_engine_remove_conflicting: true
+docker_engine_conflicting_packages:
   - docker.io
   - docker-compose-v2
+  - docker-doc
+  - podman-docker
+  - containerd
+  - runc
 
 docker_engine_users: []
+
+# Opt-in LVM-backed mounts for docker workload hosts (kif, kvm01). Empty list skips
+# all storage tasks — lightweight docker hosts (dc01 DDNS) keep Docker on root FS.
+docker_engine_volume_group: ""
+docker_engine_data_volumes: []
+docker_engine_data_volume_fstype: xfs
+docker_engine_data_volume_opts: "defaults 0 2"
+
+# NVIDIA Container Toolkit — auto detects PCI vendor 10de (NVIDIA).
+docker_engine_nvidia_runtime: auto
+docker_engine_nvidia_install_driver: false
+docker_engine_nvidia_default_runtime: false
+
+docker_engine_nvidia_repo_key_url: >-
+  https://nvidia.github.io/libnvidia-container/gpgkey
+# Maps ansible architecture to Debian multiarch name for the NVIDIA apt repo.
+docker_engine_nvidia_deb_arch: >-
+  {{ 'amd64' if ansible_facts['architecture'] | default('x86_64') == 'x86_64'
+     else ansible_facts['architecture'] | default('amd64') }}
