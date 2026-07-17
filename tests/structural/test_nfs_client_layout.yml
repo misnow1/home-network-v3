@@ -45,8 +45,10 @@
       ansible.builtin.shell: |
         grep -q 'nfs_client_soft_timeo' "{{ nfs_defaults }}"
         grep -q 'nfs_client_sec' "{{ nfs_defaults }}"
-        grep -q 'nofail' "{{ repo_root }}/roles/nfs_client/tasks/mounts.yml"
-        grep -q 'x-systemd.automount' "{{ repo_root }}/roles/nfs_client/tasks/mounts.yml"
+        grep -q 'nofail' "{{ nfs_defaults }}"
+        grep -q 'x-systemd.automount' "{{ nfs_defaults }}"
+        grep -q 'nfs_client_static_mount_opts' "{{ nfs_defaults }}"
+        grep -q 'nfs_client_static_mount_opts | join' "{{ repo_root }}/roles/nfs_client/tasks/mounts.yml"
       args:
         executable: /bin/bash
       changed_when: false
