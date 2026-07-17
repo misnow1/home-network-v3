@@ -8,6 +8,7 @@ hypervisor_libvirt_packages:
   - libvirt-daemon-system
   - libvirt-clients
   - virtinst
+  - virt-manager
   - bridge-utils
   - python3-libvirt
   - python3-lxml

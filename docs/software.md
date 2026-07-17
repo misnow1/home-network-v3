@@ -79,6 +79,7 @@ switching. Enable per host or group — production currently sets
 |---|---|
 | `qemu-kvm`, `libvirt-daemon-system`, `libvirt-clients` | KVM / libvirt |
 | `virtinst` | `virt-install` VM creation |
+| `virt-manager` | Desktop GUI for domain management (e.g. Windows guests on kvm01) |
 | `bridge-utils` | Bridge networking |
 | `python3-libvirt` | libvirt Python bindings |
 | `virt-top` | Live domain resource usage |
