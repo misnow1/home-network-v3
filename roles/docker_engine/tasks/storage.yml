@@ -6,6 +6,7 @@
     fail_msg: >-
       docker_engine_data_volumes is set but docker_engine_volume_group is empty.
       Set docker_engine_volume_group in host_vars for this workload host.
+  tags: [docker_engine_storage]
 
 - name: Docker engine storage | Assert each volume declares a size
   ansible.builtin.assert:
@@ -18,6 +19,7 @@
   loop: "{{ docker_engine_data_volumes }}"
   loop_control:
     label: "{{ item.lv | default('?') }}"
+  tags: [docker_engine_storage]
 
 - name: Docker engine storage | Install lvm2
   ansible.builtin.apt:
@@ -59,8 +61,10 @@
 - name: Docker engine storage | Assert mounts are active before Docker starts
   ansible.builtin.command:
     argv:
+      # --mountpoint (exact): --target would pass on an unmounted path by matching
+      # an ancestor mount, giving false confidence the LV is mounted.
       - findmnt
-      - --target
+      - --mountpoint
       - "{{ item.mount }}"
   loop: "{{ docker_engine_data_volumes }}"
   loop_control:

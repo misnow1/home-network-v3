@@ -8,6 +8,7 @@ hypervisor_libvirt_packages:
   - libvirt-daemon-system
   - libvirt-clients
   - virtinst
+  - virt-manager
   - bridge-utils
   - python3-libvirt
   - python3-lxml
@@ -26,7 +27,12 @@ hypervisor_libvirt_uri: qemu:///system
 hypervisor_libvirt_volume_group: ""
 hypervisor_libvirt_data_volumes: []
 hypervisor_libvirt_data_volume_fstype: xfs
-hypervisor_libvirt_data_volume_opts: "defaults 0 2"
+# fstab fields 4/5/6 (options, dump, passno) are passed separately to
+# ansible.posix.mount — opts must NOT embed dump/passno or the module escapes the
+# spaces (\040), producing an invalid options field that fails to mount at boot.
+hypervisor_libvirt_data_volume_opts: defaults
+hypervisor_libvirt_data_volume_dump: "0"
+hypervisor_libvirt_data_volume_passno: "2"
 
 # Host netplan (production hypervisors — disabled by default for lab nested VMs).
 hypervisor_netplan_enabled: false
@@ -38,6 +44,11 @@ hypervisor_netplan_vlans: []
 hypervisor_netplan_bridges: {}
 # Production br0/br3 use hypervisor_netplan_uplink when interfaces are omitted:
 #   br0 -> [uplink] with dhcp4: true; br3 -> [uplink.3] with no address.
+# Pin br0's MAC to the uplink NIC (per host) so the DHCP reservation keeps the same
+# IP after the uplink is enslaved into br0. Empty = let networkd derive br0's MAC.
+# Set in host_vars: `ip link show <uplink>` -> link/ether. Overridden by an explicit
+# `macaddress` in hypervisor_netplan_bridges.br0.
+hypervisor_netplan_br0_macaddress: ""
 
 # Libvirt bridge networks — set per environment (empty for lab nested hv01).
 hypervisor_libvirt_networks: []

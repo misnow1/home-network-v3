@@ -4,6 +4,11 @@
   register: hypervisor_bridge_check
   changed_when: false
   failed_when: hypervisor_bridge_check.rc != 0
+  # Bridges are created by netplan (applied via flush_handlers before this task);
+  # allow a few seconds for the device to appear, especially VLAN-backed br3.
+  retries: 6
+  delay: 5
+  until: hypervisor_bridge_check.rc == 0
   loop: "{{ hypervisor_libvirt_networks }}"
   loop_control:
     label: "{{ item.name }} -> {{ item.bridge }}"

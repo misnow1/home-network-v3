@@ -1,9 +1,4 @@
 ---
-- name: Apply netplan
-  ansible.builtin.command: netplan apply
-  listen: apply netplan
-  when: not ansible_check_mode
-
 - name: Restart libvirtd
   ansible.builtin.service:
     name: "{{ hypervisor_libvirt_service }}"

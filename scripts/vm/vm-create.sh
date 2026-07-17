@@ -28,6 +28,7 @@ DRY_RUN=0
 PREPARE=0
 WAIT_RESERVATION=0
 FORCE_BOOT=0
+AUTOSTART=1
 RESERVE_FQDN=""
 
 usage() {
@@ -57,6 +58,7 @@ Options:
   --prepare         Define VM with fixed MAC but do not start (reserved DHCP workflow)
   --wait-reservation  With --prepare, pause until Enter after creating router reservation
   --force-boot      Boot immediately even for production vm_use_dhcp inventory hosts
+  --no-autostart    Do not mark the VM to start on host boot (default: autostart on)
   -h, --help        Show this help
 
 Examples:
@@ -137,6 +139,10 @@ parse_args() {
         ;;
       --force-boot)
         FORCE_BOOT=1
+        shift
+        ;;
+      --no-autostart)
+        AUTOSTART=0
         shift
         ;;
       -h|--help)
@@ -340,6 +346,9 @@ create_vm() {
     else
       log_info "Prepare: VM ${vm_name} already defined — refreshing manifest"
     fi
+    if [[ "${AUTOSTART}" -eq 1 ]]; then
+      vm_set_autostart "${vm_name}"
+    fi
     vm_write_manifest "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
       "${disk_path}" "${seed_iso}" "${base_image}" "${domain_xml}" "${vm_mac}" "${manifest}"
     if [[ "${cloud_init_mode}" == "dhcp" && -n "${RESERVE_FQDN}" ]]; then
@@ -368,6 +377,9 @@ create_vm() {
     log_info "Creating VM ${vm_name} (${fqdn} @ ${vm_ip})"
   fi
   virt-install "${virt_argv[@]}"
+  if [[ "${AUTOSTART}" -eq 1 ]]; then
+    vm_set_autostart "${vm_name}"
+  fi
   vm_write_manifest "${vm_name}" "${fqdn}" "${vm_ip}" "${cloud_init_mode}" \
     "${disk_path}" "${seed_iso}" "${base_image}" "" "${vm_mac}" "${manifest}"
   log_info "VM ${vm_name} created"

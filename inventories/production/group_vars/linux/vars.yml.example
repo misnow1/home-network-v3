@@ -1,13 +1,16 @@
 ---
 # Linux member defaults — copy to vars.yml and customize.
 #
-# Point domain_join_dns_servers at dc1 (e.g. 192.168.1.10 for home.2123studios.com).
+# Most members use DHCP/systemd-resolved for DNS — leave domain_join_manage_resolv_conf
+# false (default). Set domain_join_manage_resolv_conf: true and domain_join_dns_servers
+# only when AD must be reached before normal resolver config exists (e.g. new DC build).
 
 linux_baseline_timezone: America/New_York
 
 domain_name: home.example
-domain_join_dns_servers:
-  - 203.0.113.10
+# domain_join_manage_resolv_conf: false
+# domain_join_dns_servers:
+#   - 203.0.113.10
 domain_member_allow_groups:
   - Domain Users
 

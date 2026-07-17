@@ -122,10 +122,9 @@ Uses `member01.lab.test` as a bastion subset after domain join.
 
 ## Deferred follow-up
 
-1. **SSH public keys** — AD `sshPublicKey` on user objects +
-   `AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys %u` (verify Samba AD schema on dc1)
+1. **SSH public keys** — [ad-ssh-public-keys.md](ad-ssh-public-keys.md) (`sshPublicKey` on users + `sss_ssh_authorizedkeys`; verify schema on dc1)
 2. **Package trimming** — optional `linux_baseline` minimal profile for jump hosts
-3. **NFS autofs** — not on bastion; internal hosts only (ROADMAP slice 15+)
+3. **NFS autofs** — hypervisors via `nfs-client.yml` when `nfs_client_enabled`; not on bastion — [nfs-client-runbook.md](nfs-client-runbook.md)
 
 ## Related docs
 

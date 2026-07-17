@@ -6,6 +6,7 @@
     fail_msg: >-
       hypervisor_libvirt_data_volumes is set but hypervisor_libvirt_volume_group is empty.
       Set hypervisor_libvirt_volume_group in host_vars for this hypervisor host.
+  tags: [hypervisor_storage]
 
 - name: Hypervisor libvirt storage | Assert each volume declares a size
   ansible.builtin.assert:
@@ -18,6 +19,7 @@
   loop: "{{ hypervisor_libvirt_data_volumes }}"
   loop_control:
     label: "{{ item.lv | default('?') }}"
+  tags: [hypervisor_storage]
 
 - name: Hypervisor libvirt storage | Install lvm2
   ansible.builtin.apt:
@@ -57,8 +59,10 @@
 - name: Hypervisor libvirt storage | Assert mounts are active before libvirt starts
   ansible.builtin.command:
     argv:
+      # --mountpoint (exact): --target would pass on an unmounted path by matching
+      # an ancestor mount, giving false confidence the LV is mounted.
       - findmnt
-      - --target
+      - --mountpoint
       - "{{ item.mount }}"
   loop: "{{ hypervisor_libvirt_data_volumes }}"
   loop_control:

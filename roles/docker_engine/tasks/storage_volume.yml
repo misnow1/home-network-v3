@@ -10,6 +10,7 @@
 - name: Docker engine storage | Set LV device path
   ansible.builtin.set_fact:
     _docker_lv_dev: "/dev/{{ docker_engine_volume_group }}/{{ volume.lv }}"
+  tags: [docker_engine_storage]
 
 - name: Docker engine storage | Resolve canonical LV device path
   ansible.builtin.command:
@@ -42,14 +43,17 @@
   when: _docker_lv_fstype.rc != 0
   tags: [docker_engine_storage]
 
-- name: Docker engine storage | Check whether mount path is already in use
+- name: Docker engine storage | Check whether the LV is already mounted at target
   ansible.builtin.command:
     argv:
+      # --mountpoint (exact) not --target: --target walks up to an ancestor mount,
+      # so an unmounted target falsely reports the root FS as its source (rc 0),
+      # which skips the fresh mount and fails the expected-LV assert below.
       - findmnt
       - -n
       - -o
       - SOURCE
-      - --target
+      - --mountpoint
       - "{{ volume.mount }}"
   register: _docker_mount_source
   failed_when: false
@@ -87,6 +91,8 @@
     src: "{{ _docker_lv_dev }}"
     fstype: "{{ volume.fstype | default(docker_engine_data_volume_fstype) }}"
     opts: "{{ volume.opts | default(docker_engine_data_volume_opts) }}"
+    dump: "{{ volume.dump | default(docker_engine_data_volume_dump) }}"
+    passno: "{{ volume.passno | default(docker_engine_data_volume_passno) }}"
     state: "{{ 'present' if _docker_mount_source.rc == 0 else 'mounted' }}"
   tags: [docker_engine_storage]
 

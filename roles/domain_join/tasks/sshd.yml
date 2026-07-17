@@ -1,0 +1,10 @@
+---
+- name: SSH | Deploy domain member sshd drop-in
+  ansible.builtin.template:
+    src: 10-domain-member-ssh.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-domain-member-ssh.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart ssh
+  tags: [domain_sshd]

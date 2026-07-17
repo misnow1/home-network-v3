@@ -66,6 +66,7 @@ or `dc-restore.yml` (offline backup) instead of step 2 — see
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind |
 | 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
+| 8n | `linux:!dc` (opt-in) | `nfs-client.yml` | After domain-join when `nfs_client_enabled` — [nfs-client-runbook.md](nfs-client-runbook.md) |
 | 9 | `bastion` | `bastion.yml` | Edge hardening (after domain-join) — [bastion-runbook.md](bastion-runbook.md) |
 | 10 | `ddns_clients` | `ddns-client.yml` | Optional GSS-TSIG update clients |
 
@@ -148,13 +149,19 @@ etc.) do **not** require `allow_production` — only the wrapper confirmation.
 
 ## DNS on members and file servers
 
-Domain members and file servers receive a static `/etc/resolv.conf` pointing at
-AD DNS (`domain_join_dns_servers` / `fileserver_dns_servers`). This replaces the
-systemd-resolved stub symlink and persists across reboots.
+**Domain join (sssd members):** By default the role does **not** touch
+`/etc/resolv.conf`. Hypervisors and other members that get AD DNS from DHCP
+(systemd-resolved) should keep `domain_join_manage_resolv_conf: false` (default).
 
-Netplan-managed or resolved-aware DNS for production is a future enhancement;
-until then, declare DC IPs in group/host vars and keep DCs reachable before join
-playbooks.
+Set `domain_join_manage_resolv_conf: true` and `domain_join_dns_servers` only when
+the host cannot resolve the domain yet (e.g. lab nested VMs, or bootstrap before a
+new DC is reachable on the LAN).
+
+**Samba file servers (winbind):** When `fileserver_manage_resolv_conf` is true and
+`fileserver_dns_servers` is set, the fileserver role may replace the resolved stub
+with a static `/etc/resolv.conf` pointing at AD DNS.
+
+Netplan-managed or resolved-aware DNS for production is a future enhancement.
 
 ## VM provisioning on kvm01
 
@@ -248,6 +255,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | DC | [dc-runbook.md](dc-runbook.md) |
 | AD migration | [migration-runbook.md](migration-runbook.md) |
 | Domain join | [domain-join-runbook.md](domain-join-runbook.md) |
+| AD user SSH keys | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |

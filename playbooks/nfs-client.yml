@@ -1,0 +1,13 @@
+---
+# Kerberos NFS client (autofs /home + optional /archive, /media).
+# Run baseline.yml and domain-join.yml first — krb5 mounts need AD + rpc-gssd.
+#
+# Enable per host/group: nfs_client_enabled: true
+# Hypervisors: see inventories/production/group_vars/hypervisors/vars.yml.example
+
+- name: Configure NFS clients
+  hosts: "linux:!dc"
+  become: true
+  roles:
+    - role: nfs_client
+      when: nfs_client_enabled | default(false) | bool

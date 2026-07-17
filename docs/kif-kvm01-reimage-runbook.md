@@ -257,6 +257,27 @@ Uplink and optional NICs are set in
 
 ## Phase 3b — Parallel Ubuntu install (kvm01, same NVMe)
 
+### Autoinstall USB (recommended)
+
+Automates **ansible** user, **prod SSH key**, and **sudo**; **storage is manual** in the
+installer UI so **`cs/libvirt` is never formatted**.
+
+```bash
+./scripts/vm/keys-ensure.sh -i production
+# Mount VFAT partition labeled CIDATA on the installer USB:
+./scripts/reimage/ubuntu-autoinstall/build-user-data.sh \
+  --profile kvm01 --hostname kvm01 \
+  --libvirt-uuid d1b341d8-01bd-4ecb-8545-8bc441826a59 \
+  -o /mnt/CIDATA
+```
+
+See [scripts/reimage/ubuntu-autoinstall/README.md](../scripts/reimage/ubuntu-autoinstall/README.md).
+Boot Server ISO + CIDATA; at **storage**, format **`cs/ubuntu-root`** only; leave
+**`cs/libvirt`** unformatted (mount `/var/lib/libvirt` without format if desired).
+Reboot manually when install completes.
+
+### Manual installer (fallback)
+
 **Installer rules (USB media on `sda`):**
 
 - Hostname: **`kvm01.home.2123studios.com`**
@@ -321,6 +342,17 @@ paths are no longer required when `hypervisor_libvirt_data_volumes` and
 **kif pre-converge:** remove stale netplan drop-ins (especially any file enabling `dhcp4`
 on the uplink NIC). The hypervisor role deploys `/etc/netplan/01-hypervisor.yaml` only.
 
+**kif Kerberos NFS server (manual until slice 15+):** required before kvm01 (or any
+client) can mount with `sec=krb5i`. Restored `/etc/krb5.conf` from archive may
+reference `includedir /etc/krb5.conf.d/` — create that directory on Ubuntu or
+`klist` and `rpc-svcgssd` fail. Register **`nfs/` SPNs on `KIF$` in AD** (not only
+`net ads keytab add nfs`). From any domain-joined host, `kvno nfs/kif.home.2123studios.com`
+must succeed. See [nfs-client-runbook.md](nfs-client-runbook.md) (access denied).
+Restore **`/etc/exports`** from archive if needed; do **not** restore
+`/var/lib/nfs/etab` or other `/var/lib/nfs` state from the old OS — rebuild exports
+with `exportfs -rav` on Ubuntu. Optional stable `fsid=` per export helps across
+reboots.
+
 **kif libvirt:** kif is in the `hypervisors` group — run `hypervisor.yml` directly.
 `fileserver.yml` also includes the hypervisor role when `hypervisor_libvirt_enabled`
 (from `group_vars/hypervisors`). The role defines `external-default` and `vlan3`
@@ -330,6 +362,7 @@ but does **not** remove legacy `public-bridge` — migrate attached VMs manually
 PROD='./scripts/prod-run.sh --confirm-production --'
 ${PROD} playbooks/baseline.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/domain-join.yml --limit kvm01.home.2123studios.com
+${PROD} playbooks/nfs-client.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/hypervisor.yml --limit kvm01.home.2123studios.com
 ${PROD} playbooks/backup.yml --limit kvm01.home.2123studios.com
 

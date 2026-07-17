@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+#
+# Per-user homedir mounts — local service accounts (e.g. ansible in /var/lib/ansible) are not under {{ nfs_client_homedir_map }}.
+
+*	-fstype=nfs4,rw,soft,timeo={{ nfs_client_soft_timeo }},retrans={{ nfs_client_soft_retrans }},sec={{ nfs_client_sec }},nfsvers={{ nfs_client_nfsvers }}	{{ nfs_client_server }}:{{ nfs_client_homedir_remote_prefix }}/&

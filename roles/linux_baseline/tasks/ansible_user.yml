@@ -1,0 +1,18 @@
+---
+- name: Baseline | Read ansible user passwd entry
+  ansible.builtin.command: "getent passwd {{ linux_baseline_ansible_user_name }}"
+  register: linux_baseline_ansible_getent
+  changed_when: false
+  failed_when: false
+  when: linux_baseline_ansible_user_enabled | bool
+
+- name: Baseline | Relocate ansible user home to local path
+  ansible.builtin.user:
+    name: "{{ linux_baseline_ansible_user_name }}"
+    home: "{{ linux_baseline_ansible_user_home }}"
+    move_home: true
+  when:
+    - linux_baseline_ansible_user_enabled | bool
+    - linux_baseline_ansible_getent.rc == 0
+    - (linux_baseline_ansible_getent.stdout.split(':')[5] | default('')) != linux_baseline_ansible_user_home
+  tags: [ansible_user]

@@ -12,6 +12,12 @@ hypervisor_libvirt_users:
   - ansible
   - misnow1
 
+# Kerberos NFS from kif — run playbooks/nfs-client.yml after domain-join.yml.
+nfs_client_enabled: true
+
+# SSH for AD users with NFS homedirs (GSSAPI + AD pubkey; password for VPN without client kinit).
+domain_member_sshd_enabled: true
+
 hypervisor_libvirt_networks:
   - name: external-default
     bridge: br0

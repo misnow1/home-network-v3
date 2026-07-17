@@ -2,6 +2,11 @@
 # IANA timezone (e.g. America/New_York). Override in group_vars when needed.
 linux_baseline_timezone: UTC
 
+# Local ansible SSH user — keep off NFS autofs /home (hypervisors, reimaged hosts).
+linux_baseline_ansible_user_enabled: true
+linux_baseline_ansible_user_name: ansible
+linux_baseline_ansible_user_home: /var/lib/ansible
+
 # NTP servers for chrony — override in group_vars when needed.
 chrony_ntp_servers:
   - 0.pool.ntp.org

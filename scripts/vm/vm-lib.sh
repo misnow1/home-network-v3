@@ -251,12 +251,18 @@ vm_write_install_artifacts() {
   local install_sh="${bundle_dir}/install.sh"
   local domain_xml="${bundle_dir}/domain.xml"
   local manifest="${bundle_dir}/manifest.txt"
-  local quoted_cmd nested_cpu=""
+  local quoted_cmd nested_cpu="" autostart_line=""
   quoted_cmd="$(vm_quote_args virt-install "${virt_argv[@]}")"
   if [[ "${nested_virt}" -eq 1 ]]; then
     nested_cpu=$'  --noautoconsole \\\n  --cpu host-passthrough'
   else
     nested_cpu='  --noautoconsole'
+  fi
+  if [[ "${AUTOSTART:-1}" -eq 1 ]]; then
+    # LIBVIRT_DEFAULT_URI stays literal — it is expanded when install.sh runs, not now.
+    # shellcheck disable=SC2016
+    autostart_line=$(printf 'virsh --connect "${LIBVIRT_DEFAULT_URI}" autostart "%s"' "${vm_name}")
+    nested_cpu="${nested_cpu} \\"$'\n'"  --autostart"
   fi
 
   if command -v virt-install >/dev/null 2>&1; then
@@ -301,6 +307,7 @@ fi
 
 if [[ -f "\${DOMAIN_XML}" ]]; then
   virsh --connect "\${LIBVIRT_DEFAULT_URI}" define "\${DOMAIN_XML}"
+  ${autostart_line}
   virsh --connect "\${LIBVIRT_DEFAULT_URI}" start "${vm_name}"
   exit 0
 fi
@@ -362,6 +369,16 @@ NOTES
 
   log_info "Wrote ${install_sh}"
   log_info "Wrote ${manifest}"
+}
+
+vm_set_autostart() {
+  local vm_name="$1"
+  require_cmd virsh
+  if virsh autostart "${vm_name}" >/dev/null; then
+    log_info "Marked VM ${vm_name} for autostart on host boot"
+  else
+    log_warn "Failed to mark VM ${vm_name} for autostart"
+  fi
 }
 
 vm_define_domain_from_virt_install() {

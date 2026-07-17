@@ -2,6 +2,8 @@
 domain_name: lab.test
 domain_join_dns_servers:
   - 192.168.100.10
+# Lab VMs have no production-style DHCP AD DNS; pin resolv.conf at join time.
+domain_join_manage_resolv_conf: true
 domain_member_allow_groups:
   - Domain Users
 
