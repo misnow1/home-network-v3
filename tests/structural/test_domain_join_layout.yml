@@ -57,3 +57,11 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Domain join | assert resolv.conf task is opt-in
+      ansible.builtin.shell: |
+        grep -q 'domain_join_manage_resolv_conf' "{{ repo_root }}/roles/domain_join/tasks/join.yml"
+        grep -q 'domain_join_dns_servers | length' "{{ repo_root }}/roles/domain_join/tasks/join.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false

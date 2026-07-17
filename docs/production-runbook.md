@@ -149,13 +149,19 @@ etc.) do **not** require `allow_production` — only the wrapper confirmation.
 
 ## DNS on members and file servers
 
-Domain members and file servers receive a static `/etc/resolv.conf` pointing at
-AD DNS (`domain_join_dns_servers` / `fileserver_dns_servers`). This replaces the
-systemd-resolved stub symlink and persists across reboots.
+**Domain join (sssd members):** By default the role does **not** touch
+`/etc/resolv.conf`. Hypervisors and other members that get AD DNS from DHCP
+(systemd-resolved) should keep `domain_join_manage_resolv_conf: false` (default).
 
-Netplan-managed or resolved-aware DNS for production is a future enhancement;
-until then, declare DC IPs in group/host vars and keep DCs reachable before join
-playbooks.
+Set `domain_join_manage_resolv_conf: true` and `domain_join_dns_servers` only when
+the host cannot resolve the domain yet (e.g. lab nested VMs, or bootstrap before a
+new DC is reachable on the LAN).
+
+**Samba file servers (winbind):** When `fileserver_manage_resolv_conf` is true and
+`fileserver_dns_servers` is set, the fileserver role may replace the resolved stub
+with a static `/etc/resolv.conf` pointing at AD DNS.
+
+Netplan-managed or resolved-aware DNS for production is a future enhancement.
 
 ## VM provisioning on kvm01
 

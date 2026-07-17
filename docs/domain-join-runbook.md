@@ -55,9 +55,25 @@ See [sssd-config.md](sssd-config.md):
 ## Apply order
 
 1. `baseline.yml` — chrony before Kerberos
-2. `domain-join.yml` — packages, DNS, realm join, sssd.conf, mkhomedir
+2. `domain-join.yml` — packages, optional static resolv.conf (opt-in), realm join, sssd.conf, mkhomedir
 
 DC hosts (`dc` group) are excluded — they never run `domain_join`.
+
+## DNS / resolv.conf (opt-in)
+
+Default **`domain_join_manage_resolv_conf: false`** — the role does not replace
+`/etc/resolv.conf`. Use DHCP/systemd-resolved (e.g. production hypervisors on `br0`).
+
+Enable static AD nameservers only when the host cannot resolve the realm yet:
+
+```yaml
+domain_join_manage_resolv_conf: true
+domain_join_dns_servers:
+  - 192.168.1.10
+```
+
+Lab sets both in `inventories/lab/group_vars/linux/vars.yml`. Overwriting resolv.conf
+breaks the resolved stub symlink; do not enable on members that already reach AD via DHCP.
 
 Winbind is reserved for the Samba file server slice (Slice 5) on `nas01.lab.test`.
 

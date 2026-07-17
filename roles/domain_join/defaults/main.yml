@@ -3,6 +3,9 @@
 
 domain_name: lab.test
 domain_join_dns_servers: []
+# When true and domain_join_dns_servers is non-empty, replace /etc/resolv.conf with a
+# static file (breaks systemd-resolved stub). Default false — use DHCP/resolved on members.
+domain_join_manage_resolv_conf: false
 domain_member_allow_groups: []
 
 # AD groups granted password sudo (AD password via pam_sss). AD display names are
