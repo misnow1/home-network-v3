@@ -14,6 +14,11 @@ hypervisor_netplan_optional_nics:
   - enp7s0f3u5
   - wlp4s0
 
+# Pin br0 to the uplink MAC so the DHCP reservation keeps this host's IP after the
+# uplink is enslaved into br0 (otherwise networkd derives a new br0 MAC -> new IP and
+# the converge loses the host). Get it from `ip link show enp5s0` (link/ether).
+# hypervisor_netplan_br0_macaddress: "aa:bb:cc:dd:ee:ff"
+
 # Libvirt storage — whole /var/lib/libvirt on a dedicated LV. Do NOT reformat the
 # retained cs/libvirt filesystem; size is only used if the LV is missing.
 hypervisor_libvirt_volume_group: cs

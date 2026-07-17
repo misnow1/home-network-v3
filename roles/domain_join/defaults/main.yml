@@ -14,6 +14,15 @@ sssd_ldap_id_mapping: false
 sssd_use_fully_qualified_names: false
 sssd_fall_back_homedir: /home/%u
 
+# Opt-in sshd for members with Kerberized NFS homedirs (hypervisors, etc.).
+# Bastion uses roles/bastion (GSSAPI-only, no password). Do not enable both patterns blindly.
+domain_member_sshd_enabled: false
+domain_member_sshd_gssapi: true
+domain_member_sshd_authorized_keys_command: true
+domain_member_sshd_password_authentication: true
+domain_member_sshd_kbd_interactive: true
+domain_member_sshd_gssapi_strict_acceptor_check: false
+
 lab_test_user: labtest
 lab_test_user_uid: 10001
 lab_test_user_gid: 10001

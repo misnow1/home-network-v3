@@ -7,16 +7,17 @@
     group: root
     mode: "0755"
   loop: "{{ nfs_client_static_mounts }}"
+  # Only manage the local mountpoint before NFS is mounted on it. Once mounted,
+  # enforcing owner/group would chgrp the exported filesystem, which fails under
+  # the server's root_squash (client root -> nobody).
+  when: item.path not in (ansible_mounts | default([]) | map(attribute='mount') | list)
 
 - name: NFS client | Configure static NFS mounts (fstab + systemd automount)
   ansible.builtin.mount:
     path: "{{ item.path }}"
     src: "{{ nfs_client_server }}:{{ item.remote }}"
     fstype: nfs
-    opts: >-
-      rw,soft,timeo={{ nfs_client_soft_timeo }},retrans={{ nfs_client_soft_retrans }},
-      nfsvers={{ nfs_client_nfsvers }},sec={{ nfs_client_sec }},
-      _netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30s
+    opts: "{{ nfs_client_static_mount_opts | join(',') }}"
     dump: "0"
     passno: "0"
     state: mounted

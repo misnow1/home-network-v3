@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# Domain member SSH — GSSAPI and/or AD-backed pubkey (see domain-join-runbook.md).
+# File prefix 10- loads before 50-cloud-init*.conf; OpenSSH uses the first value per keyword.
+
+UsePAM yes
+{% if domain_member_sshd_gssapi | bool %}
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+GSSAPIStrictAcceptorCheck {{ domain_member_sshd_gssapi_strict_acceptor_check | ternary('yes', 'no') }}
+{% endif %}
+{% if domain_member_sshd_password_authentication | bool %}
+PasswordAuthentication yes
+{% endif %}
+{% if domain_member_sshd_kbd_interactive | bool %}
+KbdInteractiveAuthentication yes
+{% endif %}
+{% if domain_member_sshd_authorized_keys_command | bool %}
+AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys %u
+AuthorizedKeysCommandUser nobody
+{% endif %}

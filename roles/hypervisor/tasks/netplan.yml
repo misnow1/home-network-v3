@@ -33,6 +33,46 @@
     dest: "/etc/netplan/{{ hypervisor_netplan_config_file }}"
     owner: root
     group: root
-    mode: "0644"
-  notify: apply netplan
+    # 0600 — netplan warns "permissions too open" on world-readable configs.
+    mode: "0600"
+  register: hypervisor_netplan_deploy
+  tags: [hypervisor_netplan]
+
+- name: Netplan | Probe managed bridge devices
+  ansible.builtin.command: ip link show {{ item }}
+  loop: "{{ hypervisor_netplan_bridges.keys() | list }}"
+  register: hypervisor_netplan_bridge_probe
+  changed_when: false
+  failed_when: false
+  tags: [hypervisor_netplan]
+
+# Apply when the config changed OR a managed bridge is missing. The change-only
+# handler pattern silently skips hosts whose config is on disk but was never
+# applied (e.g. an earlier run failed before the handler flushed).
+- name: Netplan | Determine whether netplan apply is required
+  ansible.builtin.set_fact:
+    hypervisor_netplan_apply_needed: >-
+      {{ hypervisor_netplan_deploy is changed
+         or (hypervisor_netplan_bridge_probe.results
+             | selectattr('rc', 'ne', 0) | list | length > 0) }}
+  tags: [hypervisor_netplan]
+
+# async + poll:0 so an SSH reset while the uplink is reconfigured into br0 does
+# not fail the task; wait_for_connection re-establishes afterwards.
+- name: Netplan | Apply configuration
+  ansible.builtin.command: netplan apply
+  async: 60
+  poll: 0
+  when:
+    - hypervisor_netplan_apply_needed | bool
+    - not ansible_check_mode
+  tags: [hypervisor_netplan]
+
+- name: Netplan | Wait for host to return after netplan apply
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 180
+  when:
+    - hypervisor_netplan_apply_needed | bool
+    - not ansible_check_mode
   tags: [hypervisor_netplan]

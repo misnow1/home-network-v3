@@ -11,6 +11,11 @@
   ansible.builtin.include_tasks: configure.yml
   tags: [domain_configure]
 
+- name: Configure sshd for domain member login
+  ansible.builtin.include_tasks: sshd.yml
+  when: domain_member_sshd_enabled | bool
+  tags: [domain_sshd]
+
 - name: Configure sudo for domain groups
   ansible.builtin.include_tasks: sudo.yml
   tags: [domain_sudo]

@@ -88,7 +88,17 @@ only in `host_vars` for compose/workload hosts — never in `group_vars/dc` or
 | `docker_engine_volume_group` | `""` | LVM VG name (required when `data_volumes` set) |
 | `docker_engine_data_volumes` | `[]` | Opt-in mounts: `lv`, `mount`, `size` per entry |
 | `docker_engine_nvidia_runtime` | `auto` | `auto` / `true` / `false` — Container Toolkit |
-| `docker_engine_nvidia_install_driver` | `false` | Run `ubuntu-drivers install --gpgpu` (kvm01) |
+| `docker_engine_nvidia_install_driver` | `false` | Install GPU driver (kvm01); reboot if a new kernel was installed. Also pulls `nvidia-utils-<branch>-server` for `nvidia-smi` |
+| `docker_engine_nvidia_driver_package` | `""` | Pin an exact driver metapackage (e.g. `nvidia-headless-no-dkms-580-server-open`). Empty = auto via `ubuntu-drivers`, run only when no `-server` driver is installed |
+| `docker_engine_nvidia_auto_reboot` | `false` | When the driver needs a new kernel: `false` stops the play for a manual reboot; `true` reboots and continues |
+
+**Driver install idempotency:** `ubuntu-drivers install --recommended` is not
+idempotent when more than one `-server` branch is "recommended" — it flips branches
+on each run, reinstalling packages and requiring a reboot every time. The role only
+runs the auto installer when **no** NVIDIA `-server` driver is present. To force a
+specific branch (recommended when the host offers several), set
+`docker_engine_nvidia_driver_package` to the exact metapackage; it installs via apt
+and is fully idempotent.
 
 Workload hosts mount `/srv/docker` and `/var/lib/docker/volumes` from separate LVs before
 Docker starts. LVs are created only when missing; existing filesystems are never
@@ -99,6 +109,33 @@ Production bridge networks and netplan (including DHCP on br0 and DNS search dom
 br0 via `vm_dns_search`) are set in
 [`inventories/production/group_vars/hypervisors/`](../inventories/production/group_vars/hypervisors/vars.yml.example).
 Per-host `host_vars` set `hypervisor_netplan_uplink` and optional NICs only.
+
+### Netplan apply and bridge MAC / DHCP reservation
+
+`netplan.yml` deploys `/etc/netplan/{{ hypervisor_netplan_config_file }}` (mode `0600`),
+then applies it whenever the config **changed** or a managed bridge is **missing**
+(so a host whose config is on disk but was never applied still converges). The apply
+runs `async` with a following `wait_for_connection`, because enslaving the uplink into
+`br0` briefly resets SSH.
+
+**Keeping the host IP when first bridging the uplink:** `br0` takes a
+systemd-networkd-derived MAC by default, so the router's DHCP reservation (keyed to the
+raw uplink NIC's MAC) no longer matches and the host gets a **new IP** — the converge
+then loses the host at its `ansible_host`. Choose one:
+
+- **Pin br0's MAC to the uplink** (recommended) — set the uplink NIC's MAC per host so
+  the existing reservation still returns the same IP. Use the dedicated variable so you
+  do **not** have to redefine the shared `hypervisor_netplan_bridges` dict:
+
+  ```yaml
+  # host_vars/<host>/vars.yml  (per host — each uplink MAC differs)
+  hypervisor_netplan_br0_macaddress: "aa:bb:cc:dd:ee:ff"   # `ip link show enp5s0`
+  ```
+
+- **Or update the router reservation** to br0's new MAC after the first apply.
+
+If the host goes unreachable after the first `hypervisor.yml`, find its new lease on the
+router, update `ansible_host` (or fix the reservation/MAC), then re-run.
 
 ## Nested virtualization
 

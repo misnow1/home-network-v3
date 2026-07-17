@@ -48,3 +48,12 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Domain join | assert optional member sshd drop-in is wired
+      ansible.builtin.shell: |
+        grep -q 'domain_member_sshd_enabled' "{{ repo_root }}/roles/domain_join/tasks/main.yml"
+        grep -q '10-domain-member-ssh.conf.j2' "{{ repo_root }}/roles/domain_join/tasks/sshd.yml"
+        grep -q 'sss_ssh_authorizedkeys' "{{ repo_root }}/roles/domain_join/templates/10-domain-member-ssh.conf.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false

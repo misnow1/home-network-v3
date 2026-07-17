@@ -43,6 +43,11 @@ hypervisor_netplan_vlans: []
 hypervisor_netplan_bridges: {}
 # Production br0/br3 use hypervisor_netplan_uplink when interfaces are omitted:
 #   br0 -> [uplink] with dhcp4: true; br3 -> [uplink.3] with no address.
+# Pin br0's MAC to the uplink NIC (per host) so the DHCP reservation keeps the same
+# IP after the uplink is enslaved into br0. Empty = let networkd derive br0's MAC.
+# Set in host_vars: `ip link show <uplink>` -> link/ether. Overridden by an explicit
+# `macaddress` in hypervisor_netplan_bridges.br0.
+hypervisor_netplan_br0_macaddress: ""
 
 # Libvirt bridge networks — set per environment (empty for lab nested hv01).
 hypervisor_libvirt_networks: []

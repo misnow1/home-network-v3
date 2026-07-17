@@ -12,3 +12,10 @@
     state: restarted
   listen: restart postfix
   when: not ansible_check_mode
+
+- name: Restart ssh
+  ansible.builtin.service:
+    name: ssh
+    state: restarted
+  listen: restart ssh
+  when: not ansible_check_mode

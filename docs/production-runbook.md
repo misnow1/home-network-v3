@@ -249,6 +249,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | DC | [dc-runbook.md](dc-runbook.md) |
 | AD migration | [migration-runbook.md](migration-runbook.md) |
 | Domain join | [domain-join-runbook.md](domain-join-runbook.md) |
+| AD user SSH keys | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |

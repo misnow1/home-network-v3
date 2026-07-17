@@ -32,6 +32,10 @@ network:
 {% else %}
       interfaces: {{ bridge.interfaces | default([]) | to_json }}
 {% endif %}
+{% set _bridge_mac = bridge.macaddress | default(hypervisor_netplan_br0_macaddress if bridge_name == 'br0' else '', true) %}
+{% if _bridge_mac %}
+      macaddress: {{ _bridge_mac }}
+{% endif %}
 {% if bridge.addresses is defined and bridge.addresses | length > 0 %}
       addresses: {{ bridge.addresses | to_json }}
 {% endif %}

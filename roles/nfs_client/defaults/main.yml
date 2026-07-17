@@ -27,4 +27,16 @@ nfs_client_static_mounts:
     remote: /media
 
 # Boot: nofail + automount; access: soft (see docs/nfs-client-runbook.md).
-# Composed in tasks/templates from the variables above.
+# Joined with commas at mount time — keep as a list so no embedded spaces leak
+# into the option string (mount.nfs rejects options containing spaces).
+nfs_client_static_mount_opts:
+  - rw
+  - soft
+  - "timeo={{ nfs_client_soft_timeo }}"
+  - "retrans={{ nfs_client_soft_retrans }}"
+  - "nfsvers={{ nfs_client_nfsvers }}"
+  - "sec={{ nfs_client_sec }}"
+  - _netdev
+  - nofail
+  - x-systemd.automount
+  - x-systemd.mount-timeout=30s

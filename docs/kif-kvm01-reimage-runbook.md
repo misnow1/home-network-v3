@@ -342,6 +342,17 @@ paths are no longer required when `hypervisor_libvirt_data_volumes` and
 **kif pre-converge:** remove stale netplan drop-ins (especially any file enabling `dhcp4`
 on the uplink NIC). The hypervisor role deploys `/etc/netplan/01-hypervisor.yaml` only.
 
+**kif Kerberos NFS server (manual until slice 15+):** required before kvm01 (or any
+client) can mount with `sec=krb5i`. Restored `/etc/krb5.conf` from archive may
+reference `includedir /etc/krb5.conf.d/` — create that directory on Ubuntu or
+`klist` and `rpc-svcgssd` fail. Register **`nfs/` SPNs on `KIF$` in AD** (not only
+`net ads keytab add nfs`). From any domain-joined host, `kvno nfs/kif.home.2123studios.com`
+must succeed. See [nfs-client-runbook.md](nfs-client-runbook.md) (access denied).
+Restore **`/etc/exports`** from archive if needed; do **not** restore
+`/var/lib/nfs/etab` or other `/var/lib/nfs` state from the old OS — rebuild exports
+with `exportfs -rav` on Ubuntu. Optional stable `fsid=` per export helps across
+reboots.
+
 **kif libvirt:** kif is in the `hypervisors` group — run `hypervisor.yml` directly.
 `fileserver.yml` also includes the hypervisor role when `hypervisor_libvirt_enabled`
 (from `group_vars/hypervisors`). The role defines `external-default` and `vlan3`

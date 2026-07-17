@@ -31,13 +31,46 @@
     - docker_engine_nvidia_install_driver | bool
   tags: [docker_engine_nvidia]
 
-- name: Docker engine NVIDIA | Install proprietary GPU driver
+# `ubuntu-drivers install --recommended` is NOT idempotent when more than one
+# -server branch is "recommended": it flips to the other branch on each run,
+# reinstalling packages and flagging a reboot every time. Only run it when no
+# NVIDIA server driver is installed yet. Pin docker_engine_nvidia_driver_package
+# for a specific, fully idempotent branch.
+- name: Docker engine NVIDIA | Detect installed driver branch (pre-install)
+  ansible.builtin.shell: |
+    set -o pipefail
+    dpkg-query -W -f='${Package}\n' 2>/dev/null \
+      | grep -oE 'nvidia-(driver|headless(-no-dkms)?)-[0-9]+-server' \
+      | grep -oE '[0-9]+' | sort -un | tail -n1
+  args:
+    executable: /bin/bash
+  register: docker_engine_nvidia_installed_branch
+  changed_when: false
+  failed_when: false
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+  tags: [docker_engine_nvidia]
+
+- name: Docker engine NVIDIA | Install pinned GPU driver package
+  ansible.builtin.apt:
+    name: "{{ docker_engine_nvidia_driver_package }}"
+    state: present
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+    - docker_engine_nvidia_driver_package | length > 0
+  tags: [docker_engine_nvidia]
+
+# Auto path: only on first install (no branch present) to avoid the flapping above.
+# May install a newer kernel module; the reboot marker check below handles reboot.
+- name: Docker engine NVIDIA | Install recommended GPU driver (auto)
   ansible.builtin.command:
     argv:
       - ubuntu-drivers
       - install
       - --gpgpu
-      - --no-install-recommends
+      - --recommended
   register: docker_engine_nvidia_driver_install
   changed_when: >-
     'All the available drivers are already installed' not in
@@ -45,6 +78,83 @@
   when:
     - docker_engine_nvidia_active | default(false) | bool
     - docker_engine_nvidia_install_driver | bool
+    - docker_engine_nvidia_driver_package | length == 0
+    - docker_engine_nvidia_installed_branch.stdout | default('') | trim | length == 0
+  tags: [docker_engine_nvidia]
+
+# `ubuntu-drivers --gpgpu` installs the headless -server driver but NOT
+# nvidia-utils-<branch>-server, which provides nvidia-smi. Match the utils package
+# to the branch that is actually installed now (idempotent once present).
+- name: Docker engine NVIDIA | Detect installed driver branch (for utils)
+  ansible.builtin.shell: |
+    set -o pipefail
+    dpkg-query -W -f='${Package}\n' 2>/dev/null \
+      | grep -oE 'nvidia-(driver|headless(-no-dkms)?)-[0-9]+-server' \
+      | grep -oE '[0-9]+' | sort -un | tail -n1
+  args:
+    executable: /bin/bash
+  register: docker_engine_nvidia_branch
+  changed_when: false
+  failed_when: false
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+  tags: [docker_engine_nvidia]
+
+- name: Docker engine NVIDIA | Install nvidia-utils for nvidia-smi
+  ansible.builtin.apt:
+    name: "nvidia-utils-{{ docker_engine_nvidia_branch.stdout | trim }}-server"
+    state: present
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+    - docker_engine_nvidia_branch.stdout | default('') | trim | length > 0
+  tags: [docker_engine_nvidia]
+
+- name: Docker engine NVIDIA | Check for pending reboot marker
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: docker_engine_nvidia_reboot_marker
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+  tags: [docker_engine_nvidia]
+
+- name: Docker engine NVIDIA | Determine whether a reboot is required
+  ansible.builtin.set_fact:
+    docker_engine_nvidia_reboot_required: >-
+      {{ (docker_engine_nvidia_reboot_marker.stat.exists | default(false))
+         or ('not the expected kernel version'
+             in (docker_engine_nvidia_driver_install.stdout | default('')))
+         or ('consider rebooting'
+             in (docker_engine_nvidia_driver_install.stdout | default(''))) }}
+  when:
+    - docker_engine_nvidia_active | default(false) | bool
+    - docker_engine_nvidia_install_driver | bool
+  tags: [docker_engine_nvidia]
+
+- name: Docker engine NVIDIA | Reboot to load the new GPU driver kernel
+  ansible.builtin.reboot:
+    msg: Rebooting to load NVIDIA driver against the installed kernel
+    reboot_timeout: 600
+  when:
+    - docker_engine_nvidia_reboot_required | default(false) | bool
+    - docker_engine_nvidia_auto_reboot | bool
+    - not ansible_check_mode
+  tags: [docker_engine_nvidia]
+
+# Gate the remaining GPU tasks (toolkit, daemon.json) until the driver kernel is
+# running. Default is manual: fail with instructions so the operator reboots, then
+# re-runs. Set docker_engine_nvidia_auto_reboot: true to reboot automatically above.
+- name: Docker engine NVIDIA | Stop for manual reboot when required
+  ansible.builtin.fail:
+    msg: >-
+      NVIDIA driver install requires a reboot before continuing (running kernel
+      != installed kernel). Reboot {{ inventory_hostname }} and re-run this play.
+      Set docker_engine_nvidia_auto_reboot: true to reboot automatically.
+  when:
+    - docker_engine_nvidia_reboot_required | default(false) | bool
+    - not docker_engine_nvidia_auto_reboot | bool
   tags: [docker_engine_nvidia]
 
 - name: Docker engine NVIDIA | Install repository key

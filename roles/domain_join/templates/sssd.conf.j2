@@ -3,7 +3,7 @@
 [sssd]
 domains = {{ domain_name }}
 config_file_version = 2
-services = nss, pam
+services = nss, pam{% if domain_member_sshd_enabled | bool and domain_member_sshd_authorized_keys_command | bool %}, ssh{% endif %}
 
 [domain/{{ domain_name }}]
 id_provider = ad

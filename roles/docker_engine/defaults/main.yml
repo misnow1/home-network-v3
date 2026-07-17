@@ -47,6 +47,18 @@ docker_engine_nvidia_runtime: auto
 docker_engine_nvidia_install_driver: false
 docker_engine_nvidia_default_runtime: false
 
+# Auto driver install uses `ubuntu-drivers install --gpgpu --recommended` only when
+# no NVIDIA -server driver is present (it is not idempotent when multiple branches
+# are recommended). Pin a specific metapackage for deterministic, idempotent installs,
+# e.g. "nvidia-headless-no-dkms-580-server-open" or "nvidia-driver-580-server".
+docker_engine_nvidia_driver_package: ""
+
+# Installing the GPU driver can pull a newer HWE kernel; the toolkit and GPU
+# workloads need the driver loaded against the running kernel. When a reboot is
+# required, stop the play by default so the operator can reboot manually. Set true
+# to let Ansible reboot the host and continue.
+docker_engine_nvidia_auto_reboot: false
+
 docker_engine_nvidia_repo_key_url: >-
   https://nvidia.github.io/libnvidia-container/gpgkey
 # Maps ansible architecture to Debian multiarch name for the NVIDIA apt repo.

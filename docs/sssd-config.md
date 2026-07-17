@@ -25,3 +25,7 @@ Lab defaults live in `inventories/lab/group_vars/all/vars.yml` and are applied b
 
 Samba file servers (`nas01`) use **winbind** for NSS, PAM, and SMB — not sssd.
 See [fileserver-runbook.md](fileserver-runbook.md) (Slice 5).
+
+## SSH public keys in AD
+
+Per-user provisioning (not host join): [ad-ssh-public-keys.md](ad-ssh-public-keys.md).
