@@ -8,6 +8,9 @@
     path: /usr/local/bin/pihole
   register: pihole_cli
 
+- name: Pi-hole | Resolve upstream DNS from provider names
+  ansible.builtin.import_tasks: resolve_upstreams.yml
+
 - name: Pi-hole | Install via curl/basic-install (optional)
   ansible.builtin.import_tasks: install.yml
   when: pihole_install | bool
@@ -55,10 +58,16 @@
     that:
       - pihole_dc_servers | length > 0
       - pihole_upstream_dns | length > 0
-    fail_msg: Set pihole_dc_servers and pihole_upstream_dns in group_vars/pihole/vars.yml
+    fail_msg: >-
+      Set pihole_dc_servers and pihole_upstream_providers (or pihole_upstream_dns)
+      in group_vars/pihole/vars.yml
 
 - name: Pi-hole | Converge AD zone forwarding
   ansible.builtin.import_tasks: ad_forwarding.yml
+
+- name: Pi-hole | Converge FTL DNS query settings
+  ansible.builtin.import_tasks: ftl_dns.yml
+  tags: [pihole_ftl_dns]
 
 - name: Pi-hole | Converge upstream DNS
   ansible.builtin.import_tasks: upstream.yml
@@ -71,6 +80,11 @@
   ansible.builtin.import_tasks: ipv6.yml
   when: pihole_enable_ipv6 | bool
   tags: [pihole_ipv6]
+
+- name: Pi-hole | Converge web interface password
+  ansible.builtin.import_tasks: web_password.yml
+  when: pihole_manage_web_password | bool
+  tags: [pihole_web_password]
 
 - name: Pi-hole | Update blocklists (optional)
   ansible.builtin.command:

@@ -3,12 +3,29 @@
 
 pihole_enabled: true
 
-# Run curl/basic-install when Pi-hole is missing (Ubuntu repave workflow).
+# Run official installer when Pi-hole is missing (Ubuntu repave workflow).
+# Pre-seeds /etc/pihole/pihole.toml — do not use --unattended on v6; see
+# docs/pihole-runbook.md and discourse.pi-hole.net/t/unattended-installation-for-v6-x/78295
 pihole_install: false
+
+# Web UI / API password — vault_pihole_web_password in group_vars/all/vault.yml.
+pihole_manage_web_password: true
+pihole_web_password: "{{ vault_pihole_web_password | default('') }}"
+pihole_web_api_url: http://127.0.0.1/api/auth
 
 # IPv6 client DNS — requires host GUA + UniFi DHCPv6 RDNSS (see pihole-runbook.md).
 pihole_enable_ipv6: false
-pihole_listening_mode: LOCAL
+
+# FTL dns.* — see docs/pihole-runbook.md § DNS query handling.
+# UI "Never forward non-FQDN queries" OFF → domainNeeded false.
+# UI "Never forward reverse private" OFF → bogusPriv false (PTR → DC via server=/ zones).
+pihole_dns_domain_needed: false
+pihole_dns_bogus_priv: false
+
+# LOCAL rejects cross-VLAN sources (IoT 192.168.3.x → Pi-hole on 192.168.1.x).
+# SINGLE + interface accepts routed queries on the primary NIC only.
+pihole_listening_mode: SINGLE
+pihole_dns_interface: "{{ ansible_default_ipv4.interface | default('enp1s0') }}"
 
 # BIND DLZ domain controllers (production defaults — override in group_vars/pihole).
 pihole_dc_servers:
@@ -22,7 +39,9 @@ pihole_reverse_zones:
   - 1.168.192.in-addr.arpa
 
 # Public upstream — align with dc_dns_forwarders; never point at Pi-hole from DCs.
-pihole_upstream_dns: []  # configured in the UI
+# Prefer provider names (matches Settings → DNS checkboxes); raw IPs still supported.
+pihole_upstream_providers: []
+pihole_upstream_dns: []
 
 # Static local names migrated from UniFi Local DNS Records (optional).
 # Each item: { name: host.example.com, ip: 192.168.1.50 }

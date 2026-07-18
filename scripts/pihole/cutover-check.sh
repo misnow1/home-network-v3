@@ -66,6 +66,13 @@ check_pihole_ad_forward() {
     fail "${label}: dc1.${AD_DOMAIN} A via Pi-hole (got '${out:-empty}', want ${DC1})"
   fi
 
+  out="$(dig +time=2 +tries=1 "@${pihole_ip}" -x "${DC1}" +short 2>/dev/null | head -1 || true)"
+  if [[ -n "${out}" ]]; then
+    pass "${label}: forwards PTR for dc1"
+  else
+    fail "${label}: PTR for ${DC1} empty via Pi-hole (check bogusPriv and reverse zones)"
+  fi
+
   out="$(dig +time=2 +tries=1 "@${pihole_ip}" "_ldap._tcp.${AD_DOMAIN}" SRV +short 2>/dev/null | head -1 || true)"
   if [[ -n "${out}" ]]; then
     pass "${label}: resolves AD SRV via DC forward"
@@ -98,9 +105,8 @@ check_dc_authoritative() {
 }
 
 check_pihole_ipv6_listen() {
-  local pihole_v4="$1"
-  local label="$2"
-  local pihole_v6="${3:-}"
+  local label="$1"
+  local pihole_v6="${2:-}"
   local out
 
   if [[ -z "${pihole_v6}" ]]; then
@@ -178,8 +184,8 @@ main() {
   check_pihole_blocking "${PIHOLE2}" "pihole2"
 
   if [[ "${PHASE}" == "ipv6" ]]; then
-    check_pihole_ipv6_listen "${PIHOLE1}" "pihole1" "${PIHOLE1_V6:-}"
-    check_pihole_ipv6_listen "${PIHOLE2}" "pihole2" "${PIHOLE2_V6:-}"
+    check_pihole_ipv6_listen "pihole1" "${PIHOLE1_V6:-}"
+    check_pihole_ipv6_listen "pihole2" "${PIHOLE2_V6:-}"
     check_pihole_aaaa_forward "${PIHOLE1}" "pihole1"
     check_pihole_aaaa_forward "${PIHOLE2}" "pihole2"
     pass "manual: confirm UniFi DHCPv6 RDNSS is ${PIHOLE1} and ${PIHOLE2}"

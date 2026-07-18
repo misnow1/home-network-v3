@@ -1,0 +1,57 @@
+---
+# Pi-hole v6 upstream provider catalog — names and addresses must match the Web UI
+# (embedded in pihole-FTL) and automated install/basic-install.sh DNS_SERVERS.
+# IPv6 strings are canonical so Settings → DNS checkboxes stay in sync.
+pihole_upstream_provider_catalog:
+  "Google (ECS, DNSSEC)":
+    v4:
+      - 8.8.8.8
+      - 8.8.4.4
+    v6:
+      - 2001:4860:4860:0:0:0:0:8888
+      - 2001:4860:4860:0:0:0:0:8844
+  "OpenDNS (ECS, DNSSEC)":
+    v4:
+      - 208.67.222.222
+      - 208.67.220.220
+    v6:
+      - 2620:119:35::35
+      - 2620:119:53::53
+  Level3:
+    v4:
+      - 4.2.2.1
+      - 4.2.2.2
+    v6: []
+  Comodo:
+    v4:
+      - 8.26.56.26
+      - 8.20.247.20
+    v6: []
+  "Quad9 (filtered, DNSSEC)":
+    v4:
+      - 9.9.9.9
+      - 149.112.112.112
+    v6:
+      - 2620:fe::fe
+      - 2620:fe::9
+  "Quad9 (unfiltered, no DNSSEC)":
+    v4:
+      - 9.9.9.10
+      - 149.112.112.10
+    v6:
+      - 2620:fe::10
+      - 2620:fe::fe:10
+  "Quad9 (filtered, ECS, DNSSEC)":
+    v4:
+      - 9.9.9.11
+      - 149.112.112.11
+    v6:
+      - 2620:fe::11
+      - 2620:fe::fe:11
+  "Cloudflare (DNSSEC)":
+    v4:
+      - 1.1.1.1
+      - 1.0.0.1
+    v6:
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001

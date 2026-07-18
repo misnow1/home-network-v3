@@ -23,3 +23,5 @@ vm_subnet_prefix: 24
 vm_dns_servers:
   - 192.168.1.1
 vm_dns_search: home.2123studios.com
+
+vault_pihole_web_password: a-secure-password

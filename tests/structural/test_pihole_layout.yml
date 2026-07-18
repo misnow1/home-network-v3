@@ -49,6 +49,9 @@
       loop:
         - "{{ repo_root }}/roles/pihole/tasks/install.yml"
         - "{{ repo_root }}/roles/pihole/tasks/ipv6.yml"
+        - "{{ repo_root }}/roles/pihole/tasks/ftl_dns.yml"
+        - "{{ repo_root }}/roles/pihole/tasks/web_password.yml"
+        - "{{ repo_root }}/roles/pihole/templates/pihole-install.toml.j2"
 
     - name: Pi-hole | assert optional task files present
       ansible.builtin.assert:
@@ -58,6 +61,32 @@
       loop: "{{ pihole_optional_tasks.results }}"
       loop_control:
         label: "{{ item.item }}"
+
+    - name: Pi-hole | assert v6 install pre-seeds toml (no --unattended)
+      ansible.builtin.shell: |
+        grep -q 'pihole-install.toml.j2' "{{ repo_root }}/roles/pihole/tasks/install.yml"
+        ! grep -qE 'cmd:.*--unattended' "{{ repo_root }}/roles/pihole/tasks/install.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert FTL DNS policy tasks set domainNeeded and bogusPriv
+      ansible.builtin.shell: |
+        grep -q 'dns.domainNeeded' "{{ repo_root }}/roles/pihole/tasks/ftl_dns.yml"
+        grep -q 'dns.bogusPriv' "{{ repo_root }}/roles/pihole/tasks/ftl_dns.yml"
+        grep -q 'pihole_dns_bogus_priv' "{{ repo_root }}/roles/pihole/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert web password task uses vault and no_log
+      ansible.builtin.shell: |
+        grep -q 'vault_pihole_web_password' "{{ repo_root }}/roles/pihole/defaults/main.yml"
+        grep -q 'no_log: true' "{{ repo_root }}/roles/pihole/tasks/web_password.yml"
+        grep -q 'pihole setpassword' "{{ repo_root }}/roles/pihole/tasks/web_password.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Pi-hole | assert cutover script supports ipv6 phase
       ansible.builtin.shell: |

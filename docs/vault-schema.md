@@ -63,6 +63,7 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_nut_snmp_community_livingroom` | 21 | SNMP community for livingroomups (optional) | production only |
 | `vault_pushover_user_key` | 21 | Pushover user key for UPS notifications | production only |
 | `vault_pushover_api_token` | 21 | Pushover application API token | production only |
+| `vault_pihole_web_password` | 10+ | Pi-hole web UI / API password (both hosts) | production only |
 
 ## Recreate the lab vault
 

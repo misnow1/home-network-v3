@@ -1,0 +1,17 @@
+# {{ ansible_managed | default(true) }}
+# Minimal pre-seed for Pi-hole v6 non-interactive install.
+# Upstreams must be set or the installer opens the ncurses UI.
+# https://discourse.pi-hole.net/t/unattended-installation-for-v6-x/78295
+# https://discourse.pi-hole.net/t/does-pihole-v6-no-longer-supports-unattended-for-automated-install/81741
+
+[dns]
+  upstreams = [
+{% for upstream in pihole_upstream_dns %}
+    "{{ upstream }}"{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]
+  domainNeeded = false
+  bogusPriv = false
+
+[misc]
+  etc_dnsmasq_d = true
