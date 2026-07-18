@@ -1,0 +1,47 @@
+---
+# Pi-hole v6 install — pre-seed pihole.toml, then run the official installer.
+# Do not pass --unattended (broken/m unsupported without a seeded toml in v6).
+# Tagged pihole_install.
+- name: Pi-hole | Require upstream DNS before install
+  ansible.builtin.assert:
+    that:
+      - pihole_upstream_dns | length > 0
+    fail_msg: >-
+      Set pihole_upstream_providers (or pihole_upstream_dns) in group_vars/pihole/vars.yml
+      before pihole_install=true.
+
+- name: Pi-hole | Ensure config directory exists
+  ansible.builtin.file:
+    path: /etc/pihole
+    state: directory
+    mode: "0755"
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Pre-seed pihole.toml for non-interactive install
+  ansible.builtin.template:
+    src: pihole-install.toml.j2
+    dest: /etc/pihole/pihole.toml
+    mode: "0644"
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Download install script
+  ansible.builtin.get_url:
+    url: https://install.pi-hole.net
+    dest: /tmp/pihole-install.sh
+    mode: "0755"
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Run official basic install
+  ansible.builtin.command:
+    cmd: /tmp/pihole-install.sh
+  environment:
+    PIHOLE_SKIP_UPDATE_CHECK: "true"
+  register: pihole_install_cmd
+  changed_when: pihole_install_cmd.rc == 0
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Remove install script
+  ansible.builtin.file:
+    path: /tmp/pihole-install.sh
+    state: absent
+  when: not pihole_cli.stat.exists

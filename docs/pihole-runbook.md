@@ -27,13 +27,56 @@ UCG dnsmasq ──(dhcp-script only)──► DDNS API on dc1 ──► BIND
 
 ## Hosts
 
-| Host | IP | OS | Install | Notes |
+| Host | IP | Hypervisor | OS | Notes |
 |---|---|---|---|---|
-| pihole-1.home.2123studios.com | 192.168.1.18 | CentOS 9 | curl/basic-install | Repave to Ubuntu planned |
-| pihole-2.home.2123studios.com | 192.168.1.22 | Rocky 10.1 | curl/basic-install | Repave to Ubuntu planned |
+| pihole-1.home.2123studios.com | 192.168.1.18 | kif | Ubuntu 24.04 | Repave second (after pihole-2) |
+| pihole-2.home.2123studios.com | 192.168.1.22 | kvm01 | Ubuntu 24.04 | Repave first |
 
-Pi-hole hosts are **config-only Ansible** — not in the `linux` group. Do not run
-`baseline.yml` or other apt-only playbooks against them until repaved as Ubuntu.
+Hosts are in the `linux` and `pihole` inventory groups. SSH as `ansible` after
+`baseline.yml` + `domain-join.yml`. Pi-hole is installed by Ansible (`pihole_install:
+true`) during `pihole-converge.yml`.
+
+## Ubuntu repave (CentOS/Rocky → 24.04)
+
+Repave **pihole-2 first** (kvm01), then **pihole-1** (kif). One host stays up for
+client DNS during each cycle.
+
+Inventory needs `vm_name`, `vm_ip`, `vm_memory_mb`, `vm_disk_gb` (8 GB disk is
+sufficient). Run `vm-create` on the host hypervisor:
+
+```bash
+# On kvm01 — pihole-2 (do this host first)
+./scripts/vm/vm-destroy.sh -i production pihole-2.home.2123studios.com
+./scripts/vm/vm-create.sh -i production pihole-2.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production pihole-2.home.2123studios.com
+
+# On kif — pihole-1 (after pihole-2 is converged)
+./scripts/vm/vm-destroy.sh -i production pihole-1.home.2123studios.com
+./scripts/vm/vm-create.sh -i production pihole-1.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production pihole-1.home.2123studios.com
+```
+
+Post-repave converge (each host):
+
+```bash
+PROD='./scripts/prod-run.sh --confirm-production --'
+
+${PROD} playbooks/baseline.yml --limit pihole-2.home.2123studios.com
+${PROD} playbooks/domain-join.yml --limit pihole-2.home.2123studios.com
+${PROD} playbooks/nfs-client.yml --limit pihole-2.home.2123studios.com   # optional homedirs only
+${PROD} playbooks/pihole-converge.yml -e allow_production=true \
+  -e pihole_install=true --limit pihole-2.home.2123studios.com
+```
+
+`pihole_install=true` pre-seeds `/etc/pihole/pihole.toml` (with `dns.upstreams` and
+`misc.etc_dnsmasq_d`) then runs the official installer **without** `--unattended`.
+Pi-hole v6 treats an existing `pihole.toml` as pre-configured and skips the ncurses
+wizard — see [unattended installation for v6.x](https://discourse.pi-hole.net/t/unattended-installation-for-v6-x/78295).
+The `--unattended` flag is unreliable on v6 when `pihole.toml` is absent
+([thread](https://discourse.pi-hole.net/t/does-pihole-v6-no-longer-supports-unattended-for-automated-install/81741/2)).
+
+Repeat with `pihole-1` after pihole-2 validates. Cloud-init `ansible` user is used after
+domain-join (no `ansible.yml` root override).
 
 ## Discovery (before first converge)
 
@@ -60,6 +103,46 @@ grep -rh '^server=' /etc/dnsmasq.d/ 2>/dev/null || true
 Pi-hole v6 **ignores** `/etc/dnsmasq.d` until `misc.etc_dnsmasq_d` is enabled —
 the Ansible role sets this automatically.
 
+## DNS query handling (FTL vs Conditional Forwarding)
+
+Pi-hole v6 has two overlapping mechanisms. **Ansible uses dnsmasq
+`server=/` lines** (`05-ad-zones.conf`) for AD — not the Web UI **Conditional
+Forwarding** (`dns.revServers`).
+
+| Web UI / FTL setting | Ansible variable | Production value | Why |
+|---|---|---|---|
+| Never forward non-FQDN queries | `dns.domainNeeded` | `false` (OFF) | Short names can be resolved via AD forward zones |
+| Never forward reverse private | `dns.bogusPriv` | `false` (OFF) | PTR for RFC1918 must reach dc1/dc2 via `server=/…in-addr.arpa/` |
+| Conditional forwarding | `dns.revServers` | `[]` (disabled) | Replaced by `05-ad-zones.conf`; do not duplicate in UI |
+| Interface listening mode | `dns.listeningMode` | `SINGLE` | Accept IoT VLAN clients (192.168.3.x) routed to Pi-hole on 192.168.1.x |
+| Listen interface | `dns.interface` | primary NIC (`enp1s0`) | Used with `SINGLE` — not `ALL` (open resolver risk) |
+
+**Do not** enable Conditional Forwarding in the Web UI for each subnet. Instead,
+list every reverse zone hosted on the DCs in `pihole_reverse_zones` (match
+`samba_dc_reverse_zones` in `group_vars/dc/vars.yml`). Ansible emits one
+`server=/zone/dc` line per zone per DC, for example:
+
+| Subnet | Reverse zone |
+|---|---|
+| VLAN 1 `192.168.1.0/24` | `1.168.192.in-addr.arpa` |
+| VLAN 2 `192.168.3.0/24` | `3.168.192.in-addr.arpa` |
+| Remote Woodbine | `33.168.192.in-addr.arpa` (only if DC hosts the zone) |
+| Remote Swanhollow | `65.168.192.in-addr.arpa` (only if DC hosts the zone) |
+
+VLAN 3 (`192.168.5.0/24`) does not use Pi-hole — no zone entry required unless
+that changes.
+
+**Top Clients hostnames:** Pi-hole is not the DHCP server. Client names in the
+dashboard come from **PTR** (reverse zones above → DC) and **AD A/AAAA** records,
+not from `revServers`. UniFi client names still come from the dhcp-script hook on
+the UCG, not from Pi-hole DNS.
+
+**`LOCAL` vs `SINGLE`:** `LOCAL` only accepts queries from subnets that match a
+local interface address. IoT clients source `192.168.3.x` to Pi-hole at
+`192.168.1.18` — rejected under `LOCAL`. `SINGLE` listens on `enp1s0` and accepts
+any source routed to that NIC (still internal-only; do not use `ALL` on WAN-facing
+hosts).
+
 ## Prerequisites
 
 1. `dc-converge.yml` completed on dc1 and dc2 (BIND DLZ authoritative)
@@ -77,14 +160,14 @@ the Ansible role sets this automatically.
    # Add pihole hosts to inventories/production/hosts.yml
    ```
 
-4. SSH to both Pi-hole VMs — often **root** on curl-installed CentOS/Rocky:
+4. Web UI password in vault (`vault_pihole_web_password`) — see [vault-schema.md](vault-schema.md):
 
    ```bash
-   cp inventories/production/group_vars/pihole/ansible.yml.example \
-      inventories/production/group_vars/pihole/ansible.yml
+   ansible-vault edit inventories/production/group_vars/all/vault.yml \
+     --vault-password-file .vault_pass
    ```
 
-   Or set `ansible_user: root` on each host in `hosts.yml`.
+5. SSH to both Pi-hole VMs — cloud-init `ansible` user after Ubuntu repave.
 
 ## Ansible converge
 
@@ -99,9 +182,12 @@ ${PROD} playbooks/pihole-converge.yml -e allow_production=true
 | Item | Path / mechanism |
 |---|---|
 | AD zone forwarding | `/etc/dnsmasq.d/05-ad-zones.conf` + `misc.etc_dnsmasq_d=true` |
+| FTL query policy | `dns.domainNeeded=false`, `dns.bogusPriv=false`, `dns.revServers=[]` |
+| Listen mode | `dns.listeningMode=SINGLE`, `dns.interface` = primary NIC |
 | Upstream public DNS | `pihole-FTL --config dns.upstreams` |
 | Disable UI conditional forwarding | `dns.revServers=[]` |
 | Static local names (optional) | `/etc/pihole/custom.list` from `pihole_local_dns_records` |
+| Web UI / API password | `pihole setpassword` when `vault_pihole_web_password` differs (API check) |
 | Reload | `pihole reloaddns` handler |
 
 Optional blocklist refresh:
@@ -205,12 +291,26 @@ directly to dc1/dc2.
 
 No changes — stays on router/public DNS; not in `dc_trusted_networks`.
 
-## IPv6 (phase 2)
+## IPv6
 
-1. Enable Pi-hole IPv6 listening in Web UI or `pihole.toml` when ready
-2. UniFi DHCPv6 RDNSS → Pi-hole addresses if supported; else temporary dc1/dc2 for v6
-3. Extend `pihole_reverse_zones` for ip6.arpa if client AAAA DDNS is in use
-4. Re-run converge and validate `dig AAAA` through Pi-hole
+Ansible sets `resolver.resolveIPv6` when `pihole_enable_ipv6: true` in
+`group_vars/pihole/vars.yml`. Listening mode is set by `ftl_dns.yml` (not IPv6-only).
+Upstream resolvers and `ip6.arpa` reverse zones are already configured.
+
+**Prerequisite:** hosts need GUA addresses (ISP prefix delegation). When PD is broken,
+`cutover-check.sh --phase ipv6` warns that no AAAA exists in AD — that is expected
+until leases renew with v6.
+
+When PD works:
+
+1. Confirm Pi-hole hosts receive GUA (DDNS or static AAAA on dc1)
+2. UniFi DHCPv6 **RDNSS** → `192.168.1.18` and `192.168.1.22` — see
+   [unifi-gateway-dns.md](unifi-gateway-dns.md)
+3. Re-run `pihole-converge.yml` and validate:
+
+   ```bash
+   ./scripts/pihole/cutover-check.sh --phase ipv6
+   ```
 
 ## Remote sites
 
@@ -232,11 +332,15 @@ dc1/dc2 — see [remote-site-dns.md](remote-site-dns.md).
 | Pi-hole shows only dc1 IP as client | Clients still use DC as DNS | Fix DHCP option 6; remove DC secondary DNS |
 | Internal names NXDOMAIN | Static names still on router | Migrate to `pihole_local_dns_records` |
 | dnsmasq.d ignored | `misc.etc_dnsmasq_d=false` | Re-run converge; confirm `misc.etc_dnsmasq_d=true` |
-| Short names fail | non-FQDN forwarding disabled | Use FQDN `host.home.2123studios.com` |
+| Short names fail | `dns.domainNeeded=true` or missing AD forward | Re-run converge; use FQDN `host.home.2123studios.com` |
+| PTR / Top Clients show IPs only | `dns.bogusPriv=true` or missing reverse zone | Re-run converge; verify `pihole_reverse_zones` |
+| IoT VLAN DNS fails | `listeningMode=LOCAL` | Use `SINGLE` + primary interface (role default) |
 | DDNS broken | dhcp-script wrapper removed/changed | Restore [unifi-gateway-dns.md](unifi-gateway-dns.md) wrapper |
 
 ## Pi-hole Web UI notes
 
 - **Do not** enable Conditional Forwarding if it duplicates `05-ad-zones.conf`
-- Upstream DNS in UI should match `pihole_upstream_dns` (Ansible is source of truth)
+- Upstream DNS: set `pihole_upstream_providers` (e.g. `Cloudflare (DNSSEC)`,
+  `Google (ECS, DNSSEC)`) so Settings → DNS checkboxes stay checked; Ansible expands
+  to canonical addresses in `dns.upstreams`
 - Blocklists apply to non-forwarded queries; AD zones pass through to DCs

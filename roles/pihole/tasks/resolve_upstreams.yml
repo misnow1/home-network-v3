@@ -1,0 +1,32 @@
+---
+# Expand pihole_upstream_providers into dns.upstreams addresses (UI-checkbox canonical).
+- name: Pi-hole | Validate upstream provider names
+  ansible.builtin.assert:
+    that:
+      - item in pihole_upstream_provider_catalog
+    fail_msg: >-
+      Unknown pihole_upstream_providers entry "{{ item }}". Names must match Pi-hole
+      Settings → DNS (see roles/pihole/vars/main.yml).
+  loop: "{{ pihole_upstream_providers }}"
+  when: pihole_upstream_providers | length > 0
+
+- name: Pi-hole | Initialize resolved upstream address list
+  ansible.builtin.set_fact:
+    _pihole_upstream_dns_resolved: []
+  when: pihole_upstream_providers | length > 0
+
+- name: Pi-hole | Collect addresses for each upstream provider
+  ansible.builtin.set_fact:
+    _pihole_upstream_dns_resolved: >-
+      {{
+        _pihole_upstream_dns_resolved
+        + (pihole_upstream_provider_catalog[item].v4 | default([]))
+        + (pihole_upstream_provider_catalog[item].v6 | default([]))
+      }}
+  loop: "{{ pihole_upstream_providers }}"
+  when: pihole_upstream_providers | length > 0
+
+- name: Pi-hole | Apply resolved upstream addresses
+  ansible.builtin.set_fact:
+    pihole_upstream_dns: "{{ _pihole_upstream_dns_resolved | unique }}"
+  when: pihole_upstream_providers | length > 0

@@ -7,7 +7,10 @@
 # Post-cutover (after UniFi DHCP DNS → Pi-hole, router forwarders retired):
 #   ./scripts/pihole/cutover-check.sh --phase post
 #
-# Environment overrides: PIHOLE1, PIHOOLE2, DC1, DC2, AD_DOMAIN, ROUTER
+# IPv6 (after Pi-hole IPv6 listening + UniFi DHCPv6 RDNSS):
+#   ./scripts/pihole/cutover-check.sh --phase ipv6
+#
+# Environment overrides: PIHOLE1, PIHOLE2, DC1, DC2, AD_DOMAIN, ROUTER
 set -euo pipefail
 
 PHASE=""
@@ -34,8 +37,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "${PHASE}" == "pre" || "${PHASE}" == "post" ]] || {
-  echo "--phase pre|post is required" >&2
+[[ "${PHASE}" == "pre" || "${PHASE}" == "post" || "${PHASE}" == "ipv6" ]] || {
+  echo "--phase pre|post|ipv6 is required" >&2
   usage
   exit 2
 }
@@ -61,6 +64,13 @@ check_pihole_ad_forward() {
     pass "${label}: forwards AD A record for dc1"
   else
     fail "${label}: dc1.${AD_DOMAIN} A via Pi-hole (got '${out:-empty}', want ${DC1})"
+  fi
+
+  out="$(dig +time=2 +tries=1 "@${pihole_ip}" -x "${DC1}" +short 2>/dev/null | head -1 || true)"
+  if [[ -n "${out}" ]]; then
+    pass "${label}: forwards PTR for dc1"
+  else
+    fail "${label}: PTR for ${DC1} empty via Pi-hole (check bogusPriv and reverse zones)"
   fi
 
   out="$(dig +time=2 +tries=1 "@${pihole_ip}" "_ldap._tcp.${AD_DOMAIN}" SRV +short 2>/dev/null | head -1 || true)"
@@ -91,6 +101,50 @@ check_dc_authoritative() {
     pass "dc1 authoritative SOA for ${AD_DOMAIN}"
   else
     fail "dc1 SOA for ${AD_DOMAIN} empty"
+  fi
+}
+
+check_pihole_ipv6_listen() {
+  local label="$1"
+  local pihole_v6="${2:-}"
+  local out
+
+  if [[ -z "${pihole_v6}" ]]; then
+    pihole_v6="$(dig +time=2 +tries=1 "@${DC1}" "pihole-1.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+    if [[ "${label}" == "pihole2" ]]; then
+      pihole_v6="$(dig +time=2 +tries=1 "@${DC1}" "pihole-2.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+    fi
+  fi
+
+  if [[ -z "${pihole_v6}" ]]; then
+    warn "${label}: no AAAA in AD — skip IPv6 listen test (assign GUA + DDNS first)"
+    return 0
+  fi
+
+  out="$(dig +time=2 +tries=1 -6 "@${pihole_v6}" "${AD_DOMAIN}" SOA +short 2>/dev/null | head -1 || true)"
+  if [[ -n "${out}" ]]; then
+    pass "${label}: responds to DNS over IPv6 (${pihole_v6})"
+  else
+    fail "${label}: no SOA via IPv6 at ${pihole_v6}"
+  fi
+}
+
+check_pihole_aaaa_forward() {
+  local pihole_ip="$1"
+  local label="$2"
+  local dc_aaaa pihole_aaaa
+
+  dc_aaaa="$(dig +time=2 +tries=1 "@${DC1}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+  if [[ -z "${dc_aaaa}" ]]; then
+    warn "dc1 has no AAAA — skip AAAA forward test for ${label}"
+    return 0
+  fi
+
+  pihole_aaaa="$(dig +time=2 +tries=1 "@${pihole_ip}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+  if [[ "${pihole_aaaa}" == "${dc_aaaa}" ]]; then
+    pass "${label}: forwards AD AAAA for dc1"
+  else
+    fail "${label}: dc1.${AD_DOMAIN} AAAA via Pi-hole (got '${pihole_aaaa:-empty}', want ${dc_aaaa})"
   fi
 }
 
@@ -128,6 +182,14 @@ main() {
   check_pihole_ad_forward "${PIHOLE2}" "pihole2"
   check_pihole_blocking "${PIHOLE1}" "pihole1"
   check_pihole_blocking "${PIHOLE2}" "pihole2"
+
+  if [[ "${PHASE}" == "ipv6" ]]; then
+    check_pihole_ipv6_listen "pihole1" "${PIHOLE1_V6:-}"
+    check_pihole_ipv6_listen "pihole2" "${PIHOLE2_V6:-}"
+    check_pihole_aaaa_forward "${PIHOLE1}" "pihole1"
+    check_pihole_aaaa_forward "${PIHOLE2}" "pihole2"
+    pass "manual: confirm UniFi DHCPv6 RDNSS is ${PIHOLE1} and ${PIHOLE2}"
+  fi
 
   if [[ "${PHASE}" == "post" ]]; then
     check_router_not_forwarding_ad

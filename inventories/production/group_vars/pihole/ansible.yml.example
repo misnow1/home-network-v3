@@ -1,10 +1,9 @@
 ---
-# Pi-hole SSH — copy to ansible.yml (gitignored alongside vars.yml).
+# Pi-hole SSH — copy to ansible.yml only for pre-repave CentOS/Rocky (root-only).
 #
 #   cp inventories/production/group_vars/pihole/ansible.yml.example \
 #      inventories/production/group_vars/pihole/ansible.yml
 #
-# Curl-installed Pi-hole on CentOS/Rocky often has root SSH only until you add an
-# ansible user. Override per-host in hosts.yml if needed.
+# After Ubuntu repave + domain-join, delete ansible.yml — cloud-init ansible user is default.
 
-ansible_user: root
+# ansible_user: root

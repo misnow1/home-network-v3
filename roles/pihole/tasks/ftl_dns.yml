@@ -1,0 +1,58 @@
+---
+# Pi-hole FTL dns.* query handling — complements dnsmasq server=/ AD forwarding.
+- name: Pi-hole | Read dns.domainNeeded
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.domainNeeded
+  register: pihole_domain_needed_current
+  changed_when: false
+
+- name: Pi-hole | Set dns.domainNeeded
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.domainNeeded {{ pihole_dns_domain_needed | bool | lower }}
+  when: pihole_domain_needed_current.stdout | trim != (pihole_dns_domain_needed | bool | lower)
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read dns.bogusPriv
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.bogusPriv
+  register: pihole_bogus_priv_current
+  changed_when: false
+
+- name: Pi-hole | Set dns.bogusPriv
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.bogusPriv {{ pihole_dns_bogus_priv | bool | lower }}
+  when: pihole_bogus_priv_current.stdout | trim != (pihole_dns_bogus_priv | bool | lower)
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read dns.listeningMode
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.listeningMode
+  register: pihole_listening_mode_current
+  changed_when: false
+  when: pihole_listening_mode | length > 0
+
+- name: Pi-hole | Set dns.listeningMode
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.listeningMode "{{ pihole_listening_mode }}"
+  when:
+    - pihole_listening_mode | length > 0
+    - pihole_listening_mode_current.stdout | trim != pihole_listening_mode
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read dns.interface
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.interface
+  register: pihole_dns_interface_current
+  changed_when: false
+  when:
+    - pihole_listening_mode == 'SINGLE'
+    - pihole_dns_interface | length > 0
+
+- name: Pi-hole | Set dns.interface for SINGLE listening mode
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.interface "{{ pihole_dns_interface }}"
+  when:
+    - pihole_listening_mode == 'SINGLE'
+    - pihole_dns_interface | length > 0
+    - pihole_dns_interface_current.stdout | trim != pihole_dns_interface
+  notify: Pi-hole reloaddns

@@ -14,14 +14,36 @@ pihole_dc_servers:
 pihole_ad_domain: home.2123studios.com
 
 pihole_reverse_zones:
-  - 1.168.192.in-addr.arpa
-  # - 3.168.192.in-addr.arpa   # uncomment if IoT reverse zone exists on DCs
+  - 1.168.192.in-addr.arpa    # VLAN 1 — keep in sync with samba_dc_reverse_zones on DCs
+  - 3.168.192.in-addr.arpa    # VLAN 2 (IoT)
+  # - 33.168.192.in-addr.arpa   # remote sites — if DC hosts the zone
+  # - 65.168.192.in-addr.arpa
+  # - f.8.6.c....ip6.arpa       # when IPv6 PD + AAAA DDNS active
 
-pihole_upstream_dns:
-  - 1.1.1.1
-  - 8.8.8.8
+# Provider names match Pi-hole Settings → DNS checkboxes.
+pihole_upstream_providers:
+  - Cloudflare (DNSSEC)
+  - Google (ECS, DNSSEC)
+# Or raw addresses (IPv6 must match UI canonical form for checkbox sync):
+# pihole_upstream_dns:
+#   - 1.1.1.1
+#   - 8.8.8.8
 
-# Migrate UniFi Local DNS Records here before cutover (see docs/pihole-runbook.md).
-# pihole_local_dns_records:
-#   - name: printer.home.2123studios.com
-#     ip: 192.168.1.50
+# Static local names — audit UniFi Local DNS Records before cutover.
+# AD-registered names (mail, dc*, etc.) need not be listed here.
+pihole_local_dns_records: []
+
+# Host resolv.conf during domain join — use DCs, not Pi-hole loopback.
+domain_join_manage_resolv_conf: true
+domain_join_dns_servers:
+  - 192.168.1.10
+  - 192.168.1.11
+
+# Enable when Pi-hole hosts have GUA and UniFi DHCPv6 RDNSS points at them.
+pihole_enable_ipv6: false
+
+# Web UI password — set vault_pihole_web_password in group_vars/all/vault.yml.
+# pihole_manage_web_password: true
+
+nfs_client_enabled: true
+nfs_client_static_mounts: []   # skip default /archive and /media
