@@ -102,7 +102,7 @@ The `certbot` role issues one SAN certificate for all `certbot_domains` via DNS-
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
-PROXY=bastion.home.2123studios.com
+PROXY=shell-clt01.home.2123studios.com
 
 # Staging dry-run first (certbot_staging: true), then flip to false and re-issue.
 ${PROD} playbooks/certbot.yml --limit "${PROXY}" -e allow_production=true
@@ -134,14 +134,12 @@ The lab fixture uses loopback upstreams and a self-signed bootstrap certificate
 - [ ] Protected vhost redirects unauthenticated users to Authelia
 - [ ] Second `reverse-proxy.yml` run reports `changed=0`
 
-## Migration from bastion-el9
+## Migration from bastion-el9 (complete)
 
 The legacy CentOS `bastion-el9` ran this nginx layout by hand (per-vhost files under
 `/etc/nginx/conf.d/`, shared snippets, a single SAN cert via the certbot nginx plugin).
-The Ubuntu replacement (`bastion.home.2123studios.com`) reproduces it from
-`reverse_proxy_sites`, switching TLS issuance to DNS-01 (no port-80 dependency). Cut over
-by pointing the public DNS/port-forward at the new host once validation passes. See
-[migration-runbook.md](migration-runbook.md).
+Production reverse proxy runs on **shell-clt01.home.2123studios.com**, reproducing the
+layout from `reverse_proxy_sites` with DNS-01 TLS (no port-80 dependency).
 
 ## Related docs
 

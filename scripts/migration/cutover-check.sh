@@ -8,7 +8,7 @@
 #   ./scripts/migration/cutover-check.sh --phase post --remote dc1.home.2123studios.com
 #
 # Does not perform FSMO transfer, router changes, or demotion — read-only validation.
-# Manual steps: docs/migration-runbook.md Phase 1 Steps 5–8.
+# Manual steps: docs/ddns-runbook.md and docs/unifi-gateway-dns.md.
 set -euo pipefail
 
 PHASE=""
@@ -166,7 +166,7 @@ run_checks() {
 
   if [[ "${PHASE}" == "pre" ]]; then
     echo ""
-    echo "Pre-cutover manual steps (docs/migration-runbook.md):"
+    echo "Pre-cutover manual steps (docs/ddns-runbook.md, docs/unifi-gateway-dns.md):"
     echo "  1. ddns-api.yml on dc1 — docs/ddns-runbook.md"
     echo "  2. samba-tool fsmo transfer to ${DC_NETBIOS}"
     echo "  3. Router cutover — docs/unifi-gateway-dns.md"

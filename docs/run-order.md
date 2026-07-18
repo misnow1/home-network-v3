@@ -29,12 +29,13 @@ ansible-playbook -i inventories/cka playbooks/cka-converge.yml --limit cka-cp1
 
 ## Production runs
 
-See **[production-runbook.md](production-runbook.md)** for the full apply order and examples.
+**Canonical apply order:** [production-runbook.md](production-runbook.md)
 
-1. Copy `inventories/production/hosts.yml.example` to `inventories/production/hosts.yml`
-2. Copy `inventories/production/group_vars/*/vars.yml.example` files to `vars.yml` and customize
-3. Create `inventories/production/group_vars/all/vault.yml` with real secrets
-4. Use the production wrapper — never call `ansible-playbook -i inventories/production` directly:
+Quick start:
+
+1. Copy inventory templates — see [inventories/README.md](../inventories/README.md)
+2. Create `inventories/production/group_vars/all/vault.yml` with real secrets
+3. Use the production wrapper — never call `ansible-playbook -i inventories/production` directly:
 
 ```bash
 ./scripts/prod-run.sh --confirm-production -- playbooks/baseline.yml --limit nas.example.home
@@ -55,41 +56,18 @@ Playbooks that create or rebuild directory services (for example `dc-bootstrap.y
 Normal converge playbooks (baseline, hypervisor, etc.) may run against production via
 `scripts/prod-run.sh` without break-glass.
 
-## Apply order (production)
+## Apply order index
 
 ### Greenfield
 
-1. Time sync (chrony) — `baseline.yml` on all Linux hosts
-2. Domain controllers — `dc-bootstrap.yml` once, then `dc-converge.yml`
-3. Hypervisors — `hypervisor.yml`, then `backup.yml`
-4. File servers — `fileserver.yml`
-5. Domain members — `domain-join.yml` on `linux:!dc`
-6. Bastion — `bastion.yml` on `bastion` (after domain-join) — [bastion-runbook.md](bastion-runbook.md)
-7. DDNS clients — `ddns-client.yml` (optional)
-8. DDNS API — `ddns-api.yml` on DCs when dhcp-script integration is used
-9. Pi-hole — `pihole-converge.yml` on `pihole` hosts; manual UCG DHCP cutover — [pihole-runbook.md](pihole-runbook.md)
-10. Certbot TLS — `certbot.yml` on `certbot` hosts (DCs: Samba LDAPS; mail VM: Postfix) — [certbot-runbook.md](certbot-runbook.md)
-11. Mail relay — `mail-relay.yml` on mail VM after certbot ([mail-relay-runbook.md](mail-relay-runbook.md))
+See [production-runbook.md](production-runbook.md) § Apply order — steps 1–10 cover
+baseline → DC → hypervisors → fileservers → domain join → bastion → DDNS → Pi-hole →
+certbot → mail relay.
 
-### AD migration (existing Samba domain)
+### Additional DC replicas
 
-See **[migration-runbook.md](migration-runbook.md)** for the full procedure. Before dc1
-join, create AD sites on pdc — **[ad-sites.md](ad-sites.md)** (FerryCrossing, Woodbine,
-Swanhollow).
+Join new DCs to the existing domain with `dc-replica-join.yml` — see
+[dc-runbook.md](dc-runbook.md) and [ad-sites.md](ad-sites.md). Router/DHCP DNS
+cutover: [unifi-gateway-dns.md](unifi-gateway-dns.md).
 
-1. Pre-flight — `./scripts/migration/preflight-check.sh`
-2. Optional backup on old DC — manual `samba-tool domain backup` (safety net)
-3. **`dc-replica-join.yml`** on dc1 (preferred — live pdc required)
-4. `dc-converge.yml` → `ddns-api.yml` on dc1 ([ddns-runbook.md](ddns-runbook.md))
-5. `certbot.yml` on dc1 ([certbot-runbook.md](certbot-runbook.md))
-6. Mail relay VM — `baseline.yml` → `certbot.yml` → `mail-relay.yml`; `dc-converge.yml` for DNS ([mail-relay-runbook.md](mail-relay-runbook.md))
-7. Transfer FSMO roles — manual on dc1
-8. Router/DHCP DNS cutover — manual ([ddns-runbook.md](ddns-runbook.md), [unifi-gateway-dns.md](unifi-gateway-dns.md))
-9. CentOS deferred hosts — manual `/etc/resolv.conf` only
-10. Demote old pdc — manual (after mail relay cutover)
-11. Reprovisioned Ubuntu members — `baseline.yml` → `domain-join.yml` → `bastion.yml` (bastion hosts)
-12. Optional — `domain-leave.yml` before in-place reprovision
-
-Offline fallback when pdc is dead: **`dc-restore.yml`** (set `samba_dc_migration_mode: restore`).
-
-See [production-runbook.md](production-runbook.md) for command examples and slice runbooks.
+See [ROADMAP.md](ROADMAP.md) for active slices and deferred work.

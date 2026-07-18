@@ -13,8 +13,7 @@ tracking — it is not a DNS resolver for clients.
 See also:
 
 - [pihole-runbook.md](pihole-runbook.md) — Pi-hole forwarding, DHCP cutover, static DNS migration
-- [ddns-runbook.md](ddns-runbook.md) — DDNS API, bearer token, hook behaviour, migration timing
-- [migration-runbook.md](migration-runbook.md) — when router cutover fits in AD migration
+- [ddns-runbook.md](ddns-runbook.md) — DDNS API, bearer token, hook behaviour, cutover timing
 - [dns-architecture.md](dns-architecture.md) — BIND DLZ and DDNS pipeline
 
 ## Architecture change
@@ -339,9 +338,9 @@ If cutover must be reversed while pdc is still running:
    ```
 3. Re-enable legacy forwarding scripts if needed (restore from `.disabled` backups).
 4. Restore member `/etc/resolv.conf` to previous DNS servers.
-5. Transfer FSMO back to pdc if moved.
+5. Transfer FSMO back to the previous DC if moved.
 
-See [migration-runbook.md](migration-runbook.md) § Rollback for full context.
+See [dc-runbook.md](dc-runbook.md) for replica join rollback context. Legacy **pdc** is retired.
 
 ## Firmware updates
 

@@ -23,8 +23,6 @@
       - docs/ddns-runbook.md
       - docs/backup-runbook.md
       - docs/production-runbook.md
-      - docs/migration-runbook.md
-      - docs/kif-kvm01-reimage-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml

@@ -1,9 +1,9 @@
 ---
-# Samba AD DC migration — join fresh dc1 as a replica of the live domain.
+# Samba AD DC — join as a replica of an existing domain.
 # Preserves users, groups, computer SIDs, and passwords via DRS replication.
-# Requires the legacy DC (pdc) to stay online during join.
+# Requires a live peer DC during join.
 #
-# See docs/migration-runbook.md. Offline fallback: playbooks/dc-restore.yml.
+# See docs/dc-runbook.md. Offline fallback: playbooks/dc-restore.yml.
 #
 # Safety: refuses production inventory unless -e allow_production=true.
 #
@@ -25,7 +25,7 @@
         fail_msg: >-
           Refusing dc-replica-join against non-lab inventory.
           Pass -e allow_production=true for break-glass production use.
-          See docs/migration-runbook.md.
+          See docs/dc-runbook.md.
       tags: [always]
 
     - name: DC replica join | assert host is in lab group or break-glass is set
@@ -35,7 +35,7 @@
             or (allow_production | default(false) | bool)
         fail_msg: >-
           {{ inventory_hostname }} is not in the lab inventory group.
-          Pass -e allow_production=true only after reading docs/migration-runbook.md.
+          Pass -e allow_production=true only after reading docs/dc-runbook.md.
       tags: [always]
 
     - name: DC replica join | Configure resolver for package installs

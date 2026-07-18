@@ -5,12 +5,14 @@ alwaysApply: true
 
 # Dev environment
 
-Ansible Python tools are installed in the repo virtualenv, not globally.
+Development runs on hypervisor hosts (**kvm01**, **kif**) or any machine with the
+prerequisites in [README.md](../README.md). Ansible Python tools are installed in the
+repo virtualenv, not globally.
 
 - Bootstrap (once / after requirements change): `./scripts/bootstrap-dev.sh`
 - Before running ansible-lint, yamllint, ansible-playbook, ansible-galaxy, etc. in a shell:
   `export PATH="$(git -C <repo-root> rev-parse --show-toplevel)/.venv/bin:$PATH"`
 - Or use fully qualified paths: `.venv/bin/ansible-lint`, `.venv/bin/yamllint`, `.venv/bin/ansible-playbook`
 - Prefer `./scripts/test-quick.sh` for linting — it sets PATH automatically.
-- System packages for `./scripts/test-quick.sh`: `shellcheck` (e.g. `dnf install shellcheck`).
+- System packages on hypervisors: `shellcheck`, `genisoimage`, `gettext-base` — installed by `hypervisor.yml` (see `hypervisor_dev_tool_packages`).
 - Do not use `pip install --user` for project tools; keep deps in `.venv` via requirements.txt.

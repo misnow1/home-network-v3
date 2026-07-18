@@ -27,13 +27,13 @@ UCG dnsmasq ──(dhcp-script only)──► DDNS API on dc1 ──► BIND
 
 ## Hosts
 
-| Host | IP | OS | Install |
-|---|---|---|---|
-| pihole1 | 192.168.1.18 | CentOS 9 | curl/basic-install |
-| pihole2 | 192.168.1.22 | Rocky 10.1 | curl/basic-install |
+| Host | IP | OS | Install | Notes |
+|---|---|---|---|---|
+| pihole-1.home.2123studios.com | 192.168.1.18 | CentOS 9 | curl/basic-install | Repave to Ubuntu planned |
+| pihole-2.home.2123studios.com | 192.168.1.22 | Rocky 10.1 | curl/basic-install | Repave to Ubuntu planned |
 
 Pi-hole hosts are **config-only Ansible** — not in the `linux` group. Do not run
-`baseline.yml` or other apt-only playbooks against them.
+`baseline.yml` or other apt-only playbooks against them until repaved as Ubuntu.
 
 ## Discovery (before first converge)
 

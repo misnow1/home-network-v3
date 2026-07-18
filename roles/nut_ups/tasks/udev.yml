@@ -6,4 +6,31 @@
     owner: root
     group: root
     mode: "0644"
-  notify: reload udev rules
+  register: nut_ups_udev_rule
+
+- name: NUT UPS | Reload udev rules when changed
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: true
+  when:
+    - nut_ups_udev_rule is changed
+    - not ansible_check_mode
+
+# Re-apply the rules to the already-connected UPS every converge. A bare
+# `udevadm control --reload-rules` only affects future hotplug events, so a UPS
+# that was plugged in before the rule existed keeps its default root:root device
+# node and the `nut` driver user gets "insufficient permissions on everything".
+# `udevadm trigger` re-runs the rules against the live device and `settle` waits
+# for the mode/group change to land before services.yml (re)starts the driver.
+- name: NUT UPS | Re-apply udev rules to the connected UPS
+  ansible.builtin.command:
+    argv: "{{ item }}"
+  loop:
+    - - udevadm
+      - trigger
+      - --action=add
+      - --subsystem-match=usb
+      - "--attr-match=idVendor={{ nut_ups_usb_vendorid }}"
+      - "--attr-match=idProduct={{ nut_ups_usb_productid }}"
+    - [udevadm, settle]
+  changed_when: false
+  when: not ansible_check_mode

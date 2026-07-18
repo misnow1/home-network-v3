@@ -16,6 +16,12 @@ hypervisor_libvirt_packages:
   - guestfish
   - tcpdump
 
+# VM scripts and ./scripts/test-quick.sh on development hypervisors (kvm01, kif).
+hypervisor_dev_tool_packages:
+  - shellcheck
+  - genisoimage
+  - gettext-base
+
 hypervisor_libvirt_users:
   - ansible
 

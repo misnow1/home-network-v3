@@ -93,7 +93,7 @@ existing domain. Only use break-glass with a documented recovery plan. Normal
 production updates use `dc-converge.yml` after initial bootstrap, replica join,
 or restore.
 
-See **[migration-runbook.md](migration-runbook.md)** for the full AD migration procedure.
+See **[dc-runbook.md](dc-runbook.md)** for replica join, restore, and production break-glass.
 
 ## What bootstrap does (greenfield)
 
@@ -105,9 +105,9 @@ See **[migration-runbook.md](migration-runbook.md)** for the full AD migration p
 6. Configures BIND DLZ, AppArmor, starts `named` and `samba-ad-dc`
 7. Copies generated `krb5.conf`
 
-## What replica join does (migration — preferred)
+## What replica join does
 
-Used when the legacy DC is still online — see [migration-runbook.md](migration-runbook.md).
+Used when joining a new DC to an **existing** online domain.
 
 1. Same safety asserts as bootstrap (`allow_production`)
 2. `linux_baseline` (packages, hostname, chrony)
@@ -120,19 +120,18 @@ Requires in `group_vars/dc/vars.yml`:
 
 ```yaml
 samba_dc_migration_mode: replica
-samba_dc_join_server: pdc.home.2123studios.com
+samba_dc_join_server: dc1.home.2123studios.com
 samba_dc_join_nameservers:
-  - 192.168.1.2
+  - 192.168.1.10
 samba_dc_join_site: FerryCrossing
 ```
 
-Before join, create AD sites on pdc — see [ad-sites.md](ad-sites.md) (FerryCrossing /
-Woodbine / Swanhollow) and [migration-runbook.md](migration-runbook.md) Phase 0.
+Before join, create AD sites — see [ad-sites.md](ad-sites.md) (FerryCrossing /
+Woodbine / Swanhollow).
 
-## What restore does (migration — offline fallback)
+## What restore does (offline fallback)
 
-Used when the legacy DC is unavailable and you have a backup tarball — see
-[migration-runbook.md](migration-runbook.md).
+Used when no live peer DC is available and you have a backup tarball.
 
 1. Same safety asserts as bootstrap (`allow_production`)
 2. `linux_baseline` (packages, hostname, chrony)

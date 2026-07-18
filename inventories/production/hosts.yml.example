@@ -4,7 +4,6 @@
 #   cp inventories/production/hosts.yml.example inventories/production/hosts.yml
 #
 # Production runs MUST use scripts/prod-run.sh. See docs/production-runbook.md.
-# AD migration: docs/migration-runbook.md (dc1/dc2 naming, deferred CentOS hosts).
 # VM provisioning: scripts/vm/vm-create.sh -i production <fqdn>
 
 all:
@@ -22,19 +21,19 @@ all:
           vm_ip: 203.0.113.10
           vm_memory_mb: 4096
           vm_disk_gb: 24
-        # Phase 2 replica — uncomment when dc2 is provisioned:
-        # dc2.example.home:
-        #   ansible_host: 203.0.113.11
-        #   vm_name: dc2-example-home
-        #   vm_ip: 203.0.113.11
+        dc2.example.home:
+          ansible_host: 203.0.113.11
+          vm_name: dc2-example-home
+          vm_ip: 203.0.113.11
 
     hypervisors:
       hosts:
         kvm01.example.home:
           ansible_host: 203.0.113.20
-          # Post-Ubuntu reimage: remove ansible_managed: false
+          ansible_managed: true   # Ubuntu 24.04 post-reimage
         kif.example.home:
           ansible_host: 203.0.113.30
+          ansible_managed: true   # Ubuntu 24.04 post-reimage
 
     fileservers:
       hosts:
@@ -43,6 +42,7 @@ all:
     nut_servers:
       hosts:
         kif.example.home:
+        kvm01.example.home:
 
     bastion:
       hosts:
@@ -68,7 +68,8 @@ all:
           vm_memory_mb: 512
           vm_disk_gb: 8
 
-    # Config-only Pi-hole (curl install on CentOS/Rocky). NOT in linux group.
+    # Config-only Pi-hole (curl install on CentOS/Rocky today). NOT in linux group.
+    # Repave to Ubuntu planned — then add to linux and use baseline + domain-join.
     # SSH: often root-only — see group_vars/pihole/ansible.yml.example
     pihole:
       hosts:
@@ -102,11 +103,7 @@ all:
           ansible_host: 203.0.113.141
           ansible_managed: true
 
-    # Tracked for migration checklists — not targeted by default playbooks
+    # Legacy or transitional hosts — not targeted by default apt playbooks.
+    # Empty post-migration (pdc retired). Keep group for structural test compatibility.
     deferred:
-      hosts:
-        pdc.example.home:
-          ansible_host: 203.0.113.2
-          # Legacy DC during migration — ad-hoc/debug only (passwordless sudo for ansible).
-          # Do NOT add to dc group or run dc-* playbooks against the legacy host.
-          ansible_managed: false
+      hosts: {}

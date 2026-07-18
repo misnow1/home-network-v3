@@ -1,27 +1,16 @@
 ---
-# Structural tests for kif/kvm01 reimage artifacts (Slice 19).
+# Structural tests for reimage helper scripts (Slice 19 — complete).
 
 - name: Structural — reimage layout
   hosts: localhost
   gather_facts: false
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
-    runbook: "{{ repo_root }}/docs/kif-kvm01-reimage-runbook.md"
     preflight_script: "{{ repo_root }}/scripts/reimage/preflight-check.sh"
     capture_script: "{{ repo_root }}/scripts/reimage/inventory-capture.sh"
     backup_script: "{{ repo_root }}/scripts/reimage/inventory-backup.sh"
     reimage_lib: "{{ repo_root }}/scripts/reimage/reimage-lib.sh"
   tasks:
-    - name: Reimage | assert runbook exists
-      ansible.builtin.stat:
-        path: "{{ runbook }}"
-      register: runbook_stat
-
-    - name: Reimage | assert runbook present
-      ansible.builtin.assert:
-        that:
-          - runbook_stat.stat.exists
-
     - name: Reimage | assert scripts exist and are executable
       ansible.builtin.stat:
         path: "{{ item }}"
@@ -61,6 +50,6 @@
           - autoinstall_builder.stat.exists
           - autoinstall_builder.stat.executable
 
-    - name: Reimage | assert ROADMAP documents slice 19
+    - name: Reimage | assert ROADMAP documents slice 19 complete
       ansible.builtin.command: grep -F 'kif/kvm01 Ubuntu reimage' "{{ repo_root }}/docs/ROADMAP.md"
       changed_when: false

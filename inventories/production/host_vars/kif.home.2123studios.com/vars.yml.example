@@ -23,7 +23,7 @@ nut_ups_devices:
   - name: kifups
     driver: usbhid-ups
     port: auto
-    description: "CP1500AVRLCDa — local rack UPS"
+    description: "CP1500AVRLCDa - local rack UPS"
     enabled: true
     options:
       pollinterval: 15
@@ -77,7 +77,7 @@ hypervisor_libvirt_volume_group: kif2
 hypervisor_libvirt_data_volumes:
   - { lv: libvirt-images, mount: /var/lib/libvirt/images, size: 500G }
 
-# Docker workload storage — dedicated LVs on kif2 (see docs/kif-kvm01-reimage-runbook.md).
+# Docker workload storage — dedicated LVs on kif2 (see host_vars and hypervisor role).
 docker_engine_volume_group: kif2
 docker_engine_data_volumes:
   - { lv: docker, mount: /srv/docker, size: 50G }

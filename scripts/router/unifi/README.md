@@ -1,7 +1,7 @@
 # UniFi gateway scripts
 
 Example on-boot helpers for **UniFi Cloud Gateway** family devices (UCG Fiber,
-UDM, UXG). See **[docs/unifi-gateway-dns.md](../../docs/unifi-gateway-dns.md)**
+UDM, UXG). See **[docs/unifi-gateway-dns.md](../../../docs/unifi-gateway-dns.md)**
 for the full cutover procedure.
 
 ## Files

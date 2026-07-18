@@ -73,7 +73,7 @@ dig +short kif.home.2123studios.com AAAA    # must be empty
 Check the other infra hosts for the same orphaned prefix
 (`dig +short <host> AAAA`) and delete as needed. See
 [dns-architecture.md](dns-architecture.md) ("Stale client AAAA after prefix
-change") and [migration-runbook.md](migration-runbook.md) for the same procedure
+change") and [dc-runbook.md](dc-runbook.md) for replica join procedure
 applied to the DCs.
 
 ## Troubleshooting: `mount.nfs: access denied by server`
@@ -174,5 +174,5 @@ client `kinit`): see [domain-join-runbook.md](domain-join-runbook.md) — enable
 
 ## Related
 
-- [kif-kvm01-reimage-runbook.md](kif-kvm01-reimage-runbook.md) — imaging and converge order
+- [hypervisor-runbook.md](hypervisor-runbook.md) — production hypervisor converge
 - [scripts/reimage/ubuntu-autoinstall/README.md](../scripts/reimage/ubuntu-autoinstall/README.md) — autoinstall USB

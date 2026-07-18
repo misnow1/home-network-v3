@@ -55,10 +55,7 @@ main() {
   [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage && exit 0
 
   local capture_script="${ROOT}/scripts/reimage/inventory-capture.sh"
-  local runbook="${ROOT}/docs/kif-kvm01-reimage-runbook.md"
 
-  [[ -f "${runbook}" ]] && pass "runbook present: docs/kif-kvm01-reimage-runbook.md" \
-    || warn "missing docs/kif-kvm01-reimage-runbook.md"
   [[ -x "${capture_script}" ]] && pass "inventory-capture.sh executable" \
     || warn "run chmod +x scripts/reimage/inventory-capture.sh"
 

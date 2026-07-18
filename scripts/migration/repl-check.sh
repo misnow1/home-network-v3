@@ -9,7 +9,7 @@
 #
 # Mixed Samba versions (e.g. dc1 4.19.x replicating from pdc 4.21.x) are expected
 # during migration — this script checks replication, not version parity.
-# See docs/migration-runbook.md § Samba version skew.
+# See docs/dc-runbook.md and scripts/migration/repl-check.sh.
 set -euo pipefail
 
 ON_DC=0
@@ -40,7 +40,7 @@ warn() { echo "WARN: $*" >&2; WARNINGS=$((WARNINGS + 1)); }
 fail() { echo "FAIL: $*" >&2; FAILURES=$((FAILURES + 1)); }
 
 run_samba_tool() {
-  # Running as root on the DC — no -U/--machine-pass needed (see migration-runbook.md).
+  # Running as root on the DC — no -U/--machine-pass needed (see dc-runbook.md).
   timeout "${1}" samba-tool "${@:2}"
 }
 

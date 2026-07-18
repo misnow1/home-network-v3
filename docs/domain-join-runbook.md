@@ -106,6 +106,6 @@ Re-run `domain-join.yml` with tags `domain_configure,domain_sshd` after enabling
 
 **Client krb5 when DNS works** (home VPN with internal DNS): `kinit user@REALM`,
 `ssh -K host`. When work VPN breaks home DNS, use password SSH to the member or a
-portable `krb5.conf` with static `kdc = pdc...` plus `/etc/hosts` for the DC.
+portable `krb5.conf` with static `kdc = dc1.home.2123studios.com` plus `/etc/hosts` for the DC.
 
 See [nfs-client-runbook.md](nfs-client-runbook.md) for mount and credential troubleshooting.

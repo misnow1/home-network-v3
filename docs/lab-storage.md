@@ -1,7 +1,8 @@
 # VM storage (lab and production profiles)
 
 Libvirt/QEMU runs as the `qemu` user on system libvirt (`qemu:///system`). VM disks,
-cloud images, and cloud-init seed ISOs must be on **local disk** on kvm01.
+cloud images, and cloud-init seed ISOs must be on **local disk** on the hypervisor that
+runs the domain (kvm01 or kif).
 
 ## NFS home and rootsquash
 
@@ -28,7 +29,7 @@ Base directory (override with `VM_DATA_BASE`):
 
 Legacy `LAB_DATA_DIR` is deprecated — use `VM_DATA_BASE` and profile subdirectories.
 
-## One-time setup on kvm01
+## One-time setup (kvm01 or kif)
 
 Lab integration tests:
 
@@ -83,7 +84,7 @@ Lab wrappers in `scripts/lab/` pass `-i lab` automatically. Production:
 ./scripts/vm/wait-ssh.sh -i production dc1.example.home
 ```
 
-See [production-runbook.md](production-runbook.md) and [migration-runbook.md](migration-runbook.md).
+See [production-runbook.md](production-runbook.md).
 
 ## Cross-hypervisor install (`--dry-run`)
 

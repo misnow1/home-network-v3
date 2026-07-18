@@ -1,10 +1,10 @@
 ---
-description: kif/kvm01 Kerberos NFS and SSH login fixes after reimage (manual until NFS server role)
+description: kif / kvm01 Kerberos NFS production lessons
+globs: docs/nfs-client-runbook.md,docs/hypervisor-runbook.md,roles/nfs_client/**,roles/domain_join/**,roles/hypervisor/**
 alwaysApply: false
-globs: docs/nfs-client-runbook.md,docs/kif-kvm01-reimage-runbook.md,docs/hypervisor-runbook.md,roles/nfs_client/**,roles/domain_join/**,roles/hypervisor/**
 ---
 
-# kif / kvm01 Kerberos NFS (production reimage lessons)
+# kif / kvm01 Kerberos NFS (production lessons)
 
 ## kif (NFS server, winbind — not domain_join)
 
@@ -28,4 +28,4 @@ globs: docs/nfs-client-runbook.md,docs/kif-kvm01-reimage-runbook.md,docs/hypervi
 2. **br0 MAC / DHCP IP** — enslaving the uplink into br0 gives br0 a new (networkd-derived) MAC, so the DHCP reservation returns a new IP and the converge loses the host. Pin `hypervisor_netplan_br0_macaddress` (per host) to the uplink MAC, or update the router reservation. Do NOT set it globally (kif is already bridged and working).
 3. **netplan file mode** — `0600` (netplan warns on world-readable).
 
-Full troubleshooting: `docs/nfs-client-runbook.md`, `docs/hypervisor-runbook.md`; reimage checklist: `docs/kif-kvm01-reimage-runbook.md` Phase 5.
+Full troubleshooting: `docs/nfs-client-runbook.md`, `docs/hypervisor-runbook.md`.
