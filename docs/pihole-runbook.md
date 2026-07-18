@@ -27,13 +27,48 @@ UCG dnsmasq ──(dhcp-script only)──► DDNS API on dc1 ──► BIND
 
 ## Hosts
 
-| Host | IP | OS | Install | Notes |
+| Host | IP | Hypervisor | OS | Notes |
 |---|---|---|---|---|
-| pihole-1.home.2123studios.com | 192.168.1.18 | CentOS 9 | curl/basic-install | Repave to Ubuntu planned |
-| pihole-2.home.2123studios.com | 192.168.1.22 | Rocky 10.1 | curl/basic-install | Repave to Ubuntu planned |
+| pihole-1.home.2123studios.com | 192.168.1.18 | kif | Ubuntu 24.04 | Repave second (after pihole-2) |
+| pihole-2.home.2123studios.com | 192.168.1.22 | kvm01 | Ubuntu 24.04 | Repave first |
 
-Pi-hole hosts are **config-only Ansible** — not in the `linux` group. Do not run
-`baseline.yml` or other apt-only playbooks against them until repaved as Ubuntu.
+Hosts are in the `linux` and `pihole` inventory groups. SSH as `ansible` after
+`baseline.yml` + `domain-join.yml`. Pi-hole is installed by Ansible (`pihole_install:
+true`) during `pihole-converge.yml`.
+
+## Ubuntu repave (CentOS/Rocky → 24.04)
+
+Repave **pihole-2 first** (kvm01), then **pihole-1** (kif). One host stays up for
+client DNS during each cycle.
+
+Inventory needs `vm_name`, `vm_ip`, `vm_memory_mb`, `vm_disk_gb` (8 GB disk is
+sufficient). Run `vm-create` on the host hypervisor:
+
+```bash
+# On kvm01 — pihole-2 (do this host first)
+./scripts/vm/vm-destroy.sh -i production pihole-2.home.2123studios.com
+./scripts/vm/vm-create.sh -i production pihole-2.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production pihole-2.home.2123studios.com
+
+# On kif — pihole-1 (after pihole-2 is converged)
+./scripts/vm/vm-destroy.sh -i production pihole-1.home.2123studios.com
+./scripts/vm/vm-create.sh -i production pihole-1.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production pihole-1.home.2123studios.com
+```
+
+Post-repave converge (each host):
+
+```bash
+PROD='./scripts/prod-run.sh --confirm-production --'
+
+${PROD} playbooks/baseline.yml --limit pihole-2.home.2123studios.com
+${PROD} playbooks/domain-join.yml --limit pihole-2.home.2123studios.com
+${PROD} playbooks/pihole-converge.yml -e allow_production=true \
+  -e pihole_install=true --limit pihole-2.home.2123studios.com
+```
+
+Repeat with `pihole-1` after pihole-2 validates. Remove `group_vars/pihole/ansible.yml`
+root override once domain-join SSH works (cloud-init `ansible` user).
 
 ## Discovery (before first converge)
 
@@ -205,12 +240,26 @@ directly to dc1/dc2.
 
 No changes — stays on router/public DNS; not in `dc_trusted_networks`.
 
-## IPv6 (phase 2)
+## IPv6
 
-1. Enable Pi-hole IPv6 listening in Web UI or `pihole.toml` when ready
-2. UniFi DHCPv6 RDNSS → Pi-hole addresses if supported; else temporary dc1/dc2 for v6
-3. Extend `pihole_reverse_zones` for ip6.arpa if client AAAA DDNS is in use
-4. Re-run converge and validate `dig AAAA` through Pi-hole
+Ansible sets `resolver.resolveIPv6` and `dns.listeningMode` when `pihole_enable_ipv6:
+true` in `group_vars/pihole/vars.yml`. Upstream resolvers and `ip6.arpa` reverse
+zones are already configured.
+
+**Prerequisite:** hosts need GUA addresses (ISP prefix delegation). When PD is broken,
+`cutover-check.sh --phase ipv6` warns that no AAAA exists in AD — that is expected
+until leases renew with v6.
+
+When PD works:
+
+1. Confirm Pi-hole hosts receive GUA (DDNS or static AAAA on dc1)
+2. UniFi DHCPv6 **RDNSS** → `192.168.1.18` and `192.168.1.22` — see
+   [unifi-gateway-dns.md](unifi-gateway-dns.md)
+3. Re-run `pihole-converge.yml` and validate:
+
+   ```bash
+   ./scripts/pihole/cutover-check.sh --phase ipv6
+   ```
 
 ## Remote sites
 

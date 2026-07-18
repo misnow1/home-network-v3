@@ -35,9 +35,33 @@
       loop_control:
         label: "{{ item.item }}"
 
-    - name: Pi-hole | assert role does not install packages
+    - name: Pi-hole | assert role does not install OS packages by default
       ansible.builtin.shell: |
         ! grep -qE 'ansible\.(builtin\.)?(yum|dnf|apt|package):' "{{ repo_root }}/roles/pihole/tasks/"*.yml
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Pi-hole | assert optional install and ipv6 task files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: pihole_optional_tasks
+      loop:
+        - "{{ repo_root }}/roles/pihole/tasks/install.yml"
+        - "{{ repo_root }}/roles/pihole/tasks/ipv6.yml"
+
+    - name: Pi-hole | assert optional task files present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing {{ item.item }}"
+      loop: "{{ pihole_optional_tasks.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Pi-hole | assert cutover script supports ipv6 phase
+      ansible.builtin.shell: |
+        grep -q 'phase ipv6' "{{ pihole_cutover }}"
       args:
         executable: /bin/bash
       changed_when: false

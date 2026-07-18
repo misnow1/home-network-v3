@@ -1,0 +1,31 @@
+---
+- name: Pi-hole | Read resolver.resolveIPv6 setting
+  ansible.builtin.command:
+    cmd: pihole-FTL --config resolver.resolveIPv6
+  register: pihole_resolve_ipv6_current
+  changed_when: false
+  when: pihole_enable_ipv6 | bool
+
+- name: Pi-hole | Enable IPv6 reverse resolution
+  ansible.builtin.command:
+    cmd: pihole-FTL --config resolver.resolveIPv6 true
+  when:
+    - pihole_enable_ipv6 | bool
+    - pihole_resolve_ipv6_current.stdout | trim != 'true'
+  notify: Pi-hole reloaddns
+
+- name: Pi-hole | Read dns.listeningMode setting
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.listeningMode
+  register: pihole_listening_mode_current
+  changed_when: false
+  when: pihole_enable_ipv6 | bool
+
+- name: Pi-hole | Set listening mode for LAN clients
+  ansible.builtin.command:
+    cmd: pihole-FTL --config dns.listeningMode "{{ pihole_listening_mode }}"
+  when:
+    - pihole_enable_ipv6 | bool
+    - pihole_listening_mode | length > 0
+    - pihole_listening_mode_current.stdout | trim != pihole_listening_mode
+  notify: Pi-hole reloaddns

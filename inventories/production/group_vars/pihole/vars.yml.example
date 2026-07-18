@@ -21,7 +21,15 @@ pihole_upstream_dns:
   - 1.1.1.1
   - 8.8.8.8
 
-# Migrate UniFi Local DNS Records here before cutover (see docs/pihole-runbook.md).
-# pihole_local_dns_records:
-#   - name: printer.home.2123studios.com
-#     ip: 192.168.1.50
+# Static local names — audit UniFi Local DNS Records before cutover.
+# AD-registered names (mail, dc*, etc.) need not be listed here.
+pihole_local_dns_records: []
+
+# Host resolv.conf during domain join — use DCs, not Pi-hole loopback.
+domain_join_manage_resolv_conf: true
+domain_join_dns_servers:
+  - 192.168.1.10
+  - 192.168.1.11
+
+# Enable when Pi-hole hosts have GUA and UniFi DHCPv6 RDNSS points at them.
+pihole_enable_ipv6: false

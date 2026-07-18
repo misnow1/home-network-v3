@@ -1,8 +1,14 @@
 ---
-# Config-only Pi-hole role — assumes curl/basic-install already present.
-# Does not install OS packages or run pihole -up.
+# Pi-hole v6 role — config-only by default; opt-in install via pihole_install.
 
 pihole_enabled: true
+
+# Run curl/basic-install when Pi-hole is missing (Ubuntu repave workflow).
+pihole_install: false
+
+# IPv6 client DNS — requires host GUA + UniFi DHCPv6 RDNSS (see pihole-runbook.md).
+pihole_enable_ipv6: false
+pihole_listening_mode: LOCAL
 
 # BIND DLZ domain controllers (production defaults — override in group_vars/pihole).
 pihole_dc_servers:

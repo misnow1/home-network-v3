@@ -8,13 +8,24 @@
     path: /usr/local/bin/pihole
   register: pihole_cli
 
+- name: Pi-hole | Install via curl/basic-install (optional)
+  ansible.builtin.import_tasks: install.yml
+  when: pihole_install | bool
+  tags: [pihole_install]
+
+- name: Pi-hole | Re-verify pihole CLI after optional install
+  ansible.builtin.stat:
+    path: /usr/local/bin/pihole
+  register: pihole_cli
+  when: pihole_install | bool
+
 - name: Pi-hole | Require curl/basic-install
   ansible.builtin.assert:
     that:
       - pihole_cli.stat.exists
     fail_msg: >-
-      Pi-hole is not installed on this host. Use the curl installer from
-      https://docs.pi-hole.net/main/basic-install/ before running pihole-converge.yml.
+      Pi-hole is not installed on this host. Set pihole_install=true or use the curl
+      installer from https://docs.pi-hole.net/main/basic-install/ before converge.
 
 - name: Pi-hole | Require v6 TOML config
   ansible.builtin.stat:
@@ -55,6 +66,11 @@
 - name: Pi-hole | Converge local static DNS records
   ansible.builtin.import_tasks: local_dns.yml
   when: pihole_local_dns_records | length > 0
+
+- name: Pi-hole | Converge IPv6 DNS settings
+  ansible.builtin.import_tasks: ipv6.yml
+  when: pihole_enable_ipv6 | bool
+  tags: [pihole_ipv6]
 
 - name: Pi-hole | Update blocklists (optional)
   ansible.builtin.command:

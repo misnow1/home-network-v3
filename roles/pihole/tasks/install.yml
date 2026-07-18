@@ -1,0 +1,23 @@
+---
+# Opt-in Pi-hole v6 install (Ubuntu curl/basic-install). Tagged pihole_install.
+- name: Pi-hole | Download install script
+  ansible.builtin.get_url:
+    url: https://install.pi-hole.net
+    dest: /tmp/pihole-install.sh
+    mode: "0755"
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Run unattended basic install
+  ansible.builtin.command:
+    cmd: /tmp/pihole-install.sh --unattended
+  environment:
+    PIHOLE_SKIP_UPDATE_CHECK: "true"
+  register: pihole_install_cmd
+  changed_when: pihole_install_cmd.rc == 0
+  when: not pihole_cli.stat.exists
+
+- name: Pi-hole | Remove install script
+  ansible.builtin.file:
+    path: /tmp/pihole-install.sh
+    state: absent
+  when: not pihole_cli.stat.exists
