@@ -162,7 +162,7 @@ network corresponding to a local interface address — when the ISP delegates a 
 | Client AAAA | DHCPv6 lease path via `dhcp-ddns-hook.sh` (Slice 9) |
 | Hardcoded `2600:…/64` | **Never** in inventory — use `localnets` |
 | Stale client AAAA after prefix change | DDNS upsert on lease renew; manual `samba-tool dns delete` for orphans |
-| Auto ip6.arpa reverse zone | See [migration-runbook.md](migration-runbook.md) — add NS glue or delete zone |
+| Auto ip6.arpa reverse zone | Add NS glue on dc1 or delete the zone via `samba-tool dns` |
 
 After a modem reboot, run `dc-converge.yml --limit dc` if BIND was restarted before the
 new prefix appeared on the NIC; otherwise `localnets` updates automatically on reload.

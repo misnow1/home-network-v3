@@ -42,7 +42,7 @@ samba_packages:
   - tcpdump
   - nmap
 
-# AD migration — see docs/migration-runbook.md
+# AD migration — see docs/dc-runbook.md (replica join / restore).
 # replica: dc-replica-join.yml (preferred, live pdc required)
 # restore: dc-restore.yml (offline backup fallback)
 samba_dc_migration_host: false

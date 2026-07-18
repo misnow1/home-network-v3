@@ -26,6 +26,23 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Hypervisor | assert development tool packages in defaults
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_dev_tool_packages:' "{{ libvirt_defaults }}" &&
+        grep -q shellcheck "{{ libvirt_defaults }}" &&
+        grep -q genisoimage "{{ libvirt_defaults }}" &&
+        grep -q gettext-base "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert libvirt tasks install development tool packages
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_dev_tool_packages' "{{ hypervisor_role }}/tasks/libvirt.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Hypervisor | assert task files exist
       ansible.builtin.stat:
         path: "{{ hypervisor_role }}/tasks/{{ item }}"

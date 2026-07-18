@@ -1,4 +1,4 @@
-# Production convergence runbook (Slice 8)
+# Production convergence runbook
 
 How to apply home-network-v3 playbooks against real hosts using the production
 inventory and `scripts/prod-run.sh` guardrails.
@@ -49,16 +49,16 @@ Dry validation (wrapper refuses without confirmation):
 Run playbooks in this order for a **greenfield** site. Re-run individual converge
 playbooks idempotently after initial bootstrap.
 
-For **migrating an existing Samba AD domain**, use `dc-replica-join.yml` (live pdc)
-or `dc-restore.yml` (offline backup) instead of step 2 — see
-[Migrating existing AD](#migrating-existing-ad) below.
+For **joining an existing Samba AD domain** (replica DC or offline restore), use
+`dc-replica-join.yml` or `dc-restore.yml` instead of step 2 — see
+[Joining additional DCs](#joining-additional-dcs) below.
 
 | Step | Host group | Playbook | Notes |
 |---|---|---|---|
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
 | 2 | `dc` | `dc-bootstrap.yml` | **Greenfield only** — once; break-glass |
-| 2m | `dc` | `dc-replica-join.yml` | **Migration (preferred)** — join live domain |
-| 2r | `dc` | `dc-restore.yml` | **Migration (fallback)** — offline backup |
+| 2m | `dc` | `dc-replica-join.yml` | Join existing domain — replica DC |
+| 2r | `dc` | `dc-restore.yml` | Join existing domain — offline backup restore |
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
 | 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
@@ -88,18 +88,18 @@ ${PROD} playbooks/bastion.yml --limit bastion.example.home
 Adjust `--limit` to match your inventory. Use `--check` for dry runs where safe
 (not for first DC bootstrap or restore).
 
-## Migrating existing AD
+## Joining additional DCs
 
-When moving from an existing Samba AD DC (e.g. legacy `pdc`) to **dc1/dc2** naming
-while keeping `home.2123studios.com` identities:
+When adding a DC to an **existing** Samba AD domain (remote site, dc2, disaster
+recovery), use replica join or offline restore — not `dc-bootstrap.yml`.
 
 | Path | Playbook | When |
 |---|---|---|
 | Greenfield | `dc-bootstrap.yml` | No existing domain — new `sam.ldb` |
-| **Migration (preferred)** | **`dc-replica-join.yml`** | Live legacy DC — DRS replication |
-| **Migration (fallback)** | **`dc-restore.yml`** | Legacy DC dead — offline backup |
+| **Replica join** | **`dc-replica-join.yml`** | Live peer DC — DRS replication |
+| **Offline restore** | **`dc-restore.yml`** | No live peer — backup tarball |
 
-Full phased procedure: **[migration-runbook.md](migration-runbook.md)**.
+See **[dc-runbook.md](dc-runbook.md)** and **[ad-sites.md](ad-sites.md)**.
 
 Pre-flight (read-only):
 
@@ -107,19 +107,17 @@ Pre-flight (read-only):
 ./scripts/migration/preflight-check.sh
 ```
 
-Migration DC sequence (replica join):
+Replica join sequence:
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 
 ${PROD} playbooks/dc-replica-join.yml -e allow_production=true \
-  --limit dc1.home.2123studios.com
-${PROD} playbooks/dc-converge.yml -e allow_production=true --limit dc1.home.2123studios.com
-${PROD} playbooks/ddns-api.yml -e allow_production=true --limit dc1.home.2123studios.com
-${PROD} playbooks/certbot.yml -e allow_production=true --limit dc1.home.2123studios.com
+  --limit dc2.home.2123studios.com
+${PROD} playbooks/dc-converge.yml -e allow_production=true --limit dc2.home.2123studios.com
 ```
 
-Offline restore fallback — set `samba_dc_migration_mode: restore` in `group_vars/dc/vars.yml`:
+Offline restore — set `samba_dc_migration_mode: restore` in `group_vars/dc/vars.yml`:
 
 ```bash
 ${PROD} playbooks/dc-restore.yml -e allow_production=true \
@@ -127,9 +125,9 @@ ${PROD} playbooks/dc-restore.yml -e allow_production=true \
   --limit dc1.home.2123studios.com
 ```
 
-CentOS hosts (`kvm01`, `kif`) are **deferred** — manual DNS cutover only. Ubuntu
-members can be reprovisioned and converged with `baseline.yml` → `domain-join.yml`.
-Optional `domain-leave.yml` before in-place reprovision.
+Ubuntu members can be reprovisioned and converged with `baseline.yml` → `domain-join.yml`.
+Optional `domain-leave.yml` before in-place reprovision. Non-Ubuntu VMs (e.g. Pi-hole)
+will be **repaved as Ubuntu** and converged — not in-place migrated.
 
 **Never** run `dc-bootstrap.yml` on a host with `samba_dc_migration_host: true`.
 
@@ -244,26 +242,26 @@ do not define it (unlike lab `home-dc-lab`).
 | `bastion` | Edge jump hosts — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban |
 | `ddns_clients` | Hosts that run GSS-TSIG nsupdate |
 | `linux` | Parent of member groups (optional organizational group) |
-| `deferred` | CentOS/RHEL hosts tracked for migration — not targeted by apt playbooks |
+| `deferred` | Legacy or transitional hosts — not targeted by default apt playbooks (empty post-migration) |
 
 See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.example`.
 
-## Slice-specific runbooks
+## Related runbooks
 
-| Slice | Doc |
+| Topic | Doc |
 |---|---|
 | DC | [dc-runbook.md](dc-runbook.md) |
-| AD migration | [migration-runbook.md](migration-runbook.md) |
+| AD sites | [ad-sites.md](ad-sites.md) |
 | Domain join | [domain-join-runbook.md](domain-join-runbook.md) |
 | AD user SSH keys | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |
+| Pi-hole | [pihole-runbook.md](pihole-runbook.md) |
+| Mail relay | [mail-relay-runbook.md](mail-relay-runbook.md) |
+| Reverse proxy | [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
 | DDNS | [ddns-runbook.md](ddns-runbook.md) |
 | Certbot / LDAP TLS | [certbot-runbook.md](certbot-runbook.md) |
 | Backups | [backup-runbook.md](backup-runbook.md) |
 
-## Deferred (post–Slice 8)
-
-- SFTP/NAS restic repositories and systemd backup timers (lab uses local repo)
-- Pi-hole — [pihole-runbook.md](pihole-runbook.md); observability, bare-metal install — see [ROADMAP.md](ROADMAP.md)
+See [ROADMAP.md](ROADMAP.md) for slice status and deferred work.

@@ -197,7 +197,7 @@ main() {
   fi
 
   for doc in \
-    "${ROOT}/docs/migration-runbook.md" \
+    "${ROOT}/docs/dc-runbook.md" \
     "${ROOT}/playbooks/dc-replica-join.yml" \
     "${ROOT}/playbooks/dc-restore.yml" \
     "${ROOT}/roles/samba_dc/tasks/replica_join.yml" \

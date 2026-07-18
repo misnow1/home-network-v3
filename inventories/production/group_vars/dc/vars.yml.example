@@ -57,13 +57,14 @@ mail_relay_dns_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
 mail_relay_target_ip: 192.168.1.15   # mail.home.2123studios.com VM — adjust to live IP
 
-# AD migration (docs/migration-runbook.md) — set on dc1 before dc-replica-join.yml
+# Replica join — set on the joining DC before dc-replica-join.yml (see docs/dc-runbook.md)
 # samba_dc_migration_host: true
 # samba_dc_migration_mode: replica
 # samba_dc_target_server_name: dc1
-# samba_dc_join_server: pdc.example.home
+# samba_dc_join_server: pdc.example.home   # join source — use dc1 for new replicas
 # samba_dc_join_nameservers:
 #   - 192.168.1.2
+# For new replicas post-migration, use dc1.example.home as join server.
 # AD site for dc1 — see docs/ad-sites.md
 # samba_dc_join_site: FerryCrossing
 #

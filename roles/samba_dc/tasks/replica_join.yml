@@ -1,7 +1,7 @@
 ---
 # Join a fresh host as an additional Samba AD DC (DRS replication).
 # Imported only by playbooks/dc-replica-join.yml.
-# Preserves domain SIDs — see docs/migration-runbook.md.
+# Preserves domain SIDs — see docs/dc-runbook.md.
 
 - name: DC replica join | Refuse join on restore-only hosts
   ansible.builtin.stat:
@@ -23,7 +23,7 @@
       samba_dc_migration_mode: replica, samba_dc_join_server, and
       samba_dc_join_nameservers in group_vars/dc/vars.yml.
       Use playbooks/dc-restore.yml only for offline backup restore.
-      See docs/migration-runbook.md.
+      See docs/dc-runbook.md.
   tags: [samba_provision]
 
 - name: DC replica join | Assert join credentials are in inventory

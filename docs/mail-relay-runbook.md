@@ -1,12 +1,11 @@
 # Internal mail relay runbook (Slice 16+)
 
-Replace **pdc** as the internal→external SMTP relay. Outbound server mail (cron, alerts)
+Replace the legacy **pdc** internal→external SMTP relay. Outbound server mail (cron, alerts)
 relays through **native Postfix on a dedicated Ubuntu VM** at **`mail.home.2123studios.com`**
 and forwards to **Gmail** with pdc-equivalent sender rewrite rules.
 
 See also:
 
-- [migration-runbook.md](migration-runbook.md) — pdc decommission checklist
 - [certbot-runbook.md](certbot-runbook.md) — Dreamhost DNS-01 (same role as DCs)
 - [vault-schema.md](vault-schema.md) — Gmail app password variables
 - [production-runbook.md](production-runbook.md) — VM provisioning via `scripts/vm/vm-create.sh`
@@ -158,27 +157,20 @@ Verify in Gmail:
 `group_vars/linux/`):
 
 ```bash
-${PROD} playbooks/baseline.yml --limit bastion.home.2123studios.com
-${PROD} playbooks/domain-join.yml --limit bastion.home.2123studios.com
-${PROD} playbooks/bastion.yml --limit bastion.home.2123studios.com
+${PROD} playbooks/baseline.yml --limit shell-clt01.home.2123studios.com
+${PROD} playbooks/domain-join.yml --limit shell-clt01.home.2123studios.com
+${PROD} playbooks/bastion.yml --limit shell-clt01.home.2123studios.com
 ```
 
-**Legacy CentOS hosts (kif, kvm01, etc.)** — manual `/etc/postfix/main.cf`:
+**kif (winbind)** — mail relay client via tagged domain-join:
 
+```bash
+${PROD} playbooks/domain-join.yml --limit kif.home.2123studios.com --tags domain_mail_relay
 ```
-relayhost = [mail.home.2123studios.com]:587
-smtp_use_tls = yes
-```
 
-On kif: remove `/root/.forward` once centralized aliases deliver mail; set `relayhost`
-to the mail VM (kif no longer runs the relay).
+## Step 6 — Legacy pdc (retired)
 
-## Step 6 — Retire pdc
-
-Confirm no relay traffic to pdc, then proceed with migration runbook Step 8:
-
-- [migration-runbook.md](migration-runbook.md) Phase 3 checklist — "Internal mail relay no longer depends on pdc"
-- Demote or power off pdc
+Internal mail relay runs on **mail.home.2123studios.com**. Legacy **pdc** is decommissioned.
 
 ## Apply order summary
 

@@ -4,14 +4,14 @@ Lease-driven dynamic DNS: dnsmasq `dhcp-script` → HTTP API on the DC → GSS-T
 `nsupdate` → BIND on the Samba AD DC.
 
 This is **greenfield infrastructure** — deploying a new DDNS API and router hook.
-It is not part of AD replication. During migration it runs in the same maintenance
-window as the DC cutover; see [During AD migration](#during-ad-migration) below.
+It is not part of AD replication. Router cutover timing is documented in
+[Router cutover timing](#router-cutover-timing) below.
 
 See also:
 
 - [dns-architecture.md](dns-architecture.md) — design and component map
 - [unifi-gateway-dns.md](unifi-gateway-dns.md) — UCG Fiber router persistence and cutover
-- [migration-runbook.md](migration-runbook.md) — AD replica join, FSMO, demote (gates link here)
+- [dc-runbook.md](dc-runbook.md) — replica join and DC converge
 
 ## Overview
 
@@ -112,10 +112,9 @@ and on-boot inject for `dhcp-script`.
 See **[unifi-gateway-dns.md](unifi-gateway-dns.md)** and
 [`scripts/router/unifi/`](../scripts/router/unifi/).
 
-## During AD migration
+## Router cutover timing
 
-AD migration ([migration-runbook.md](migration-runbook.md)) and DDNS deployment are
-**separate concerns** that meet at cutover:
+DDNS deployment and DC authority shift meet at router cutover:
 
 ```mermaid
 flowchart TB
@@ -136,21 +135,17 @@ flowchart TB
   Router --> Demote
 ```
 
-| Migration step | DDNS action | Doc |
+| Cutover step | DDNS action | Doc |
 |---|---|---|
-| Step 2 — Converge | Creates `dnsupdater` (API prerequisite) | This runbook § Prerequisites |
-| Step 3 — Gate | Run `ddns-api.yml`; verify API health | § Production deployment — DC |
-| Step 5 — FSMO | No DDNS change | — |
-| Step 6 — Gate | UniFi DHCP DNS → dc1; install router hook | [unifi-gateway-dns.md](unifi-gateway-dns.md) |
-| Step 8 — Demote | Only after router cutover validated | [migration-runbook.md](migration-runbook.md) |
+| DC converge | Creates `dnsupdater` (API prerequisite) | This runbook § Prerequisites |
+| Pre-cutover gate | Run `ddns-api.yml`; verify API health | § Production deployment — DC |
+| Router cutover | UniFi DHCP DNS → dc1; install router hook | [unifi-gateway-dns.md](unifi-gateway-dns.md) |
 
-**Gate criteria before router cutover (Step 6):**
+**Gate criteria before router cutover:**
 
 - `ddns-api.yml` deployed; `curl http://<dc-ip>:8765/ddns/v1/health` returns `ok`
 - FSMO on dc1
 - `./scripts/migration/cutover-check.sh --phase pre` passes (includes API check)
-
-**Gate criteria before demoting pdc (Step 8):**
 
 - DHCP clients receive dc1 as DNS
 - DDNS hook creates A/PTR after lease renew (`dig @dc1 <host>.<domain> A`)

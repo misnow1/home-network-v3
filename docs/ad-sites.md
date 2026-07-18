@@ -18,7 +18,7 @@ This domain spans three locations:
 local DC is installed — create the site and subnet now; join a DC later with
 `--site=Woodbine` or `--site=Swanhollow`.
 
-**Samba limitation:** `samba-tool sites` on pdc supports `create`, `list`, `remove`,
+**Samba limitation:** `samba-tool sites` on a writable DC supports `create`, `list`, `remove`,
 `subnet`, and `view` only — there is **no** `site-link` subcommand. Sites created
 with `samba-tool sites create` are also **not** added to `DEFAULTIPSITELINK`
 automatically. That is fine for dc1 join; manage site links later via RSAT when
@@ -26,7 +26,6 @@ remote DCs need inter-site replication ([Samba wiki — AD Sites](https://wiki.s
 
 See also:
 
-- [migration-runbook.md](migration-runbook.md) — Phase 0 (run on legacy pdc before dc1 join)
 - [dc-runbook.md](dc-runbook.md) — replica join playbook
 - [dns-architecture.md](dns-architecture.md) — DNS and reverse zones per site
 - [remote-site-dns.md](remote-site-dns.md) — conditional forwarders until local DCs exist
@@ -42,10 +41,10 @@ samba_dc_join_site: FerryCrossing
 For a future DC at Woodbine or Swanhollow, set `samba_dc_join_site` on that host
 before running `dc-replica-join.yml`.
 
-## One-time setup on the domain (run on pdc, then dc1 after cutover)
+## One-time setup on the domain (run on dc1)
 
-All commands below run on a **writable** domain controller (`pdc` during migration,
-then `dc1`).
+All commands below run on a **writable** domain controller (**dc1** or **dc2**).
+During the historical pdc migration, these ran on pdc first.
 
 ### 1. Inspect current state
 
@@ -147,16 +146,17 @@ sudo ldbsearch -H /var/lib/samba/private/sam.ldb \
 ```
 
 If empty, the site can remain unused or be removed manually — do not delete while
-pdc or legacy objects still reference it.
+legacy objects still reference it.
 
 ## Joining a DC at a specific site
 
-**dc1 (FerryCrossing)** — Ansible sets `samba_dc_join_site`; manual equivalent:
+**dc1 (FerryCrossing)** — Ansible sets `samba_dc_join_site`; manual equivalent
+(historical migration joined against pdc):
 
 ```bash
 samba-tool domain join home.2123studios.com DC \
   --realm=HOME.2123STUDIOS.COM \
-  --server=pdc.home.2123studios.com \
+  --server=dc1.home.2123studios.com \
   --dns-backend=BIND9_DLZ \
   --site=FerryCrossing \
   -UAdministrator

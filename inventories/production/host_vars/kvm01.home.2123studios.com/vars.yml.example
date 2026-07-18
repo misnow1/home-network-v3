@@ -7,6 +7,27 @@
 #
 # Apply after Ubuntu 24.04 reimage: baseline.yml → hypervisor.yml → backup.yml
 # Shared hypervisor settings: inventories/production/group_vars/hypervisors/vars.yml
+#
+# NUT monitor passwords: inventories/production/group_vars/all/vault.yml — see docs/vault-schema.md
+# Converge: playbooks/nut-converge.yml — see docs/nut-runbook.md
+
+nut_ups_mode: netserver
+nut_ups_listen_address: 192.168.1.21
+
+nut_ups_usb_vendorid: "0764"
+nut_ups_usb_productid: "0501"
+
+nut_ups_devices:
+  - name: deskups
+    driver: usbhid-ups
+    port: auto
+    description: "CP1500AVRLCDa - local rack UPS"
+    enabled: true
+    options:
+      pollinterval: 15
+      pollfreq: 30
+      ondelay: 0
+      offdelay: 20
 
 hypervisor_netplan_uplink: enp5s0
 hypervisor_netplan_optional_nics:

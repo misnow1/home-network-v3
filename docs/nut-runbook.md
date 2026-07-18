@@ -6,7 +6,7 @@ See also:
 
 - [vault-schema.md](vault-schema.md) — monitor and Pushover secrets
 - [mail-relay-runbook.md](mail-relay-runbook.md) — Postfix relay client prerequisite
-- [kif-kvm01-reimage-runbook.md](kif-kvm01-reimage-runbook.md) — kif cutover context
+- [hypervisor-runbook.md](hypervisor-runbook.md) — production hypervisor converge
 
 ## Prerequisites
 

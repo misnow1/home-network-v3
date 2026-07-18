@@ -18,7 +18,7 @@
     fail_msg: >-
       dc-restore is the offline backup path (samba_dc_migration_mode: restore).
       Use playbooks/dc-replica-join.yml when the legacy DC is still online.
-      See docs/migration-runbook.md.
+      See docs/dc-runbook.md.
   tags: [samba_provision]
 
 - name: DC restore | Refresh apt cache

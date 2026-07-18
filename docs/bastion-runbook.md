@@ -38,10 +38,11 @@ inventory (see [`production-runbook.md`](production-runbook.md)).
 
 ```bash
 # Reservation-first — do not skip --prepare on first provision
-./scripts/vm/vm-create.sh -i production --prepare bastion.home.2123studios.com
+# Production host: shell-clt01.home.2123studios.com (template: bastion.example.home)
+./scripts/vm/vm-create.sh -i production --prepare shell-clt01.home.2123studios.com
 # Create UniFi DHCP reservation: printed MAC -> ansible_host IP
-./scripts/vm/vm-start.sh -i production bastion.home.2123studios.com
-./scripts/vm/wait-ssh.sh -i production bastion.home.2123studios.com
+./scripts/vm/vm-start.sh -i production shell-clt01.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production shell-clt01.home.2123studios.com
 ```
 
 Then apply playbooks below. Reprovisioning: `vm-destroy.sh` then repeat the prepare
@@ -49,9 +50,12 @@ workflow so MAC and reservation stay aligned.
 
 ## Production apply
 
+Production bastion host: **shell-clt01.home.2123studios.com** (also in `reverse_proxy`
+and `certbot` groups). Template examples use `bastion.example.home`.
+
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
-BASTION=bastion.home.2123studios.com
+BASTION=shell-clt01.home.2123studios.com
 
 ${PROD} playbooks/baseline.yml --limit "${BASTION}"
 ${PROD} playbooks/domain-join.yml --limit "${BASTION}"
@@ -70,7 +74,7 @@ kinit youruser@HOME.2123STUDIOS.COM
 
 ssh -o GSSAPIAuthentication=yes \
     -o PreferredAuthentications=gssapi-with-mic \
-    bastion.home.2123studios.com
+    shell-clt01.home.2123studios.com
 ```
 
 Password is used for `kinit` on the client, not on the SSH wire to bastion.
@@ -78,10 +82,10 @@ Password is used for `kinit` on the client, not on the SSH wire to bastion.
 SSH access is restricted by `domain_member_allow_groups` in
 `inventories/production/group_vars/linux/vars.yml` (SSSD `simple_allow_groups`).
 
-## Migration from bastion-el9
+## Migration from bastion-el9 (complete)
 
-The legacy CentOS/RHEL 9 host (`bastion-el9`) is replaced by a fresh Ubuntu 24.04 VM at
-`bastion.home.2123studios.com`. See [migration-runbook.md](migration-runbook.md) Phase 2.
+The legacy CentOS/RHEL 9 host (`bastion-el9`) was replaced by **shell-clt01**
+(Ubuntu 24.04).
 
 1. Optionally `domain-leave.yml` before wipe (in-place reprovision only).
 2. Reinstall Ubuntu 24.04 (cloud-init or manual).
@@ -129,6 +133,5 @@ Uses `member01.lab.test` as a bastion subset after domain join.
 ## Related docs
 
 - [domain-join-runbook.md](domain-join-runbook.md) — SSSD and group access
-- [migration-runbook.md](migration-runbook.md) — Phase 2 reprovision
 - [production-runbook.md](production-runbook.md) — wrapper and apply order
 - [software.md](software.md) — package list

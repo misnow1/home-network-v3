@@ -1,9 +1,9 @@
 # Hypervisor runbook (Slice 4 / 25+)
 
 Lab and production hypervisor hosts run **libvirt/KVM** and optionally **Docker** on
-Ubuntu 24.04. Slice 4 proves the stack inside nested `hv01.lab.test` on kvm01.
-Slice 25+ adds **netplan host bridges** and **libvirt bridge networks** for production
-kif/kvm01.
+Ubuntu 24.04. Slice 4 proves the stack inside nested `hv01.lab.test` on a development
+hypervisor (kvm01 or kif). Slice 25+ adds **netplan host bridges** and **libvirt bridge
+networks** for production kif/kvm01.
 
 ## Lab integration (automated)
 
@@ -162,7 +162,8 @@ those groups.
 4. `backup.yml`
 
 See [`host_vars/kvm01.../vars.yml.example`](../inventories/production/host_vars/kvm01.home.2123studios.com/vars.yml.example) and
-[`kif-kvm01-reimage-runbook.md`](kif-kvm01-reimage-runbook.md) for VM restore after hypervisor converge.
+Restore must-preserve VM definitions from Tier-1 capture after hypervisor converge —
+see [`hypervisor-runbook.md`](hypervisor-runbook.md).
 
 ### Production kif (hypervisor + fileserver)
 

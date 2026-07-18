@@ -3,7 +3,9 @@
 Package lists for Ubuntu 24.04 managed hosts. All `linux` inventory hosts receive
 [`linux_baseline`](../roles/linux_baseline/); role playbooks add functional packages on top.
 
-CentOS deferred hosts (`kvm01`, `kif`) are out of scope — manual management only.
+Hosts with `ansible_managed: false` in inventory are out of scope for apt playbooks.
+Production hypervisors **kif** and **kvm01** are Ubuntu-managed post-reimage (Slice 19).
+Non-Ubuntu VMs (e.g. Pi-hole) use config-only roles until repaved as Ubuntu.
 
 ## Shared baseline (`linux` group)
 
@@ -85,6 +87,16 @@ switching. Enable per host or group — production currently sets
 | `virt-top` | Live domain resource usage |
 | `guestfish` | Offline disk image inspection |
 | `tcpdump` | Bridge/VLAN traffic debugging |
+
+**Development toolchain** (`hypervisor_dev_tool_packages` — kvm01, kif, and lab `hv01`):
+
+| Package | Purpose |
+|---|---|
+| `shellcheck` | `./scripts/test-quick.sh` |
+| `genisoimage` | Cloud-init seed ISOs (`scripts/vm/vm-lib.sh`) |
+| `gettext-base` | `envsubst` for templated VM/autoinstall assets |
+
+Python/Ansible lint and playbooks use the repo `.venv` (`./scripts/bootstrap-dev.sh`), not apt.
 
 Docker CE (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`,
 `docker-compose-plugin`) is installed from Docker's official apt repo by the

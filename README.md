@@ -3,18 +3,30 @@
 Ansible and supporting automation to provision machines in a home network and lab.
 Designed test-first: quick CI checks on GitHub, full libvirt integration tests on kvm01.
 
-## Prerequisites (control node / kvm01)
+## Prerequisites (development hypervisors)
+
+Development and integration tests run on production **hypervisors** — **kvm01** and
+**kif** (`inventories/production` `hypervisors` group). Clone the repo on either host,
+bootstrap the Python venv locally, and run the same scripts as CI.
+
+**Repo checkout:** kif often uses NFS home (`kif:/home/...`); kvm01 may use NFS or local
+disk. VM disks and seed ISOs must live on **local libvirt storage** on the host running
+libvirt — see [docs/lab-storage.md](docs/lab-storage.md).
+
+**Python / Ansible** (repo `.venv` — not system-wide):
 
 - Python 3.11+
-- `ansible-core`, `ansible-lint`, `yamllint` (`pip install -r requirements.txt`)
-- `shellcheck` (system package — `./scripts/test-quick.sh`)
-- `virsh`, `virt-install`, `qemu-img` (integration tests)
-- `cloud-localds` or `genisoimage` (cloud-init seed ISO)
-- `envsubst` (gettext)
-- **Local lab storage** on kvm01 (not NFS home) — see [docs/lab-storage.md](docs/lab-storage.md)
+- `./scripts/bootstrap-dev.sh` installs `ansible-core`, `ansible-lint`, `yamllint`, and Galaxy collections from `requirements.txt` / `requirements.yml`
+
+**System packages** (installed by `hypervisor.yml` on hypervisors — see [docs/software.md](docs/software.md)):
+
+- `shellcheck` — `./scripts/test-quick.sh`
+- `virsh`, `virt-install`, `qemu-img` — libvirt VM lifecycle
+- `genisoimage` — cloud-init seed ISOs (`scripts/vm/vm-lib.sh`)
+- `gettext-base` (`envsubst`) — templated cloud-init and autoinstall assets
 
 ```bash
-sudo ./scripts/vm/dirs-ensure.sh -i lab   # once per host (lab profile)
+sudo ./scripts/vm/dirs-ensure.sh -i lab   # once per hypervisor (lab profile)
 ```
 
 ## Quick start
@@ -44,7 +56,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the slice plan and deferred work.
 |---|---|
 | `inventories/lab/` | Default inventory for development and integration tests |
 | `inventories/cka/` | CKA practice VMs on vlan3 (see [docs/cka-runbook.md](docs/cka-runbook.md)) |
-| `inventories/production/` | Gitignored production hosts (`hosts.yml.example` is the template) |
+| `inventories/production/` | Gitignored production hosts — see [inventories/README.md](inventories/README.md) |
 | `scripts/test-*.sh` | Test entrypoints |
 | `scripts/vm/` | Generic VM lifecycle (lab and production profiles) |
 | `scripts/lab/` | Lab libvirt network, DDNS hook, thin wrappers (`-i lab`) |

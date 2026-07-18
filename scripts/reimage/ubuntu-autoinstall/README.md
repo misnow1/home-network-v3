@@ -34,4 +34,5 @@ Ansible `hypervisor.yml` only.
 4. Reboot manually when the installer finishes (interactive autoinstall may not auto-reboot).
 5. Verify: `ssh -i scripts/vm/keys/prod_id_ed25519 ansible@<ip> hostname`
 
-See [kif-kvm01-reimage-runbook.md](../../docs/kif-kvm01-reimage-runbook.md) Phase 3b.
+See [hypervisor-runbook.md](../../../docs/hypervisor-runbook.md) and
+[scripts/reimage/](../) for kvm01 autoinstall helpers.

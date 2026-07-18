@@ -6,7 +6,7 @@
   gather_facts: false
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
-    migration_runbook: "{{ repo_root }}/docs/migration-runbook.md"
+    dc_runbook: "{{ repo_root }}/docs/dc-runbook.md"
     dc_restore_playbook: "{{ repo_root }}/playbooks/dc-restore.yml"
     dc_replica_join_playbook: "{{ repo_root }}/playbooks/dc-replica-join.yml"
     dc_restore_tasks: "{{ repo_root }}/roles/samba_dc/tasks/restore.yml"
@@ -19,16 +19,6 @@
     repl_check_script: "{{ repo_root }}/scripts/migration/repl-check.sh"
     cutover_check_script: "{{ repo_root }}/scripts/migration/cutover-check.sh"
   tasks:
-    - name: Migration | assert migration runbook exists
-      ansible.builtin.stat:
-        path: "{{ migration_runbook }}"
-      register: migration_runbook_stat
-
-    - name: Migration | assert migration runbook present
-      ansible.builtin.assert:
-        that:
-          - migration_runbook_stat.stat.exists
-
     - name: Migration | assert dc-replica-join playbook has allow_production guard
       ansible.builtin.shell: |
         grep -q 'allow_production' "{{ dc_replica_join_playbook }}"
@@ -162,34 +152,11 @@
           - cutover_check_stat.stat.exists
           - cutover_check_stat.stat.executable
 
-    - name: Migration | assert migration runbook documents replication monitoring
+    - name: Migration | assert dc runbook documents replica join and restore
       ansible.builtin.shell: |
-        grep -q 'repl-check.sh' "{{ migration_runbook }}"
-        grep -q 'cutover-check.sh' "{{ migration_runbook }}"
-        grep -q 'Samba version skew' "{{ migration_runbook }}"
-      args:
-        executable: /bin/bash
-      changed_when: false
-
-    - name: Migration | assert migration runbook documents pdc audit
-      ansible.builtin.shell: |
-        grep -q 'pdc-audit.sh' "{{ migration_runbook }}"
-      args:
-        executable: /bin/bash
-      changed_when: false
-
-    - name: Migration | assert migration runbook documents replica join
-      ansible.builtin.shell: |
-        grep -q 'dc-replica-join.yml' "{{ migration_runbook }}"
-        grep -q 'samba_dc_join_server' "{{ migration_runbook }}"
-      args:
-        executable: /bin/bash
-      changed_when: false
-
-    - name: Migration | assert migration runbook documents UniFi gateway cutover
-      ansible.builtin.shell: |
-        grep -q 'unifi-gateway-dns.md' "{{ migration_runbook }}"
-        grep -q 'ddns-runbook.md' "{{ migration_runbook }}"
+        grep -q 'dc-replica-join.yml' "{{ dc_runbook }}"
+        grep -q 'dc-restore.yml' "{{ dc_runbook }}"
+        grep -q 'samba_dc_join_server' "{{ dc_runbook }}"
       args:
         executable: /bin/bash
       changed_when: false

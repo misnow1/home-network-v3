@@ -11,6 +11,12 @@
     state: present
   tags: [libvirt]
 
+- name: Libvirt | Install development tool packages
+  ansible.builtin.apt:
+    name: "{{ hypervisor_dev_tool_packages }}"
+    state: present
+  tags: [libvirt]
+
 - name: Libvirt | Enable and start libvirtd
   ansible.builtin.service:
     name: "{{ hypervisor_libvirt_service }}"
