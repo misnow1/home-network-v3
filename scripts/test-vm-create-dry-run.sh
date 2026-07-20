@@ -33,13 +33,28 @@ main() {
   [[ -f "${seed_dir}/install.sh" ]] || die "missing install.sh"
   [[ -x "${seed_dir}/install.sh" ]] || die "install.sh not executable"
   [[ -f "${seed_dir}/manifest.txt" ]] || die "missing manifest.txt"
-  grep -q "vm_name=${vm_name}" "${seed_dir}/manifest.txt"
-  grep -q '^ethernets_json=' "${seed_dir}/manifest.txt"
-  grep -q 'macaddress:' "${seed_dir}/manifest.txt"
+  grep -q "vm_name=${vm_name}" "${seed_dir}/manifest.txt" \
+    || die "manifest missing vm_name"
+  grep -q '^ethernets_json=' "${seed_dir}/manifest.txt" \
+    || die "manifest missing ethernets_json"
+  grep -q 'macaddress:' "${seed_dir}/manifest.txt" \
+    || die "manifest missing generated MAC (must work without virt-install)"
   ! grep -q 'home-dc-lab' "${seed_dir}/user-data" \
     || die "libvirt network leaked into guest netplan"
   ! grep -q 'macaddress' "${seed_dir}/user-data" \
     || die "libvirt MAC leaked into guest netplan"
+
+  # CI has no virt-install; MAC assignment must not depend on domain XML.
+  ensured_macs="$(vm_ensure_ethernets_macs \
+    '[{"network":"default","dhcp4":true,"dhcp6":true}]')"
+  grep -q 'macaddress' <<< "${ensured_macs}" \
+    || die "vm_ensure_ethernets_macs did not assign a MAC"
+  grep -Eq '52:54:00:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}' <<< "${ensured_macs}" \
+    || die "vm_ensure_ethernets_macs MAC is not in the qemu OUI range"
+  pinned_macs="$(vm_ensure_ethernets_macs \
+    '[{"network":"default","dhcp4":true,"macaddress":"52:54:00:aa:bb:cc"}]')"
+  grep -q '52:54:00:aa:bb:cc' <<< "${pinned_macs}" \
+    || die "vm_ensure_ethernets_macs overwrote a pinned MAC"
 
   "${ROOT}/scripts/vm/vm-create.sh" -i lab --dry-run \
     --name "${vm_name}-dhcp" \
@@ -50,8 +65,10 @@ main() {
   dhcp_seed_dir="$(vm_seeds_dir lab)/${vm_name}-dhcp"
   grep -q 'macaddress:' "${dhcp_seed_dir}/manifest.txt" \
     || die "missing generated MAC in DHCP dry-run manifest"
-  grep -q 'dhcp4: true' "${dhcp_seed_dir}/user-data"
-  grep -q 'dhcp6: true' "${dhcp_seed_dir}/user-data"
+  grep -q 'dhcp4: true' "${dhcp_seed_dir}/user-data" \
+    || die "DHCP user-data missing dhcp4"
+  grep -q 'dhcp6: true' "${dhcp_seed_dir}/user-data" \
+    || die "DHCP user-data missing dhcp6"
 
   normalized="$(vm_normalize_ethernets \
     '{"vm_network":"default-net","ethernets":[{"dhcp4":true},{"network":"vlan3","macaddress":"52:54:00:12:34:56"}]}')"

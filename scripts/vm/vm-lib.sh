@@ -403,6 +403,28 @@ vm_primary_mac() {
     "${ethernets_json}"
 }
 
+# Fill missing NIC MACs with QEMU locally-administered addresses (52:54:00:*).
+# Keeps dry-run manifests usable when virt-install is unavailable (e.g. CI).
+vm_ensure_ethernets_macs() {
+  local ethernets_json="$1"
+  require_cmd python3
+  python3 - "${ethernets_json}" <<'PY'
+import json
+import secrets
+import sys
+
+entries = json.loads(sys.argv[1])
+for entry in entries:
+    if entry.get("macaddress"):
+        continue
+    # Locally administered unicast MAC in the qemu/kvm OUI range.
+    entry["macaddress"] = "52:54:00:%02x:%02x:%02x" % tuple(
+        secrets.token_bytes(3)
+    )
+print(json.dumps(entries, separators=(",", ":")))
+PY
+}
+
 vm_print_ethernets_yaml() {
   local ethernets_json="$1"
   python3 - "${ethernets_json}" <<'PY'
@@ -512,6 +534,7 @@ vm_write_install_artifacts() {
   local os_variant="${13:-}"
   local -a virt_argv=()
 
+  ethernets_json="$(vm_ensure_ethernets_macs "${ethernets_json}")"
   vm_build_virt_install_argv virt_argv "${vm_name}" "${disk_path}" "${seed_iso}" \
     "${ethernets_json}" "${memory_mb}" "${vcpus}" "${nested_virt}" "${perf_profile}" \
     "${cpu_topology}" "${os_variant}"

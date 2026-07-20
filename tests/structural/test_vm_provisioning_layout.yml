@@ -34,6 +34,7 @@
     - name: VM | assert vm-lib defines ethernet and reservation helpers
       ansible.builtin.shell: |
         grep -q 'vm_normalize_ethernets' "{{ vm_lib }}"
+        grep -q 'vm_ensure_ethernets_macs' "{{ vm_lib }}"
         grep -q 'vm_ethernets_with_xml_macs' "{{ vm_lib }}"
         grep -q 'vm_build_netplan_yaml' "{{ vm_lib }}"
         grep -q 'vm_discover_ips' "{{ vm_lib }}"

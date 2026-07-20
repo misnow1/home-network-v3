@@ -253,6 +253,7 @@ create_vm() {
 
   vm_perf_profile_validate "${perf_profile}"
   require_cmd qemu-img
+  ethernets_json="$(vm_ensure_ethernets_macs "${ethernets_json}")"
 
   local windows_guest=0
   if vm_is_windows_profile "${perf_profile}"; then
