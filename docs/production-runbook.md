@@ -165,9 +165,9 @@ Netplan-managed or resolved-aware DNS for production is a future enhancement.
 
 Production VMs are created on the hypervisor with generic scripts in `scripts/vm/`.
 They attach to the pre-existing libvirt network `external-default` (home LAN
-192.168.1.0/24). DC and mail hosts use static IPs from inventory (`vm_ip` matching
-`ansible_host`). Other hosts may use DHCP on that network with router reservations
-(reservations are configured outside this repo).
+192.168.1.0/24). `vm_network` in `group_vars/all/vars.yml` is the default libvirt
+network. A per-NIC `network` value overrides it for VM attachment only; it is never
+written into guest Netplan.
 
 One-time on kvm01:
 
@@ -178,7 +178,22 @@ sudo ./scripts/vm/dirs-ensure.sh -i production
 
 ### Static IP VMs (dc1, dc2, mail, …)
 
-Host entries need `vm_name`, `vm_ip`, and matching `ansible_host`.
+Host entries need `vm_name`, matching `ansible_host`, and an `ethernets` list:
+
+```yaml
+ethernets:
+  - network: external-default      # optional; defaults to vm_network
+    macaddress: 52:54:00:ab:cd:ef  # optional libvirt-only MAC pin
+    dhcp6: true
+    addresses: [192.168.1.10/24]
+    nameservers: [192.168.1.1]
+    routes:
+      - to: default
+        via: 192.168.1.1
+```
+
+`network` and `macaddress` are consumed by libvirt and deliberately omitted from
+the guest Netplan file.
 
 ```bash
 ./scripts/vm/vm-create.sh -i production dc1.example.home
@@ -187,9 +202,11 @@ Host entries need `vm_name`, `vm_ip`, and matching `ansible_host`.
 
 ### Reserved DHCP VMs (bastion, build hosts, …)
 
-Set `vm_use_dhcp: true` and `ansible_host` to the **intended reservation IP** (not
-the live lease — that must match after you reserve). Optional `vm_mac` pins the NIC;
-otherwise a stable MAC is derived from `vm_name` and written to the seed manifest.
+Set `ansible_host` to the **intended reservation IP** (not the live lease). Omit
+`ethernets` for the traditional default of one `dhcp4` + `dhcp6` NIC on
+`vm_network`, or specify it explicitly. Optional `macaddress` pins the NIC;
+otherwise virt-install generates it and the create manifest prints an
+inventory-ready `ethernets` block.
 
 ```bash
 # 1. Define VM with fixed MAC — does not boot
@@ -205,7 +222,7 @@ otherwise a stable MAC is derived from `vm_name` and written to the seed manifes
 ```
 
 Immediate boot without `--prepare` still works for lab-style hosts but warns on
-production `vm_use_dhcp` entries (race with router reservations). Pass
+production DHCP entries (race with router reservations). Pass
 `--force-boot` to suppress the warning.
 
 ### Ephemeral DHCP (IP does not matter)
@@ -225,9 +242,10 @@ Then apply playbooks via `prod-run.sh` as below. Destroy when retiring a test VM
 ./scripts/vm/vm-destroy.sh -i production dc1.example.home
 ```
 
-Host entries need `vm_name` and either `vm_ip` (static) or `vm_use_dhcp: true`.
-Network defaults (`vm_gateway`, `vm_dns_servers`, etc.) live in
-`group_vars/all/vars.yml`. See [lab-storage.md](lab-storage.md).
+Host entries need `vm_name`. Omitted `ethernets` means dual-stack DHCP; static or
+multi-NIC hosts define `ethernets`. The `vm_network` libvirt default lives in
+`group_vars/all/vars.yml`. `wait-ssh.sh` reports every address returned by
+`virsh domifaddr <name> --source agent`. See [lab-storage.md](lab-storage.md).
 
 The libvirt network `external-default` must already exist on kvm01 — these scripts
 do not define it (unlike lab `home-dc-lab`).

@@ -7,12 +7,69 @@
   when: linux_baseline_ansible_user_enabled | bool
 
 - name: Baseline | Relocate ansible user home to local path
-  ansible.builtin.user:
-    name: "{{ linux_baseline_ansible_user_name }}"
-    home: "{{ linux_baseline_ansible_user_home }}"
-    move_home: true
   when:
     - linux_baseline_ansible_user_enabled | bool
     - linux_baseline_ansible_getent.rc == 0
     - (linux_baseline_ansible_getent.stdout.split(':')[5] | default('')) != linux_baseline_ansible_user_home
   tags: [ansible_user]
+  block:
+    - name: Baseline | Parse current ansible home directory
+      ansible.builtin.set_fact:
+        linux_baseline_ansible_user_current_home: "{{ linux_baseline_ansible_getent.stdout.split(':')[5] }}"
+        linux_baseline_ansible_user_uid: "{{ linux_baseline_ansible_getent.stdout.split(':')[2] }}"
+        linux_baseline_ansible_user_gid: "{{ linux_baseline_ansible_getent.stdout.split(':')[3] }}"
+
+    - name: Baseline | Ensure parent directory for new ansible home exists
+      ansible.builtin.file:
+        path: "{{ linux_baseline_ansible_user_home | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Baseline | Check whether current ansible home exists
+      ansible.builtin.stat:
+        path: "{{ linux_baseline_ansible_user_current_home }}"
+      register: linux_baseline_ansible_current_home_stat
+
+    - name: Baseline | Ensure local ansible home directory exists
+      ansible.builtin.file:
+        path: "{{ linux_baseline_ansible_user_home }}"
+        state: directory
+        owner: "{{ linux_baseline_ansible_user_uid }}"
+        group: "{{ linux_baseline_ansible_user_gid }}"
+        mode: "0700"
+
+    - name: Baseline | Copy ansible home to local path
+      ansible.builtin.command:
+        argv:
+          - cp
+          - -a
+          - "{{ linux_baseline_ansible_user_current_home }}/."
+          - "{{ linux_baseline_ansible_user_home }}/"
+      when:
+        - linux_baseline_ansible_current_home_stat.stat.exists | default(false)
+        - linux_baseline_ansible_current_home_stat.stat.isdir | default(false)
+      changed_when: true
+
+    - name: Baseline | Update ansible home directory in /etc/passwd
+      ansible.builtin.replace:
+        path: /etc/passwd
+        regexp: '^{{ linux_baseline_ansible_user_name | regex_escape }}:([^:]*:[^:]*:[^:]*:[^:]*:)[^:]*(:.*)$'
+        replace: '{{ linux_baseline_ansible_user_name }}:\1{{ linux_baseline_ansible_user_home }}\2'
+        backup: true
+
+    - name: Baseline | Verify ansible home was updated in passwd
+      ansible.builtin.command: "getent passwd {{ linux_baseline_ansible_user_name }}"
+      register: linux_baseline_ansible_getent_after
+      changed_when: false
+      failed_when: linux_baseline_ansible_getent_after.stdout.split(':')[5] != linux_baseline_ansible_user_home
+
+    - name: Baseline | Reset SSH connection after ansible home relocation
+      ansible.builtin.meta: reset_connection
+
+    - name: Baseline | Remove old ansible home directory
+      ansible.builtin.file:
+        path: "{{ linux_baseline_ansible_user_current_home }}"
+        state: absent
+      when:
+        - linux_baseline_ansible_current_home_stat.stat.exists | default(false)
+        - linux_baseline_ansible_user_current_home != linux_baseline_ansible_user_home

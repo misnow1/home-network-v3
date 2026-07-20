@@ -33,6 +33,11 @@
   ansible.builtin.include_tasks: networks.yml
   tags: [hypervisor_networks]
 
+- name: Hypervisor | Apply host performance tuning
+  ansible.builtin.include_tasks: performance.yml
+  when: hypervisor_perf_tuning_enabled | bool
+  tags: [hypervisor_performance]
+
 - name: Hypervisor | Install and configure Docker
   ansible.builtin.include_role:
     name: docker_engine

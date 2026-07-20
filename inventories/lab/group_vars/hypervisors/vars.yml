@@ -3,6 +3,10 @@
 # docker_engine's own default (false) which would otherwise shadow it and skip Docker.
 docker_engine_enabled: true
 
+# Host tuning for nested lab hypervisor (see docs/hypervisor-performance.md).
+hypervisor_perf_tuning_enabled: true
+docker_engine_data_volume_opts: defaults,noatime
+
 # Shared backup settings for lab hypervisors (playbooks + integration tests).
 backup_restic_repository: /var/lib/restic/lab-backup
 backup_restic_password_file: /root/.restic-password

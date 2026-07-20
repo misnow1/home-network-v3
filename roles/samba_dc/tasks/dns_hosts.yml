@@ -21,8 +21,8 @@
 - name: Samba DC DNS hosts | Map DC FQDN to LAN IP
   ansible.builtin.lineinfile:
     path: /etc/hosts
-    regexp: '^\s*{{ (vm_ip | default(ansible_host)) | regex_escape() }}\s+{{ inventory_hostname | regex_escape() }}(\s|$)'
-    line: "{{ vm_ip | default(ansible_host) }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
+    regexp: '^\s*{{ ansible_host | regex_escape() }}\s+{{ inventory_hostname | regex_escape() }}(\s|$)'
+    line: "{{ ansible_host }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
     insertafter: '^127\.0\.0\.1\s'
   when: samba_dc_dns_hosts_sam_ldb.stat.exists
   tags: [samba_dns, samba_converge, samba_provision]

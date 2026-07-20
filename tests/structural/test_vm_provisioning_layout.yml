@@ -31,12 +31,18 @@
       loop_control:
         label: "{{ item.item }}"
 
-    - name: VM | assert vm-lib defines MAC and reservation helpers
+    - name: VM | assert vm-lib defines ethernet and reservation helpers
       ansible.builtin.shell: |
-        grep -q 'vm_resolve_mac' "{{ vm_lib }}"
-        grep -q 'vm_generate_mac_from_name' "{{ vm_lib }}"
+        grep -q 'vm_normalize_ethernets' "{{ vm_lib }}"
+        grep -q 'vm_ethernets_with_xml_macs' "{{ vm_lib }}"
+        grep -q 'vm_build_netplan_yaml' "{{ vm_lib }}"
+        grep -q 'vm_discover_ips' "{{ vm_lib }}"
         grep -q 'vm_print_reservation_block' "{{ vm_lib }}"
         grep -q 'vm_define_domain_from_virt_install' "{{ vm_lib }}"
+        grep -q 'vm_perf_profile_validate' "{{ vm_lib }}"
+        grep -q 'vm_disk_virt_install_arg' "{{ vm_lib }}"
+        grep -q 'vm_enrich_windows11_domain_xml' "{{ vm_lib }}"
+        grep -q 'vm_create_blank_disk' "{{ vm_lib }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -46,6 +52,7 @@
         grep -q '\-\-prepare' "{{ vm_create }}"
         grep -q '\-\-wait-reservation' "{{ vm_create }}"
         grep -q '\-\-force-boot' "{{ vm_create }}"
+        grep -q '\-\-perf-profile' "{{ vm_create }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -58,11 +65,11 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: VM | assert production hosts example documents vm_mac for DHCP bastion
+    - name: VM | assert production hosts example documents ethernets behavior
       ansible.builtin.shell: |
-        grep -q 'vm_use_dhcp: true' "{{ prod_hosts_example }}"
-        grep -q 'vm_mac' "{{ prod_hosts_example }}"
-        grep -q 'ansible_host is the intended DHCP reservation IP' "{{ prod_hosts_example }}"
+        grep -q 'ethernets:' "{{ prod_hosts_example }}"
+        grep -q 'macaddress:' "{{ prod_hosts_example }}"
+        grep -q 'Omitted ethernets defaults' "{{ prod_hosts_example }}"
       args:
         executable: /bin/bash
       changed_when: false

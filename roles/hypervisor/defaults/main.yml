@@ -36,7 +36,18 @@ hypervisor_libvirt_data_volume_fstype: xfs
 # fstab fields 4/5/6 (options, dump, passno) are passed separately to
 # ansible.posix.mount — opts must NOT embed dump/passno or the module escapes the
 # spaces (\040), producing an invalid options field that fails to mount at boot.
-hypervisor_libvirt_data_volume_opts: defaults
+hypervisor_libvirt_data_volume_opts: >-
+  {{ 'defaults,noatime' if hypervisor_perf_tuning_enabled | default(false) | bool else 'defaults' }}
+
+# Opt-in host tuning for KVM/Docker (see docs/hypervisor-performance.md).
+hypervisor_perf_tuning_enabled: false
+hypervisor_perf_tuned_profile: virtual-host
+hypervisor_perf_packages:
+  - tuned
+  - numactl
+  - linux-tools-generic
+hypervisor_perf_sysctl_swappiness: 10
+hypervisor_perf_thp_policy: madvise
 hypervisor_libvirt_data_volume_dump: "0"
 hypervisor_libvirt_data_volume_passno: "2"
 

@@ -49,6 +49,7 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_users` | `[ansible]` | Users in `libvirt`/`kvm` groups |
 | `hypervisor_libvirt_volume_group` | `""` | LVM VG name (required when `data_volumes` set) |
 | `hypervisor_libvirt_data_volumes` | `[]` | Opt-in libvirt mounts: `lv`, `mount`, `size` per entry |
+| `hypervisor_perf_tuning_enabled` | `false` | Enable tuned/sysctl/THP host tuning (see [`hypervisor-performance.md`](hypervisor-performance.md)) |
 | `docker_engine_enabled` | `true` | Include `docker_engine` role |
 
 ### Libvirt storage host profiles
@@ -142,6 +143,11 @@ router, update `ansible_host` (or fix the reservation/MAC), then re-run.
 `hv01.lab.test` is created with `vm_nested_virt: true` (CPU host-passthrough) and
 `vm_disk_gb: 32` (libvirt + Docker need more space than the cloud image overlay).
 Integration tests assert `/dev/kvm` exists and `virsh -c qemu:///system list` succeeds.
+
+When `hypervisor_perf_tuning_enabled: true`, integration tests also assert `tuned` is
+active with the `virtual-host` profile, `vm.swappiness` is lowered, and THP is set to
+`madvise`. Lab hypervisors enable this by default — see
+[`hypervisor-performance.md`](hypervisor-performance.md) for measurement and production rollout.
 
 Group membership (`libvirt`, `docker`) takes effect after a new login. Integration tests
 use `become` for `virsh`/`docker run` and separately assert the `ansible` user is in

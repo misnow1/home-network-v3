@@ -1,0 +1,12 @@
+[Unit]
+Description=Set transparent hugepage policy for virtualization hosts
+After=local-fs.target
+ConditionPathExists=/sys/kernel/mm/transparent_hugepage/enabled
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo {{ hypervisor_perf_thp_policy }} > /sys/kernel/mm/transparent_hugepage/enabled'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

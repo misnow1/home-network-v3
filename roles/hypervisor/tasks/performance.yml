@@ -1,0 +1,55 @@
+---
+- name: Hypervisor performance | Install tuning packages
+  ansible.builtin.apt:
+    name: "{{ hypervisor_perf_packages }}"
+    state: present
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Deploy sysctl fragment
+  ansible.builtin.template:
+    src: sysctl-performance.conf.j2
+    dest: /etc/sysctl.d/99-hypervisor-performance.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Enable and start tuned
+  ansible.builtin.service:
+    name: tuned
+    state: started
+    enabled: true
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Read active tuned profile
+  ansible.builtin.command: tuned-adm active
+  register: hypervisor_tuned_active
+  changed_when: false
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Apply tuned profile
+  ansible.builtin.command: tuned-adm profile {{ hypervisor_perf_tuned_profile }}
+  register: hypervisor_tuned_apply
+  changed_when: hypervisor_perf_tuned_profile not in hypervisor_tuned_active.stdout
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Deploy THP oneshot unit
+  ansible.builtin.template:
+    src: hypervisor-thp.service.j2
+    dest: /etc/systemd/system/hypervisor-thp.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart hypervisor thp
+  tags: [hypervisor_performance]
+
+- name: Hypervisor performance | Enable THP oneshot
+  ansible.builtin.systemd:
+    name: hypervisor-thp.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [hypervisor_performance]

@@ -176,7 +176,7 @@
 
     wait_for_samba || true
     run_samba_dnsupdate || {
-      expected_ip="{{ vm_ip | default(ansible_host) }}"
+      expected_ip="{{ ansible_host }}"
       if dig +short @127.0.0.1 "${host}.${zone}" A | grep -qx "$expected_ip"; then
         echo "dns-records-verified-via-dig"
         rm -f "$cache"

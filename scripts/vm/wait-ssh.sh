@@ -90,6 +90,20 @@ wait_for_ssh() {
   die "Timed out waiting for SSH on ${target_label} (${vm_ip})"
 }
 
+report_guest_ips() {
+  local vm_name="$1"
+  local ips
+  ips="$(vm_discover_ips "${vm_name}" || true)"
+  if [[ -n "${ips}" ]]; then
+    log_info "Guest-agent addresses for ${vm_name}:"
+    while IFS= read -r ip; do
+      log_info "  ${ip}"
+    done <<< "${ips}"
+  else
+    log_warn "No guest-agent addresses reported for ${vm_name}"
+  fi
+}
+
 main() {
   parse_args "$@"
 
@@ -111,9 +125,11 @@ main() {
       VM_IP="$(vm_wait_for_ip "${VM_NAME}" "${IP_DISCOVERY_TIMEOUT_SECS}" "${SLEEP_SECS}")"
       log_info "Discovered ${VM_NAME} at ${VM_IP}"
     else
-      VM_IP="$(vm_inventory_lookup "${PROFILE}" "${INVENTORY_FQDN}" "vm_ip")"
+      VM_IP="$(vm_inventory_lookup "${PROFILE}" "${INVENTORY_FQDN}" "ansible_host")"
     fi
     wait_for_ssh "${INVENTORY_FQDN}" "${VM_IP}"
+    require_cmd virsh
+    report_guest_ips "${VM_NAME}"
     return 0
   fi
 
@@ -124,6 +140,8 @@ main() {
   fi
 
   wait_for_ssh "${VM_NAME}" "${VM_IP}"
+  require_cmd virsh
+  report_guest_ips "${VM_NAME}"
 }
 
 main "$@"

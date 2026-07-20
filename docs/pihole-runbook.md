@@ -41,8 +41,11 @@ true`) during `pihole-converge.yml`.
 Repave **pihole-2 first** (kvm01), then **pihole-1** (kif). One host stays up for
 client DNS during each cycle.
 
-Inventory needs `vm_name`, `vm_ip`, `vm_memory_mb`, `vm_disk_gb` (8 GB disk is
-sufficient). Run `vm-create` on the host hypervisor:
+Inventory needs `vm_name`, `vm_memory_mb`, and `vm_disk_gb` (8 GB is sufficient).
+Pi-hole NICs use dual-stack DHCP with router reservations. Pin `macaddress` under
+`ethernets` to preserve the reservation across repaves; `network` is the libvirt
+network name and is not copied into guest Netplan. Run `vm-create` on the host
+hypervisor:
 
 ```bash
 # On kvm01 — pihole-2 (do this host first)

@@ -43,6 +43,35 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Hypervisor | assert performance tuning defaults exist
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_perf_tuning_enabled' "{{ libvirt_defaults }}" &&
+        grep -q 'hypervisor_perf_tuned_profile' "{{ libvirt_defaults }}" &&
+        grep -q 'hypervisor_perf_thp_policy' "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert performance tasks are gated in main.yml
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_perf_tuning_enabled' "{{ hypervisor_role }}/tasks/main.yml" &&
+        grep -q 'performance.yml' "{{ hypervisor_role }}/tasks/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hypervisor | assert performance baseline script exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/hypervisor/perf-baseline.sh"
+      register: perf_baseline_script
+      failed_when: not perf_baseline_script.stat.exists
+
+    - name: Hypervisor | assert hypervisor performance doc exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/docs/hypervisor-performance.md"
+      register: perf_doc
+      failed_when: not perf_doc.stat.exists
+
     - name: Hypervisor | assert task files exist
       ansible.builtin.stat:
         path: "{{ hypervisor_role }}/tasks/{{ item }}"
@@ -52,6 +81,7 @@
         - netplan.yml
         - storage.yml
         - storage_volume.yml
+        - performance.yml
         - users.yml
         - directories.yml
         - pools.yml

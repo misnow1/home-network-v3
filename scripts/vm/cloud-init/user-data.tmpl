@@ -25,20 +25,10 @@ packages:
   - qemu-guest-agent
 
 write_files:
-  - path: /etc/netplan/99-vm-static.yaml
-    permissions: '0644'
+  - path: /etc/netplan/99-vm-network.yaml
+    permissions: '0600'
     content: |
-      network:
-        version: 2
-        ethernets:
-          ${VM_NIC}:
-            dhcp4: false
-            addresses:
-              - ${VM_IP}/${VM_SUBNET_PREFIX}
-            routes:
-              - to: default
-                via: ${VM_GATEWAY}
-${VM_DNS_SERVERS_YAML}
+${VM_NETPLAN_YAML}
 
 runcmd:
   - netplan apply

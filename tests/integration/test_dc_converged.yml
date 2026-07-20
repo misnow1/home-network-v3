@@ -63,9 +63,9 @@
     - name: Assert DC hostname A record includes expected LAN IP
       ansible.builtin.assert:
         that:
-          - (vm_ip | default(ansible_host)) in dc_hostname_a.stdout_lines
+          - ansible_host in dc_hostname_a.stdout_lines
         fail_msg: >-
-          Expected {{ vm_ip | default(ansible_host) }} in A records for
+          Expected {{ ansible_host }} in A records for
           {{ inventory_hostname }}; got {{ dc_hostname_a.stdout_lines }}
 
     - name: Assert DC hostname A records exclude Docker bridge range
