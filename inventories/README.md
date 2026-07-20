@@ -42,6 +42,7 @@ Never commit `hosts.yml`, `vars.yml`, `vault.yml`, or `ansible.yml` under
 | `pihole` | Pi-hole DNS forwarders (config-only) | `pihole-converge.yml` |
 | `certbot` | Hosts needing DNS-01 certificates | `certbot.yml` |
 | `linux_members` | Domain-joined members (sssd) | `domain-join.yml`, `nfs-client.yml` |
+| `windows` | Windows guests (not Ansible-managed) | `vm-create.sh` (`vm_perf_profile: windows11`) |
 | `linux` | Parent of Ubuntu apt-managed groups | `baseline.yml` |
 | `deferred` | Legacy/transitional — empty post-migration | None by default |
 

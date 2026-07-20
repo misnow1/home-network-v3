@@ -18,13 +18,21 @@ all:
         dc1.example.home:
           ansible_host: 203.0.113.10
           vm_name: dc1-example-home
-          vm_ip: 203.0.113.10
           vm_memory_mb: 4096
           vm_disk_gb: 24
+          ethernets:
+            - addresses: [203.0.113.10/24]
+              dhcp6: true
+              nameservers: [203.0.113.1]
+              routes: [{to: default, via: 203.0.113.1}]
         dc2.example.home:
           ansible_host: 203.0.113.11
           vm_name: dc2-example-home
-          vm_ip: 203.0.113.11
+          ethernets:
+            - addresses: [203.0.113.11/24]
+              dhcp6: true
+              nameservers: [203.0.113.1]
+              routes: [{to: default, via: 203.0.113.1}]
 
     hypervisors:
       hosts:
@@ -47,11 +55,10 @@ all:
     bastion:
       hosts:
         bastion.example.home:
-          # ansible_host is the intended DHCP reservation IP when vm_use_dhcp is true.
+          # ansible_host is the intended DHCP reservation IP.
           ansible_host: 203.0.113.40
           vm_name: bastion-example-home
-          vm_use_dhcp: true
-          # vm_mac: 52:54:00:ab:cd:ef   # optional — omit to auto-generate a stable MAC from vm_name
+          # Omitted ethernets defaults to one dual-stack DHCP NIC on vm_network.
 
     # Edge nginx + Authelia reverse proxy. Typically the bastion host.
     # Site definitions live in group_vars/reverse_proxy/vars.yml.
@@ -64,9 +71,12 @@ all:
         mail.example.home:
           ansible_host: 203.0.113.15
           vm_name: mail-example-home
-          vm_ip: 203.0.113.15
           vm_memory_mb: 512
           vm_disk_gb: 8
+          ethernets:
+            - dhcp4: true
+              dhcp6: true
+              # macaddress: 52:54:00:ab:cd:ef  # optional libvirt-only pin
 
     # Pi-hole DNS forwarders — Ubuntu 24.04; vm-create on host hypervisor (kif/kvm01).
     pihole:
@@ -75,16 +85,40 @@ all:
           ansible_host: 203.0.113.18
           ansible_managed: true
           vm_name: pihole-1-example
-          vm_ip: 203.0.113.18
           vm_memory_mb: 1536
           vm_disk_gb: 8
+          ethernets:
+            - dhcp4: true
+              dhcp6: true
         pihole2.example.home:
           ansible_host: 203.0.113.22
           ansible_managed: true
           vm_name: pihole-2-example
-          vm_ip: 203.0.113.22
           vm_memory_mb: 1536
           vm_disk_gb: 8
+          ethernets:
+            - dhcp4: true
+              dhcp6: true
+
+    # Windows guests — not Ansible-managed. vm-create --perf-profile windows11 defines
+    # UEFI/Secure Boot/TPM + Hyper-V enlightenments; attach install ISO manually.
+    windows:
+      hosts:
+        win11.example.home:
+          ansible_host: 203.0.113.19
+          ansible_managed: false
+          vm_name: win11-example
+          vm_cpu_count: 6
+          vm_cpu_topology: "6,1"
+          vm_memory_mb: 8192
+          vm_disk_gb: 128
+          vm_perf_profile: windows11
+          vm_os_variant: win11
+          ethernets:
+            - macaddress: 52:54:00:00:11:11
+              network: external-default
+              dhcp4: true
+              dhcp6: true
 
     certbot:
       children:

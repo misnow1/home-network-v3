@@ -130,3 +130,34 @@
       loop_control:
         label: "{{ item.name }}"
       when: hypervisor_libvirt_networks | length > 0
+
+    - name: Assert tuned is running when host performance tuning enabled
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['tuned.service'].state == 'running'
+        fail_msg: tuned is not running
+      when: hypervisor_perf_tuning_enabled | default(false) | bool
+
+    - name: Assert virtual-host tuned profile is active
+      ansible.builtin.command: tuned-adm active
+      register: hypervisor_tuned_active
+      become: true
+      changed_when: false
+      failed_when: hypervisor_perf_tuned_profile not in hypervisor_tuned_active.stdout
+      when: hypervisor_perf_tuning_enabled | default(false) | bool
+
+    - name: Assert vm.swappiness matches performance tuning
+      ansible.builtin.command: sysctl -n vm.swappiness
+      register: hypervisor_swappiness
+      become: true
+      changed_when: false
+      failed_when: hypervisor_swappiness.stdout | trim != (hypervisor_perf_sysctl_swappiness | string)
+      when: hypervisor_perf_tuning_enabled | default(false) | bool
+
+    - name: Assert THP policy matches performance tuning
+      ansible.builtin.command: cat /sys/kernel/mm/transparent_hugepage/enabled
+      register: hypervisor_thp_enabled
+      become: true
+      changed_when: false
+      failed_when: hypervisor_perf_thp_policy not in hypervisor_thp_enabled.stdout
+      when: hypervisor_perf_tuning_enabled | default(false) | bool

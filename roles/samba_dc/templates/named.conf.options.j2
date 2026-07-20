@@ -23,7 +23,7 @@ options {
 {% if samba_dc_bind_interfaces_only | bool %}
     listen-on {
         127.0.0.1;
-        {{ vm_ip | default(ansible_host) }};
+        {{ ansible_host }};
     };
 {% else %}
     listen-on { any; };

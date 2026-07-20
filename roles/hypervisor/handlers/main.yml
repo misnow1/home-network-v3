@@ -1,4 +1,23 @@
 ---
+- name: Apply sysctl
+  ansible.builtin.command: sysctl --system
+  listen: Apply sysctl
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: Reload systemd
+  when: not ansible_check_mode
+
+- name: Restart hypervisor thp
+  ansible.builtin.systemd:
+    name: hypervisor-thp.service
+    state: restarted
+  listen: Restart hypervisor thp
+  when: not ansible_check_mode
+
 - name: Restart libvirtd
   ansible.builtin.service:
     name: "{{ hypervisor_libvirt_service }}"

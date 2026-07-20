@@ -98,6 +98,16 @@ switching. Enable per host or group — production currently sets
 
 Python/Ansible lint and playbooks use the repo `.venv` (`./scripts/bootstrap-dev.sh`), not apt.
 
+**Performance tuning** (`hypervisor_perf_packages` — when `hypervisor_perf_tuning_enabled: true`):
+
+| Package | Purpose |
+|---|---|
+| `tuned` | `virtual-host` profile for KVM hosts |
+| `numactl` | NUMA topology inspection (`numactl -H`) |
+| `linux-tools-generic` | `perf` and related kernel tools |
+
+See [`hypervisor-performance.md`](hypervisor-performance.md) for sysctl, THP, VM profiles, and measurement.
+
 Docker CE (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`,
 `docker-compose-plugin`) is installed from Docker's official apt repo by the
 [`docker_engine`](../roles/docker_engine/) role when `docker_engine_enabled: true`.

@@ -2,6 +2,7 @@
 # Non-secret lab variables.
 
 # VM provisioning (scripts/vm/vm-create.sh -i lab)
+# Default libvirt network when a host/NIC omits ethernets[].network.
 vm_network: home-dc-lab
 vm_gateway: 192.168.100.1
 vm_subnet_prefix: 24

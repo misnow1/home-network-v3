@@ -33,8 +33,10 @@ No kerberized NFS autofs mounts — bastion is a lean jump host. Homedirs are lo
 ## VM provisioning (production)
 
 Bastion uses DHCP with a router reservation so the UCG `dhcp-script` registers DNS on
-first boot. Set `ansible_host` to the reservation IP and `vm_use_dhcp: true` in
-inventory (see [`production-runbook.md`](production-runbook.md)).
+first boot. Set `ansible_host` to the reservation IP. Omitting `ethernets` gives one
+dual-stack DHCP NIC on the profile's `vm_network`; an explicit `ethernets` entry can
+pin `macaddress` and/or select a different libvirt `network` (neither field is copied
+into guest Netplan). See [`production-runbook.md`](production-runbook.md).
 
 ```bash
 # Reservation-first — do not skip --prepare on first provision

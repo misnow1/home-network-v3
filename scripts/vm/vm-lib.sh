@@ -27,47 +27,154 @@ vm_inventory_host_json() {
     --host "${fqdn}"
 }
 
-vm_build_static_dns_yaml() {
-  local dns_servers_json="${1:-[]}"
-  local dns_search="${2:-}"
-  python3 - "${dns_servers_json}" "${dns_search}" <<'PY'
-import json, sys
+vm_normalize_ethernets() {
+  local host_json="${1:-}"
+  if [[ -z "${host_json}" ]]; then
+    host_json='{}'
+  fi
+  require_cmd python3
+  python3 - "${host_json}" <<'PY'
+import ipaddress
+import json
+import re
+import sys
 
-servers = json.loads(sys.argv[1] or "[]")
-search = sys.argv[2]
-if not servers and not search:
-    print("")
-    sys.exit(0)
-lines = ["            nameservers:"]
-if servers:
-    lines.append("              addresses:")
-    for addr in servers:
-        lines.append(f"                - {addr}")
-if search:
-    lines.append("              search:")
-    lines.append(f"                - {search}")
-print("\n".join(lines))
+host = json.loads(sys.argv[1] or "{}")
+default_network = host.get("vm_network")
+raw = host.get("ethernets")
+
+if raw is None:
+    if host.get("vm_ip") and not host.get("vm_use_dhcp"):
+        prefix = host.get("vm_subnet_prefix", 24)
+        entry = {
+            "addresses": [f"{host['vm_ip']}/{prefix}"],
+            "dhcp4": False,
+            "dhcp6": False,
+        }
+        if host.get("vm_gateway"):
+            entry["routes"] = [{"to": "default", "via": str(host["vm_gateway"])}]
+        if host.get("vm_dns_servers"):
+            entry["nameservers"] = list(host["vm_dns_servers"])
+    else:
+        entry = {"dhcp4": True, "dhcp6": True}
+    if host.get("vm_mac"):
+        entry["macaddress"] = host["vm_mac"]
+    raw = [entry]
+
+if not isinstance(raw, list) or not raw:
+    raise SystemExit("ethernets must be a non-empty list when provided")
+
+mac_re = re.compile(r"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")
+normalized = []
+for index, original in enumerate(raw, 1):
+    if not isinstance(original, dict):
+        raise SystemExit(f"ethernets[{index}] must be a mapping")
+    entry = dict(original)
+    if entry.get("network") and entry.get("bridge"):
+        raise SystemExit(f"ethernets[{index}] cannot set both network and bridge")
+    if not entry.get("network") and not entry.get("bridge"):
+        if not default_network:
+            raise SystemExit(f"ethernets[{index}] needs network/bridge and vm_network has no default")
+        entry["network"] = default_network
+    if "mac_address" in entry and "macaddress" not in entry:
+        entry["macaddress"] = entry.pop("mac_address")
+    if entry.get("macaddress") and not mac_re.fullmatch(str(entry["macaddress"])):
+        raise SystemExit(f"ethernets[{index}] has invalid macaddress")
+
+    addresses = entry.get("addresses", [])
+    if not isinstance(addresses, list):
+        raise SystemExit(f"ethernets[{index}].addresses must be a list")
+    for address in addresses:
+        try:
+            ipaddress.ip_interface(address)
+        except ValueError as exc:
+            raise SystemExit(f"ethernets[{index}] invalid address {address}: {exc}") from exc
+
+    if not addresses and "dhcp4" not in entry and "dhcp6" not in entry:
+        entry["dhcp4"] = True
+        entry["dhcp6"] = True
+    else:
+        entry.setdefault("dhcp4", False)
+        entry.setdefault("dhcp6", False)
+    if not isinstance(entry["dhcp4"], bool) or not isinstance(entry["dhcp6"], bool):
+        raise SystemExit(f"ethernets[{index}] dhcp4/dhcp6 must be booleans")
+    normalized.append(entry)
+
+print(json.dumps(normalized, separators=(",", ":")))
 PY
 }
 
-vm_build_dhcp_dns_search_yaml() {
-  local dns_search="${1:-}"
-  if [[ -z "${dns_search}" ]]; then
-    export VM_DNS_SEARCH_YAML=""
-    return 0
-  fi
-  export VM_DNS_SEARCH_YAML="            nameservers:
-              search:
-                - ${dns_search}"
+vm_inventory_ethernets() {
+  local profile="$1"
+  local fqdn="$2"
+  vm_normalize_ethernets "$(vm_inventory_host_json "${profile}" "${fqdn}")"
+}
+
+vm_ethernets_primary_ipv4() {
+  local ethernets_json="$1"
+  python3 - "${ethernets_json}" <<'PY'
+import ipaddress, json, sys
+for address in json.loads(sys.argv[1])[0].get("addresses", []):
+    interface = ipaddress.ip_interface(address)
+    if interface.version == 4:
+        print(interface.ip)
+        break
+PY
+}
+
+vm_ethernets_use_dhcp() {
+  local ethernets_json="$1"
+  # The first NIC is the management NIC. DHCPv6 on a static-IPv4 host does not
+  # require IPv4 lease discovery or a router reservation.
+  python3 -c 'import json,sys; e=json.loads(sys.argv[1]); raise SystemExit(0 if e[0].get("dhcp4") else 1)' \
+    "${ethernets_json}"
+}
+
+vm_build_netplan_yaml() {
+  local ethernets_json="$1"
+  require_cmd python3
+  python3 - "${ethernets_json}" <<'PY'
+import json
+import sys
+import yaml
+
+entries = json.loads(sys.argv[1])
+ethernets = {}
+for index, entry in enumerate(entries, 1):
+    guest = {
+        key: value
+        for key, value in entry.items()
+        if key not in {"network", "bridge", "macaddress", "mac_address"}
+    }
+    nameservers = guest.get("nameservers")
+    if isinstance(nameservers, list):
+        guest["nameservers"] = {"addresses": nameservers}
+    ethernets[f"enp{index}s0"] = guest
+
+print(yaml.safe_dump(
+    {"network": {"version": 2, "ethernets": ethernets}},
+    sort_keys=False,
+    default_flow_style=False,
+).rstrip())
+PY
+}
+
+vm_indent_yaml() {
+  local spaces="$1"
+  local content="$2"
+  local padding
+  printf -v padding '%*s' "${spaces}" ''
+  while IFS= read -r line; do
+    printf '%s%s\n' "${padding}" "${line}"
+  done <<< "${content}"
 }
 
 vm_render_cloud_init() {
   local profile="$1"
-  local mode="$2"
-  local fqdn="$3"
-  local vm_name="$4"
-  local vm_ip="${5:-}"
-  local pubkey seed_dir user_data meta_data template
+  local fqdn="$2"
+  local vm_name="$3"
+  local ethernets_json="$4"
+  local pubkey seed_dir user_data meta_data template netplan_yaml
 
   pubkey="$(cat "$(vm_ssh_pub_key_path "${profile}")")"
   seed_dir="$(vm_seeds_dir "${profile}")/${vm_name}"
@@ -76,20 +183,11 @@ vm_render_cloud_init() {
   export VM_FQDN="${fqdn}"
   export VM_HOST_SHORT="${fqdn%%.*}"
   export VM_INSTANCE_ID="${vm_name}"
-  export VM_IP="${vm_ip}"
   export VM_SSH_PUBKEY="${pubkey}"
-  export VM_NIC="${VM_NIC:-enp1s0}"
-
-  if [[ "${mode}" == "dhcp" ]]; then
-    template="${ROOT}/scripts/vm/cloud-init/user-data-dhcp.tmpl"
-    vm_build_dhcp_dns_search_yaml "${VM_DNS_SEARCH:-}"
-  else
-    template="${ROOT}/scripts/vm/cloud-init/user-data.tmpl"
-    export VM_GATEWAY="${VM_GATEWAY:?VM_GATEWAY required for static cloud-init}"
-    export VM_SUBNET_PREFIX="${VM_SUBNET_PREFIX:-24}"
-    VM_DNS_SERVERS_YAML="$(vm_build_static_dns_yaml "${VM_DNS_SERVERS_JSON:-[]}" "${VM_DNS_SEARCH:-}")"
-    export VM_DNS_SERVERS_YAML
-  fi
+  template="${ROOT}/scripts/vm/cloud-init/user-data.tmpl"
+  netplan_yaml="$(vm_build_netplan_yaml "${ethernets_json}")"
+  VM_NETPLAN_YAML="$(vm_indent_yaml 6 "${netplan_yaml}")"
+  export VM_NETPLAN_YAML
 
   user_data="${seed_dir}/user-data"
   meta_data="${seed_dir}/meta-data"
@@ -130,93 +228,284 @@ vm_ensure_libvirt_network() {
   fi
 }
 
-vm_build_network_arg() {
-  local bridge="${1:-}"
-  local net_name="${2:-home-dc-lab}"
-  local vm_mac="${3:-}"
-  local arg=""
+vm_network_args() {
+  local ethernets_json="$1"
+  local vcpus="${2:-1}"
+  local perf_profile="${3:-lab}"
+  python3 - "${ethernets_json}" "${vcpus}" "${perf_profile}" <<'PY'
+import json, sys
 
-  if [[ -n "${bridge}" ]]; then
-    arg="bridge=${bridge},model=virtio"
-  else
-    arg="network=${net_name},model=virtio"
-  fi
-  if [[ -n "${vm_mac}" ]]; then
-    arg="${arg},mac=${vm_mac}"
-  fi
-  printf '%s' "${arg}"
-}
+entries = json.loads(sys.argv[1])
+vcpus = int(sys.argv[2])
+perf_profile = sys.argv[3]
 
-vm_generate_mac_from_name() {
-  local vm_name="$1"
-  require_cmd python3
-  python3 - "${vm_name}" <<'PY'
-import hashlib, sys
-
-digest = hashlib.sha256(sys.argv[1].encode()).digest()
-print(f"52:54:00:{digest[0]:02x}:{digest[1]:02x}:{digest[2]:02x}")
+for entry in entries:
+    if entry.get("bridge"):
+        arg = f"bridge={entry['bridge']},model=virtio"
+    else:
+        arg = f"network={entry['network']},model=virtio"
+    if entry.get("macaddress"):
+        arg += f",mac={entry['macaddress']}"
+    if perf_profile in ("balanced", "storage", "windows11") and vcpus > 1:
+        arg += f",driver.queues={vcpus}"
+    print(arg)
 PY
 }
 
-vm_manifest_lookup() {
-  local manifest="$1"
-  local key="$2"
-  [[ -f "${manifest}" ]] || return 1
-  grep -E "^${key}=" "${manifest}" 2>/dev/null | head -1 | cut -d= -f2- || true
+vm_perf_profile_validate() {
+  local profile="$1"
+  case "${profile}" in
+    lab|balanced|storage|windows11) ;;
+    *) die "Invalid perf profile: ${profile} (expected lab, balanced, storage, or windows11)" ;;
+  esac
 }
 
-vm_resolve_mac() {
-  local profile="${1:-}"
-  local fqdn="${2:-}"
-  local vm_name="$3"
-  local seed_dir="$4"
-  local mac manifest
+vm_is_windows_profile() {
+  [[ "${1:-}" == "windows11" ]]
+}
 
-  if [[ -n "${profile}" && -n "${fqdn}" ]]; then
-    mac="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_mac")"
-    if [[ -n "${mac}" ]]; then
-      printf '%s' "${mac}"
-      return 0
-    fi
-  fi
-
-  manifest="${seed_dir}/manifest.txt"
-  mac="$(vm_manifest_lookup "${manifest}" "vm_mac")"
-  if [[ -n "${mac}" ]]; then
-    printf '%s' "${mac}"
+vm_parse_cpu_topology() {
+  # Prints: cores threads  (from "cores,threads" inventory form).
+  local topology="${1:-}"
+  local cores threads
+  if [[ -z "${topology}" ]]; then
+    printf ''
     return 0
   fi
-
-  vm_generate_mac_from_name "${vm_name}"
+  if [[ ! "${topology}" =~ ^([1-9][0-9]*),([1-9][0-9]*)$ ]]; then
+    die "Invalid vm_cpu_topology: ${topology} (expected cores,threads e.g. 6,1)"
+  fi
+  cores="${BASH_REMATCH[1]}"
+  threads="${BASH_REMATCH[2]}"
+  printf '%s %s' "${cores}" "${threads}"
 }
 
-# Build virt-install argv (array name in caller: local -a args; vm_build_virt_install_argv args ...).
+vm_disk_virt_install_arg() {
+  local perf_profile="$1"
+  local disk_path="$2"
+  case "${perf_profile}" in
+    lab)
+      printf 'path=%s,format=qcow2,bus=virtio' "${disk_path}"
+      ;;
+    balanced|storage|windows11)
+      printf 'path=%s,format=qcow2,bus=virtio,cache=none,io=native,discard=unmap' "${disk_path}"
+      ;;
+    *)
+      die "Invalid perf profile: ${perf_profile}"
+      ;;
+  esac
+}
+
+# Inject Hyper-V / Windows 11 domain knobs virt-install cannot express fully.
+vm_enrich_windows11_domain_xml() {
+  local domain_xml="$1"
+  local os_variant="${2:-win11}"
+  require_cmd python3
+  python3 - "${domain_xml}" "${os_variant}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+path, os_variant = sys.argv[1], sys.argv[2]
+tree = ET.parse(path)
+root = tree.getroot()
+
+# Metadata: win/11 for libosinfo.
+metadata = root.find("metadata")
+if metadata is None:
+    metadata = ET.SubElement(root, "metadata")
+libns = "http://libosinfo.org/xmlns/libvirt/domain/1.0"
+ET.register_namespace("libosinfo", libns)
+libinfo = metadata.find(f"{{{libns}}}libosinfo")
+if libinfo is None:
+    for child in list(metadata):
+        metadata.remove(child)
+    libinfo = ET.SubElement(metadata, f"{{{libns}}}libosinfo")
+os_el = libinfo.find(f"{{{libns}}}os")
+if os_el is None:
+    os_el = ET.SubElement(libinfo, f"{{{libns}}}os")
+os_id = "http://microsoft.com/win/11" if os_variant.startswith("win11") else f"http://microsoft.com/{os_variant}"
+os_el.set("id", os_id)
+
+features = root.find("features")
+if features is None:
+    features = ET.SubElement(root, "features")
+hyperv = features.find("hyperv")
+if hyperv is None:
+    hyperv = ET.SubElement(features, "hyperv")
+hyperv.set("mode", "custom")
+
+def ensure_hv(tag, **attrs):
+    node = hyperv.find(tag)
+    if node is None:
+        node = ET.SubElement(hyperv, tag)
+    node.set("state", "on")
+    for key, value in attrs.items():
+        node.set(key, value)
+    return node
+
+ensure_hv("relaxed")
+ensure_hv("vapic")
+ensure_hv("spinlocks", retries="8191")
+ensure_hv("vpindex")
+ensure_hv("runtime")
+ensure_hv("synic")
+stimer = ensure_hv("stimer")
+direct = stimer.find("direct")
+if direct is None:
+    direct = ET.SubElement(stimer, "direct")
+direct.set("state", "on")
+ensure_hv("reset")
+ensure_hv("frequencies")
+ensure_hv("tlbflush")
+ensure_hv("ipi")
+
+cpu = root.find("cpu")
+if cpu is not None and cpu.get("mode") == "host-passthrough":
+    # Ensure topoext for AMD hosts (harmless elsewhere).
+    found = False
+    for feature in cpu.findall("feature"):
+        if feature.get("name") == "topoext":
+            feature.set("policy", "require")
+            found = True
+            break
+    if not found:
+        feat = ET.SubElement(cpu, "feature")
+        feat.set("policy", "require")
+        feat.set("name", "topoext")
+
+tree.write(path, encoding="utf-8", xml_declaration=True)
+PY
+}
+
+vm_ethernets_with_xml_macs() {
+  local ethernets_json="$1"
+  local domain_xml="$2"
+  python3 - "${ethernets_json}" "${domain_xml}" <<'PY'
+import json, sys
+import xml.etree.ElementTree as ET
+
+entries = json.loads(sys.argv[1])
+macs = [
+    element.attrib["address"]
+    for element in ET.parse(sys.argv[2]).getroot().findall("./devices/interface/mac")
+]
+if len(macs) != len(entries):
+    raise SystemExit(f"domain XML has {len(macs)} NIC MACs; expected {len(entries)}")
+for entry, mac in zip(entries, macs):
+    entry["macaddress"] = mac
+print(json.dumps(entries, separators=(",", ":")))
+PY
+}
+
+vm_primary_mac() {
+  local ethernets_json="$1"
+  python3 -c 'import json,sys; print(json.loads(sys.argv[1])[0].get("macaddress",""))' \
+    "${ethernets_json}"
+}
+
+# Fill missing NIC MACs with QEMU locally-administered addresses (52:54:00:*).
+# Keeps dry-run manifests usable when virt-install is unavailable (e.g. CI).
+vm_ensure_ethernets_macs() {
+  local ethernets_json="$1"
+  require_cmd python3
+  python3 - "${ethernets_json}" <<'PY'
+import json
+import secrets
+import sys
+
+entries = json.loads(sys.argv[1])
+for entry in entries:
+    if entry.get("macaddress"):
+        continue
+    # Locally administered unicast MAC in the qemu/kvm OUI range.
+    entry["macaddress"] = "52:54:00:%02x:%02x:%02x" % tuple(
+        secrets.token_bytes(3)
+    )
+print(json.dumps(entries, separators=(",", ":")))
+PY
+}
+
+vm_print_ethernets_yaml() {
+  local ethernets_json="$1"
+  python3 - "${ethernets_json}" <<'PY'
+import json, sys, yaml
+print(yaml.safe_dump({"ethernets": json.loads(sys.argv[1])}, sort_keys=False).rstrip())
+PY
+}
+
+# Build virt-install argv with one --network per normalized ethernet.
+# Optional trailing args: cpu_topology (cores,threads), os_variant.
 vm_build_virt_install_argv() {
   local -n _out="$1"
   local vm_name="$2"
   local disk_path="$3"
   local seed_iso="$4"
-  local network_arg="$5"
+  local ethernets_json="$5"
   local memory_mb="$6"
   local vcpus="$7"
   local nested_virt="$8"
+  local perf_profile="${9:-lab}"
+  local cpu_topology="${10:-}"
+  local os_variant="${11:-}"
+  local -a network_args=()
+  local network_arg disk_arg vcpus_arg cores threads
+  vm_perf_profile_validate "${perf_profile}"
+  mapfile -t network_args < <(vm_network_args "${ethernets_json}" "${vcpus}" "${perf_profile}")
+  disk_arg="$(vm_disk_virt_install_arg "${perf_profile}" "${disk_path}")"
+
+  vcpus_arg="${vcpus}"
+  if [[ -n "${cpu_topology}" ]]; then
+    read -r cores threads <<< "$(vm_parse_cpu_topology "${cpu_topology}")"
+    vcpus_arg="sockets=1,cores=${cores},threads=${threads}"
+  fi
+
+  if [[ -z "${os_variant}" ]]; then
+    if vm_is_windows_profile "${perf_profile}"; then
+      os_variant="win11"
+    else
+      os_variant="ubuntu24.04"
+    fi
+  fi
 
   _out=(
     --connect "${LIBVIRT_DEFAULT_URI:-qemu:///system}"
     --name "${vm_name}"
     --memory "${memory_mb}"
-    --vcpus "${vcpus}"
-    --disk "path=${disk_path},format=qcow2,bus=virtio"
-    --disk "path=${seed_iso},device=cdrom"
-    --os-variant ubuntu24.04
-    --network "${network_arg}"
-    --graphics none
-    --console "pty,target.type=serial"
-    --import
-    --noautoconsole
+    --vcpus "${vcpus_arg}"
+    --disk "${disk_arg}"
+    --os-variant "${os_variant}"
   )
-  if [[ "${nested_virt}" -eq 1 ]]; then
-    _out+=(--cpu host-passthrough)
+  if [[ -n "${seed_iso}" ]]; then
+    _out+=(--disk "path=${seed_iso},device=cdrom")
+  fi
+  for network_arg in "${network_args[@]}"; do
+    _out+=(--network "${network_arg}")
+  done
+
+  if vm_is_windows_profile "${perf_profile}"; then
+    _out+=(
+      --boot "uefi,firmware.feature0.name=secure-boot,firmware.feature0.enabled=yes,firmware.feature1.name=enrolled-keys,firmware.feature1.enabled=yes"
+      --features "hyperv_relaxed=on,hyperv_vapic=on,hyperv_spinlocks=on,hyperv_spinlocks_retries=8191,hyperv_synic=on,hyperv_reset=on,smm=on,vmport=off"
+      --cpu "host-passthrough,migratable=off"
+      --tpm "backend.type=emulator,backend.version=2.0,model=tpm-crb"
+      --clock "offset=localtime"
+      --graphics "vnc,listen=127.0.0.1"
+      --video vga
+      --import
+      --noautoconsole
+    )
+  else
+    _out+=(
+      --graphics none
+      --console "pty,target.type=serial"
+      --import
+      --noautoconsole
+    )
+    if [[ "${nested_virt}" -eq 1 ]]; then
+      _out+=(--cpu host-passthrough)
+    elif [[ "${perf_profile}" != "lab" ]]; then
+      _out+=(--cpu host-model)
+    fi
   fi
 }
 
@@ -232,41 +521,41 @@ vm_quote_args() {
 vm_write_install_artifacts() {
   local vm_name="$1"
   local fqdn="$2"
-  local vm_ip="$3"
-  local cloud_init_mode="$4"
-  local disk_path="$5"
-  local seed_iso="$6"
-  local base_image="$7"
-  local network_arg="$8"
-  local memory_mb="$9"
-  local vcpus="${10}"
-  local nested_virt="${11}"
-  local bundle_dir="${12}"
-  local vm_mac="${13:-}"
+  local ethernets_json="$3"
+  local disk_path="$4"
+  local seed_iso="$5"
+  local base_image="$6"
+  local memory_mb="$7"
+  local vcpus="$8"
+  local nested_virt="$9"
+  local perf_profile="${10:-lab}"
+  local bundle_dir="${11}"
+  local cpu_topology="${12:-}"
+  local os_variant="${13:-}"
   local -a virt_argv=()
 
+  ethernets_json="$(vm_ensure_ethernets_macs "${ethernets_json}")"
   vm_build_virt_install_argv virt_argv "${vm_name}" "${disk_path}" "${seed_iso}" \
-    "${network_arg}" "${memory_mb}" "${vcpus}" "${nested_virt}"
+    "${ethernets_json}" "${memory_mb}" "${vcpus}" "${nested_virt}" "${perf_profile}" \
+    "${cpu_topology}" "${os_variant}"
 
   local install_sh="${bundle_dir}/install.sh"
   local domain_xml="${bundle_dir}/domain.xml"
   local manifest="${bundle_dir}/manifest.txt"
-  local quoted_cmd nested_cpu="" autostart_line=""
+  local quoted_cmd autostart_line=""
   quoted_cmd="$(vm_quote_args virt-install "${virt_argv[@]}")"
-  if [[ "${nested_virt}" -eq 1 ]]; then
-    nested_cpu=$'  --noautoconsole \\\n  --cpu host-passthrough'
-  else
-    nested_cpu='  --noautoconsole'
-  fi
   if [[ "${AUTOSTART:-1}" -eq 1 ]]; then
     # LIBVIRT_DEFAULT_URI stays literal — it is expanded when install.sh runs, not now.
     # shellcheck disable=SC2016
     autostart_line=$(printf 'virsh --connect "${LIBVIRT_DEFAULT_URI}" autostart "%s"' "${vm_name}")
-    nested_cpu="${nested_cpu} \\"$'\n'"  --autostart"
   fi
 
   if command -v virt-install >/dev/null 2>&1; then
     if virt-install "${virt_argv[@]}" --print-xml > "${domain_xml}" 2>/dev/null; then
+      if vm_is_windows_profile "${perf_profile}"; then
+        vm_enrich_windows11_domain_xml "${domain_xml}" "${os_variant:-win11}"
+      fi
+      ethernets_json="$(vm_ethernets_with_xml_macs "${ethernets_json}" "${domain_xml}")"
       log_info "Wrote ${domain_xml}"
     else
       log_warn "Could not generate domain.xml (libvirt network may be undefined on this host)"
@@ -291,12 +580,22 @@ LIBVIRT_DEFAULT_URI="\${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 DOMAIN_XML="\${DOMAIN_XML:-${domain_xml}}"
 
 [[ -f "\${DISK_PATH}" ]] || { echo "Missing disk: \${DISK_PATH}" >&2; exit 1; }
-[[ -f "\${SEED_ISO}" ]] || { echo "Missing seed ISO: \${SEED_ISO}" >&2; exit 1; }
-[[ -f "\${BASE_IMAGE}" ]] || {
-  echo "Missing base cloud image: \${BASE_IMAGE}" >&2
+EOF
+    if [[ -n "${seed_iso}" ]]; then
+      cat <<'EOF'
+[[ -f "${SEED_ISO}" ]] || { echo "Missing seed ISO: ${SEED_ISO}" >&2; exit 1; }
+EOF
+    fi
+    if [[ -n "${base_image}" ]]; then
+      cat <<'EOF'
+[[ -f "${BASE_IMAGE}" ]] || {
+  echo "Missing base cloud image: ${BASE_IMAGE}" >&2
   echo "Copy from the build host or run image-ensure.sh on this hypervisor." >&2
   exit 1
 }
+EOF
+    fi
+    cat <<EOF
 
 command -v virsh >/dev/null || { echo "virsh required" >&2; exit 1; }
 
@@ -309,24 +608,13 @@ if [[ -f "\${DOMAIN_XML}" ]]; then
   virsh --connect "\${LIBVIRT_DEFAULT_URI}" define "\${DOMAIN_XML}"
   ${autostart_line}
   virsh --connect "\${LIBVIRT_DEFAULT_URI}" start "${vm_name}"
+  virsh --connect "\${LIBVIRT_DEFAULT_URI}" domiflist "${vm_name}"
   exit 0
 fi
 
 command -v virt-install >/dev/null || { echo "virt-install required (no domain.xml)" >&2; exit 1; }
-
-exec virt-install \\
-  --connect "\${LIBVIRT_DEFAULT_URI}" \\
-  --name "${vm_name}" \\
-  --memory "${memory_mb}" \\
-  --vcpus "${vcpus}" \\
-  --disk "path=\${DISK_PATH},format=qcow2,bus=virtio" \\
-  --disk "path=\${SEED_ISO},device=cdrom" \\
-  --os-variant ubuntu24.04 \\
-  --network "${network_arg}" \\
-  --graphics none \\
-  --console "pty,target.type=serial" \\
-  --import \\
-${nested_cpu}
+${quoted_cmd}
+virsh --connect "\${LIBVIRT_DEFAULT_URI}" domiflist "${vm_name}"
 EOF
   } > "${install_sh}"
   chmod 755 "${install_sh}"
@@ -334,18 +622,13 @@ EOF
   {
     printf 'vm_name=%s\n' "${vm_name}"
     printf 'fqdn=%s\n' "${fqdn}"
-    if [[ "${cloud_init_mode}" == "dhcp" ]]; then
-      printf 'network_mode=dhcp\n'
-    else
-      printf 'network_mode=static\n'
-      printf 'vm_ip=%s\n' "${vm_ip}"
-    fi
-    if [[ -n "${vm_mac}" ]]; then
-      printf 'vm_mac=%s\n' "${vm_mac}"
-    fi
+    printf 'ethernets_json=%s\n' "${ethernets_json}"
     printf 'disk_path=%s\n' "${disk_path}"
     printf 'seed_iso=%s\n' "${seed_iso}"
     printf 'base_image=%s\n' "${base_image}"
+    printf 'perf_profile=%s\n' "${perf_profile}"
+    printf 'cpu_topology=%s\n' "${cpu_topology}"
+    printf 'os_variant=%s\n' "${os_variant}"
     printf 'install_script=%s\n' "${install_sh}"
     if [[ -f "${domain_xml}" ]]; then
       printf 'domain_xml=%s\n' "${domain_xml}"
@@ -357,14 +640,17 @@ EOF
 
 # Copy to target hypervisor
 # 1. Base cloud image (once per hypervisor): copy base_image or run image-ensure.sh
-# 2. Disk overlay: disk_path (qcow2 backing file must resolve on target — same path or qemu-img rebase)
-# 3. Cloud-init seed: seed_iso (and optional user-data/meta-data in the same directory)
+#    (Ubuntu guests only — Windows blank disks skip this)
+# 2. Disk overlay: disk_path
+# 3. Cloud-init seed: seed_iso when present (Ubuntu guests)
 # 4. Run install_script on the target (uses domain.xml when present — preserves MAC)
 
 # If backing path differs on the target:
 #   qemu-img info disk_path
 #   qemu-img rebase -u -b /path/on/target/noble-server-cloudimg-amd64.img disk_path
 NOTES
+    printf '\n# Inventory-ready resolved interfaces\n'
+    vm_print_ethernets_yaml "${ethernets_json}"
   } > "${manifest}"
 
   log_info "Wrote ${install_sh}"
@@ -390,6 +676,7 @@ vm_define_domain_from_virt_install() {
   require_cmd virsh
   require_cmd virt-install
 
+  mkdir -p "$(dirname "${domain_xml}")"
   virt-install "${virt_argv[@]}" --print-xml > "${domain_xml}"
   virsh define "${domain_xml}" >/dev/null
   log_info "Defined VM ${vm_name} (not started)"
@@ -398,27 +685,17 @@ vm_define_domain_from_virt_install() {
 vm_write_manifest() {
   local vm_name="$1"
   local fqdn="$2"
-  local vm_ip="$3"
-  local cloud_init_mode="$4"
-  local disk_path="$5"
-  local seed_iso="$6"
-  local base_image="$7"
-  local domain_xml="$8"
-  local vm_mac="$9"
-  local manifest="${10}"
+  local ethernets_json="$3"
+  local disk_path="$4"
+  local seed_iso="$5"
+  local base_image="$6"
+  local domain_xml="$7"
+  local manifest="$8"
 
   {
     printf 'vm_name=%s\n' "${vm_name}"
     printf 'fqdn=%s\n' "${fqdn}"
-    if [[ "${cloud_init_mode}" == "dhcp" ]]; then
-      printf 'network_mode=dhcp\n'
-    else
-      printf 'network_mode=static\n'
-      printf 'vm_ip=%s\n' "${vm_ip}"
-    fi
-    if [[ -n "${vm_mac}" ]]; then
-      printf 'vm_mac=%s\n' "${vm_mac}"
-    fi
+    printf 'ethernets_json=%s\n' "${ethernets_json}"
     printf 'disk_path=%s\n' "${disk_path}"
     printf 'seed_iso=%s\n' "${seed_iso}"
     printf 'base_image=%s\n' "${base_image}"
@@ -427,6 +704,8 @@ vm_write_manifest() {
       printf 'define_cmd=virsh define %s\n' "${domain_xml}"
       printf 'start_cmd=virsh start %s\n' "${vm_name}"
     fi
+    printf '\n# Inventory-ready resolved interfaces\n'
+    vm_print_ethernets_yaml "${ethernets_json}"
   } > "${manifest}"
   log_info "Wrote ${manifest}"
 }
@@ -434,9 +713,11 @@ vm_write_manifest() {
 vm_print_reservation_block() {
   local fqdn="$1"
   local vm_name="$2"
-  local vm_mac="$3"
+  local ethernets_json="$3"
   local reserve_ip="$4"
   local profile="$5"
+  local vm_mac
+  vm_mac="$(vm_primary_mac "${ethernets_json}")"
 
   cat <<EOF >&2
 
@@ -457,13 +738,17 @@ vm_wait_for_reservation_confirm() {
   read -r _
 }
 
-vm_discover_ip() {
+vm_discover_ips() {
   local vm_name="$1"
   require_cmd virsh
   virsh domifaddr "${vm_name}" --source agent 2>/dev/null \
-    | awk '/ipv4/ { print $4 }' \
-    | cut -d/ -f1 \
-    | head -1
+    | awk '/ipv4|ipv6/ { print $4 }' \
+    | cut -d/ -f1
+}
+
+vm_discover_ip() {
+  local vm_name="$1"
+  vm_discover_ips "${vm_name}" | awk '!/^127\./ && $0 != "::1" { print; exit }'
 }
 
 vm_wait_for_ip() {
@@ -501,6 +786,21 @@ vm_create_disk() {
   else
     qemu-img create -f qcow2 -F qcow2 -b "${base_image}" "${disk_path}"
   fi
+  chmod 660 "${disk_path}" 2>/dev/null || true
+}
+
+# Blank qcow2 for Windows (or other non-cloud-image) guests — no backing file.
+vm_create_blank_disk() {
+  local profile="$1"
+  local disk_path="$2"
+  local disk_gb="$3"
+
+  [[ -n "${disk_gb}" ]] || die "Blank disk create requires disk size in GB"
+  mkdir -p "$(vm_vms_dir "${profile}")"
+  if [[ -f "${disk_path}" ]]; then
+    return 0
+  fi
+  qemu-img create -f qcow2 "${disk_path}" "${disk_gb}G"
   chmod 660 "${disk_path}" 2>/dev/null || true
 }
 
@@ -542,6 +842,28 @@ vm_ensure_network_for_profile() {
   vm_ensure_libvirt_network "${net_name}"
 }
 
+vm_ensure_ethernets_for_profile() {
+  local profile="$1"
+  local ethernets_json="$2"
+  local kind name
+  while IFS=$'\t' read -r kind name; do
+    [[ -n "${name}" ]] || continue
+    if [[ "${kind}" == "bridge" ]]; then
+      vm_validate_bridge "${name}"
+    else
+      vm_ensure_network_for_profile "${profile}" "${name}"
+    fi
+  done < <(python3 - "${ethernets_json}" <<'PY'
+import json, sys
+for entry in json.loads(sys.argv[1]):
+    if entry.get("bridge"):
+        print("bridge", entry["bridge"], sep="\t")
+    else:
+        print("network", entry["network"], sep="\t")
+PY
+)
+}
+
 vm_inventory_lookup() {
   local profile="$1"
   local fqdn="$2"
@@ -572,13 +894,7 @@ load_inventory_network_exports() {
 vm_host_uses_dhcp() {
   local profile="$1"
   local fqdn="$2"
-  local use_dhcp vm_ip
-  use_dhcp="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_use_dhcp")"
-  if [[ "${use_dhcp,,}" == "true" ]]; then
-    return 0
-  fi
-  vm_ip="$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_ip")"
-  [[ -z "${vm_ip}" ]]
+  vm_ethernets_use_dhcp "$(vm_inventory_ethernets "${profile}" "${fqdn}")"
 }
 
 vm_inventory_host_known() {
@@ -586,6 +902,24 @@ vm_inventory_host_known() {
   local fqdn="$2"
   [[ -n "$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "ansible_host")" ]] \
     || [[ -n "$(vm_inventory_lookup_optional "${profile}" "${fqdn}" "vm_name")" ]]
+}
+
+vm_profile_default_network() {
+  local profile="$1"
+  local vars_file
+  vars_file="$(vm_profile_inventory_dir "${profile}")/group_vars/all/vars.yml"
+  if [[ ! -f "${vars_file}" && -f "${vars_file}.example" ]]; then
+    vars_file="${vars_file}.example"
+  fi
+  [[ -f "${vars_file}" ]] || die "Profile ${profile} has no group_vars/all/vars.yml"
+  python3 - "${vars_file}" <<'PY'
+import sys, yaml
+data = yaml.safe_load(open(sys.argv[1], encoding="utf-8")) or {}
+network = data.get("vm_network")
+if not network:
+    raise SystemExit(f"{sys.argv[1]} is missing vm_network")
+print(network)
+PY
 }
 
 load_profile_network_exports() {
