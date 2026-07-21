@@ -1,0 +1,9 @@
+---
+# mail2 secondary relay — copy to vars.yml (gitignored alongside hosts.yml).
+#
+# Per-host certbot domain (group_vars/mail_relay sets mail.home defaults for primary).
+
+certbot_domains:
+  - mail2.home.2123studios.com
+
+mail_relay_hostname: mail2.home.2123studios.com

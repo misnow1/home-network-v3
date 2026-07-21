@@ -35,4 +35,6 @@ lab_test_user_gid: 10001
 # Do NOT enable on hosts in the mail_relay group (they run the mail_relay server role).
 mail_relay_client_enabled: false
 mail_relay_hostname: mail.home.2123studios.com
+# Optional secondary relay when primary is unreachable (Postfix smtp_fallback_relay).
+mail_relay_fallback_hostname: ""
 mail_relay_manage_root_forward: false

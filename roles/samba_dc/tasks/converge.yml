@@ -86,3 +86,7 @@
 - name: DC converge | Ensure mail relay DNS records
   ansible.builtin.import_tasks: dns_mail_relay.yml
   tags: [samba_dns, samba_converge]
+
+- name: DC converge | Ensure LDAP VIP DNS record
+  ansible.builtin.import_tasks: dns_ldap_vip.yml
+  tags: [samba_dns, samba_converge, ldap_vip]

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# keepalived notify — DNAT VIP LDAP/LDAPS to this DC's primary IP.
+#
+# Samba uses "bind interfaces only" and only binds addresses present at start.
+# Restarting Samba on VIP acquire would rebind, but also risks VRRP flaps and
+# samba_dnsupdate registering the VIP as the DC hostname. DNAT avoids both.
+set -euo pipefail
+
+STATE="${1:-}"
+VIP="{{ ldap_vip_address }}"
+BACKEND="{{ ldap_vip_backend_ip }}"
+TABLE="ldap_vip"
+PORTS="{{ ldap_vip_dnat_ports | join(', ') }}"
+
+log() {
+  logger -t ldap-vip-notify -- "$*" || true
+  echo "$*" >&2
+}
+
+teardown_dnat() {
+  if nft list table ip "$TABLE" >/dev/null 2>&1; then
+    nft delete table ip "$TABLE"
+    log "removed nftables table $TABLE"
+  fi
+}
+
+setup_dnat() {
+  teardown_dnat
+  nft add table ip "$TABLE"
+  # Remote clients: VIP arrives on the LAN NIC
+  nft add chain ip "$TABLE" prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'
+  # Local tests on the DC itself (openssl/ldapsearch to VIP)
+  nft add chain ip "$TABLE" output '{ type nat hook output priority -100; policy accept; }'
+  # shellcheck disable=SC2086
+  nft add rule ip "$TABLE" prerouting ip daddr "$VIP" tcp dport { $PORTS } dnat to "$BACKEND"
+  # shellcheck disable=SC2086
+  nft add rule ip "$TABLE" output ip daddr "$VIP" tcp dport { $PORTS } dnat to "$BACKEND"
+  log "DNAT $VIP:{$PORTS} -> $BACKEND (state=$STATE)"
+}
+
+case "$STATE" in
+  MASTER)
+    setup_dnat
+    ;;
+  BACKUP|FAULT|STOP)
+    teardown_dnat
+    log "VIP LDAP DNAT cleared (state=$STATE)"
+    ;;
+  *)
+    log "unknown state '$STATE' — ignoring"
+    exit 0
+    ;;
+esac

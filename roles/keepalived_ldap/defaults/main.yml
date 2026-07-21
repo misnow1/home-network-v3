@@ -1,0 +1,23 @@
+---
+# Floating LDAP/LDAPS VIP on Samba AD DC pair (keepalived + VRRP).
+# See docs/ldap-vip-runbook.md.
+
+ldap_vip_enabled: false
+ldap_vip_address: 192.168.1.12
+ldap_vip_hostname: ldap.home.2123studios.com
+ldap_vip_vrid: 51
+# Per-host: ldap_vip_state (MASTER|BACKUP) and ldap_vip_priority (e.g. 100/90).
+ldap_vip_state: BACKUP
+ldap_vip_priority: 90
+ldap_vip_interface: "{{ ansible_facts['default_ipv4']['interface'] | default('eth0') }}"
+# Primary IP Samba already listens on — VIP:389/636 are DNATed here (not bound by Samba).
+ldap_vip_backend_ip: "{{ ansible_host | default(ansible_facts['default_ipv4']['address'] | default('')) }}"
+ldap_vip_dnat_ports:
+  - 389
+  - 636
+# VRRP auth password — override with vault in production.
+ldap_vip_auth_pass: home-ldap-vip
+ldap_vip_check_interval: 3
+ldap_vip_check_fall: 2
+ldap_vip_check_rise: 2
+ldap_vip_check_weight: -20
