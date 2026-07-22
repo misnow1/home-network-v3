@@ -229,6 +229,7 @@ Or set values manually:
 DDNS_UPDATE_URL="http://192.168.1.10:8765/ddns/v1/lease"
 DDNS_BEARER_TOKEN="<vault_ddns_shared_secret>"
 DDNS_DNS_DOMAIN="home.2123studios.com"
+DDNS_UPDATE_URL_FALLBACK="http://192.168.1.11:8765/ddns/v1/lease"
 ```
 
 The wrapper exports `DDNS_ENV_FILE=/data/home-ddns/home-ddns.env` automatically.

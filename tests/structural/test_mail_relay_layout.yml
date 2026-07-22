@@ -79,6 +79,8 @@
         grep -q "'mail_relay' not in group_names" "{{ domain_join_main }}"
         grep -q 'postfix_relayclient.yml' "{{ domain_join_main }}"
         grep -q 'mail_relay_hostname' "{{ repo_root }}/roles/domain_join/templates/postfix-main.cf.j2"
+        grep -q 'mail_relay_fallback_hostname' "{{ repo_root }}/roles/domain_join/templates/postfix-main.cf.j2"
+        grep -q 'mail_relay_secondary_enabled' "{{ dns_mail_relay_tasks }}"
       args:
         executable: /bin/bash
       changed_when: false

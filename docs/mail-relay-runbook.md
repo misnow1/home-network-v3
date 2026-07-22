@@ -1,8 +1,9 @@
 # Internal mail relay runbook (Slice 16+)
 
 Replace the legacy **pdc** internal→external SMTP relay. Outbound server mail (cron, alerts)
-relays through **native Postfix on a dedicated Ubuntu VM** at **`mail.home.2123studios.com`**
-and forwards to **Gmail** with pdc-equivalent sender rewrite rules.
+relays through **native Postfix on dedicated Ubuntu VMs** at **`mail.home.2123studios.com`**
+(primary, kvm01) and **`mail2.home.2123studios.com`** (fallback, kif), forwarding to **Gmail**
+with pdc-equivalent sender rewrite rules.
 
 See also:
 
@@ -14,10 +15,12 @@ See also:
 
 | Component | Location |
 |---|---|
-| Postfix relay | Dedicated VM — `mail.home.2123studios.com` |
-| TLS | Certbot snap on same VM (`certbot` inventory group) |
-| DNS A + MX | AD DNS on dc1 (Ansible `dns_mail_relay.yml`) |
+| Postfix relay (primary) | `mail.home.2123studios.com` — kvm01 (192.168.1.15) |
+| Postfix relay (fallback) | `mail2.home.2123studios.com` — kif (192.168.1.17) |
+| TLS | Certbot snap on each mail VM (`certbot` inventory group) |
+| DNS A + MX | AD DNS on DCs (Ansible `dns_mail_relay.yml`) — MX → primary only |
 | Member `relayhost` | Ansible `domain_join` role when `mail_relay_client_enabled: true` |
+| Member fallback | `smtp_fallback_relay` → `mail2` when primary unreachable |
 | Upstream | Gmail SMTP (`smtp.gmail.com:587`) with app password |
 
 Sender rewrite (replicates pdc `/etc/postfix/sender_rewrite`):
@@ -62,12 +65,15 @@ Add the mail relay host to `inventories/production/hosts.yml` (see
 in both **`mail_relay`** and **`linux`** (via `linux.children.mail_relay`) so
 `baseline.yml` matches it.
 
-4. DC group vars — point DNS at the mail VM IP:
+4. DC group vars — point DNS at the mail VM IPs:
 
 ```yaml
 mail_relay_dns_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
-mail_relay_target_ip: 192.168.1.15   # mail VM
+mail_relay_target_ip: 192.168.1.15   # mail VM on kvm01
+mail_relay_secondary_enabled: true
+mail_relay_secondary_hostname: mail2.home.2123studios.com
+mail_relay_secondary_target_ip: 192.168.1.17   # mail2 VM on kif
 ```
 
 5. Linux member group vars (when ready to cut over):
@@ -75,6 +81,7 @@ mail_relay_target_ip: 192.168.1.15   # mail VM
 ```yaml
 mail_relay_client_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
+mail_relay_fallback_hostname: mail2.home.2123studios.com
 mail_relay_manage_root_forward: true   # optional: remove /root/.forward
 ```
 
@@ -82,28 +89,42 @@ The mail VM uses `mail_relay_client_enabled: false` in `group_vars/mail_relay/` 
 `domain-join.yml` joins AD without configuring relay-client Postfix (server role handles
 that via `mail-relay.yml`).
 
-## Step 1 — Provision the mail relay VM
+## Step 1 — Provision the mail relay VMs
 
-From the control node (kvm01 or similar):
+From the control node (kvm01 or kif):
+
+**Primary (kvm01):**
 
 ```bash
 ./scripts/vm/vm-create.sh -i production mail.home.2123studios.com
 ./scripts/vm/wait-ssh.sh -i production mail.home.2123studios.com
 ```
 
+**Fallback (kif):**
+
+```bash
+./scripts/vm/vm-create.sh -i production mail2.home.2123studios.com
+./scripts/vm/wait-ssh.sh -i production mail2.home.2123studios.com
+```
+
+Copy `host_vars/mail2.home.2123studios.com/vars.yml.example` → `vars.yml` for per-host
+certbot domain before converging mail2.
+
 Suggested sizing: 512MB–1GB RAM, 8–12GB disk (see `hosts.yml.example`).
 
 ## Step 2 — Converge baseline, domain join, certbot, and Postfix
 
+Run for **each** mail VM (or `--limit` both):
+
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 
-${PROD} playbooks/baseline.yml --limit mail.home.2123studios.com
-${PROD} playbooks/domain-join.yml --limit mail.home.2123studios.com
+${PROD} playbooks/baseline.yml --limit 'mail.home.2123studios.com,mail2.home.2123studios.com'
+${PROD} playbooks/domain-join.yml --limit 'mail.home.2123studios.com,mail2.home.2123studios.com'
 ${PROD} playbooks/certbot.yml -e allow_production=true \
-  --limit mail.home.2123studios.com
+  --limit 'mail.home.2123studios.com,mail2.home.2123studios.com'
 ${PROD} playbooks/mail-relay.yml -e allow_production=true \
-  --limit mail.home.2123studios.com
+  --limit 'mail.home.2123studios.com,mail2.home.2123studios.com'
 ```
 
 Run `domain-join.yml` before certbot so the mail VM is domain-joined and uses AD DNS.
@@ -129,6 +150,7 @@ Verify:
 
 ```bash
 dig +short @192.168.1.10 mail.home.2123studios.com A
+dig +short @192.168.1.10 mail2.home.2123studios.com A
 dig +short @192.168.1.10 home.2123studios.com MX
 ```
 
@@ -150,6 +172,19 @@ Verify in Gmail:
 
 - Mail arrives at `vault_mail_default_recipient`
 - Envelope / headers reflect rewritten `@2123studios.com` sender
+
+**Failover smoke test** — stop Postfix on primary, then from a member:
+
+```bash
+# on mail.home (or block kvm01 host)
+sudo systemctl stop postfix
+
+# on a domain-joined member
+echo "fallback smoke $(date)" | mail -s "mail2 fallback test" root
+sudo postqueue -p   # should show mail2 as active relay after primary fails
+```
+
+Restore primary when done: `sudo systemctl start postfix` on mail.home.
 
 ## Step 5 — Cut over members
 
@@ -175,11 +210,15 @@ Internal mail relay runs on **mail.home.2123studios.com**. Legacy **pdc** is dec
 ## Apply order summary
 
 ```text
-vm-create mail.home.2123studios.com
-baseline.yml → domain-join.yml → certbot.yml → mail-relay.yml   (mail VM)
+vm-create mail.home.2123studios.com          (kvm01)
+vm-create mail2.home.2123studios.com         (kif)
+baseline.yml → domain-join.yml → certbot.yml → mail-relay.yml   (both mail VMs)
 dc-converge.yml                                                 (dc1 — DNS A + MX)
-baseline.yml → domain-join.yml                                  (members — relayhost client)
+baseline.yml → domain-join.yml                                  (members — relayhost + fallback)
 ```
+
+Members use bracketed `relayhost` / `smtp_fallback_relay` hostnames — **not MX lookup**.
+Dual MX records would not help LAN submission; Postfix fallback is the correct mechanism.
 
 ## Troubleshooting
 
@@ -190,4 +229,5 @@ baseline.yml → domain-join.yml                                  (members — r
 | TLS errors | Run `certbot.yml` first; check `/etc/letsencrypt/live/` |
 | `mail-relay.yml` fails on cert | certbot must complete before Postfix converge |
 | Members can't relay | `mail_relay_mynetworks` includes member subnet |
+| Fallback not used | Confirm `mail_relay_fallback_hostname` in group_vars/linux; check `postconf relayhost smtp_fallback_relay` |
 | Playbook skipped on DC certbot | DC hosts still require `samba_dc_tls_enabled` |

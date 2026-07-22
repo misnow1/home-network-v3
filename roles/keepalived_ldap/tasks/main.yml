@@ -1,0 +1,67 @@
+---
+- name: LDAP VIP | Require VRRP state and priority when enabled
+  ansible.builtin.assert:
+    that:
+      - ldap_vip_state in ['MASTER', 'BACKUP']
+      - ldap_vip_priority | int >= 1
+      - ldap_vip_address | length > 0
+      - ldap_vip_hostname | length > 0
+      - ldap_vip_backend_ip | length > 0
+    fail_msg: >-
+      Configure ldap_vip_state, ldap_vip_priority, ldap_vip_address, and
+      ldap_vip_backend_ip when ldap_vip_enabled is true.
+  when: ldap_vip_enabled | bool
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Install keepalived and nftables
+  ansible.builtin.apt:
+    name:
+      - keepalived
+      - nftables
+    state: present
+    update_cache: true
+  when: ldap_vip_enabled | bool
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Deploy LDAPS health check script
+  ansible.builtin.template:
+    src: check_ldaps.sh.j2
+    dest: /usr/local/sbin/check-ldaps-vip.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: ldap_vip_enabled | bool
+  notify: Restart keepalived
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Deploy VIP notify script (DNAT)
+  ansible.builtin.template:
+    src: ldap-vip-notify.sh.j2
+    dest: /usr/local/sbin/ldap-vip-notify.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: ldap_vip_enabled | bool
+  notify: Restart keepalived
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Deploy keepalived configuration
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: ldap_vip_enabled | bool
+  notify: Restart keepalived
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Enable and start keepalived
+  ansible.builtin.service:
+    name: keepalived
+    state: started
+    enabled: true
+  when:
+    - ldap_vip_enabled | bool
+    - not ansible_check_mode
+  tags: [ldap_vip]

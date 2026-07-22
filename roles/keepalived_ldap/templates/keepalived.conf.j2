@@ -1,0 +1,40 @@
+# {{ ansible_managed }}
+# LDAP/LDAPS VIP for {{ ldap_vip_hostname }} — see docs/ldap-vip-runbook.md.
+#
+# Samba does not rebind when the VIP appears on the NIC. notify_* scripts DNAT
+# VIP:389/636 to this DC's primary IP so clients reach LDAPS without a Samba restart.
+
+global_defs {
+    script_user root
+    enable_script_security
+}
+
+vrrp_script check_ldaps {
+    script "/usr/local/sbin/check-ldaps-vip.sh"
+    interval {{ ldap_vip_check_interval }}
+    weight {{ ldap_vip_check_weight }}
+    fall {{ ldap_vip_check_fall }}
+    rise {{ ldap_vip_check_rise }}
+}
+
+vrrp_instance VI_LDAP {
+    state {{ ldap_vip_state }}
+    interface {{ ldap_vip_interface }}
+    virtual_router_id {{ ldap_vip_vrid }}
+    priority {{ ldap_vip_priority }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass {{ ldap_vip_auth_pass }}
+    }
+    virtual_ipaddress {
+        {{ ldap_vip_address }}/24
+    }
+    track_script {
+        check_ldaps
+    }
+    notify_master "/usr/local/sbin/ldap-vip-notify.sh MASTER"
+    notify_backup "/usr/local/sbin/ldap-vip-notify.sh BACKUP"
+    notify_fault "/usr/local/sbin/ldap-vip-notify.sh FAULT"
+    notify_stop "/usr/local/sbin/ldap-vip-notify.sh STOP"
+}

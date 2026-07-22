@@ -20,8 +20,8 @@ certbot_local_ca_dir: /etc/letsencrypt/local-ca
 certbot_local_ca_valid_days: 825
 certbot_server_cert_valid_days: 397
 certbot_dreamhost_api_key: "{{ vault_dreamhost_api_key | default('') }}"
-certbot_dreamhost_propagation_seconds: 180
-certbot_dreamhost_propagation_poll_interval: 10
+certbot_dreamhost_propagation_seconds: 600
+certbot_dreamhost_propagation_poll_interval: 30
 certbot_dreamhost_validation_resolvers:
   - 8.8.8.8
   - 1.1.1.1

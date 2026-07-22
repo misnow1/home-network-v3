@@ -1,0 +1,9 @@
+---
+# dc1 — LDAP VIP primary (MASTER) and cert SAN for ldap.home.2123studios.com
+
+certbot_domains:
+  - dc1.home.2123studios.com
+  - ldap.home.2123studios.com
+
+ldap_vip_state: MASTER
+ldap_vip_priority: 100

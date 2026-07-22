@@ -77,6 +77,15 @@ all:
             - dhcp4: true
               dhcp6: true
               # macaddress: 52:54:00:ab:cd:ef  # optional libvirt-only pin
+        mail2.example.home:
+          ansible_host: 203.0.113.17
+          vm_name: mail2-example-home
+          vm_memory_mb: 512
+          vm_disk_gb: 8
+          ethernets:
+            - dhcp4: true
+              dhcp6: true
+              # macaddress: 52:54:00:ab:cd:f0  # optional libvirt-only pin
 
     # Pi-hole DNS forwarders — Ubuntu 24.04; vm-create on host hypervisor (kif/kvm01).
     pihole:

@@ -37,9 +37,10 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | Priority | Slice | Name | Status | Notes |
 |---|---|---|---|---|
 | 1 | 10+ | Pi-hole / DNS forwarders | **in progress** | Config-only Ansible role; Pi-hole → dc1/dc2; UCG DHCP — [pihole-runbook.md](pihole-runbook.md) |
-| 2 | 16 | Internal mail relay | **in progress** | Dedicated mail VM (Postfix + certbot); AD DNS + domain_join relayhost — [mail-relay-runbook.md](mail-relay-runbook.md) |
-| 3 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth — [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
-| 4 | 25+ | Hypervisor host networking | **in progress** | Netplan/Ansible for br0 + VLAN bridges on kif/kvm01 — [hypervisor-runbook.md](hypervisor-runbook.md) |
+| 2 | 16 | Internal mail relay | **in progress** | Dual relay (`mail` + `mail2`), Postfix fallback, AD DNS — [mail-relay-runbook.md](mail-relay-runbook.md) |
+| 3 | 27 | LDAP VIP (keepalived) | **in progress** | Floating `ldap.home` on dc1/dc2; Authelia + single-URL LDAP clients — [ldap-vip-runbook.md](ldap-vip-runbook.md), [authelia-runbook.md](authelia-runbook.md) |
+| 4 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth — [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
+| 5 | 25+ | Hypervisor host networking | **in progress** | Netplan/Ansible for br0 + VLAN bridges on kif/kvm01 — [hypervisor-runbook.md](hypervisor-runbook.md) |
 
 ## Active — automation backlog (post-reimage)
 
@@ -62,6 +63,11 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 24+ | kif ESP/boot mirror | kif reimage (optional) | Rebuild 2×1TB pair with mirrored ESP/`/boot`; retire spare-as-OS or repurpose 512GB SSD |
 | — | nut_client role | Slice 21 | Server slice done; client role for kvm01 netclient path deferred |
 | — | AD SSH public keys | Slice 18 | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
+| 28+ | Bastion / edge VIP HA | Slice 26, second bastion VM | keepalived floating VIP for UniFi port-forwards — [adr/001-bastion-keepalived-vip.md](adr/001-bastion-keepalived-vip.md) |
+| — | Authelia container HA | Slice 27, container platform | Migrate Authelia/Valkey off single kif host; session loss acceptable short-term |
+| — | Cert lifetime monitoring | Slice 11+ observability | Alert on Let's Encrypt remaining lifetime (LDAP VIP, mail, edge SAN certs) |
+| — | Inventory vm_hypervisor field | — | Record which hypervisor runs each VM for outage planning |
+| — | LDAP VIP cert on kif (compose sidecar) | — | If Authelia stack migrates, revisit compose-local certbot; DC VIP+SAN remains portable LDAP endpoint |
 
 ## Principles
 

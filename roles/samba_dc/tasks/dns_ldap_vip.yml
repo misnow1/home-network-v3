@@ -1,0 +1,53 @@
+---
+# Ensure ldap.home A record points at the LDAP VIP (keepalived on DC pair).
+
+- name: Samba DC LDAP VIP DNS | Check if domain is provisioned
+  ansible.builtin.stat:
+    path: /var/lib/samba/private/sam.ldb
+  register: samba_sam_ldb
+  changed_when: false
+  tags: [samba_dns, samba_converge, ldap_vip]
+
+- name: Samba DC LDAP VIP DNS | Require VIP address when enabled
+  ansible.builtin.assert:
+    that:
+      - ldap_vip_address | length > 0
+    fail_msg: Set ldap_vip_address when ldap_vip_enabled is true.
+  when: ldap_vip_enabled | bool
+  tags: [samba_dns, samba_converge, ldap_vip]
+
+- name: Samba DC LDAP VIP DNS | Ensure ldap A record
+  ansible.builtin.shell: |
+    set -euo pipefail
+    zone="{{ dc_domain_name }}"
+    host="{{ ldap_vip_dns_name }}"
+    ip="{{ ldap_vip_address }}"
+    changed=0
+
+    if ! samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
+      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}[[:space:]]*$"; then
+      if samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
+        | grep -qE '^[[:space:]]+A:'; then
+        old_ip=$(samba-tool dns query localhost "$zone" "$host" A --machine-pass \
+          | awk '/^[[:space:]]+A:/ {print $2; exit}')
+        samba-tool dns delete localhost "$zone" "$host" A "$old_ip" --machine-pass
+      fi
+      samba-tool dns add localhost "$zone" "$host" A "$ip" --machine-pass
+      echo "added-a: $host -> $ip"
+      changed=1
+    else
+      echo "ok-a: $host"
+    fi
+
+    if [[ "$changed" -eq 1 ]]; then
+      echo "changed: yes"
+    fi
+  args:
+    executable: /bin/bash
+  register: samba_dc_ldap_vip_dns_result
+  changed_when: "'changed: yes' in samba_dc_ldap_vip_dns_result.stdout"
+  when:
+    - ldap_vip_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - not ansible_check_mode
+  tags: [samba_dns, samba_converge, ldap_vip]

@@ -21,7 +21,8 @@ Internet ── 443 ──> nginx (reverse_proxy host)
 - One data-driven nginx vhost per proxied app, rendered from `reverse_proxy_sites`.
 - Authelia is the auth service (a Docker container on `kif`). This role only wires the
   forward-auth subrequest to it via `reverse_proxy_authelia_url`; it does **not** manage
-  the Authelia container or its configuration.
+  the Authelia container or its configuration. LDAP and notifier changes are manual —
+  see [authelia-runbook.md](authelia-runbook.md).
 - All vhosts share one Let's Encrypt SAN certificate issued by the
   [`certbot`](../roles/certbot/) role.
 

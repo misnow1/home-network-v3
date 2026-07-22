@@ -25,3 +25,8 @@
         name: samba_dc
         tasks_from: converge
       tags: [samba_converge]
+
+    - name: Converge LDAP VIP (keepalived)
+      ansible.builtin.import_role:
+        name: keepalived_ldap
+      tags: [ldap_vip, samba_converge]

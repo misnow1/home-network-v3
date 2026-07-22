@@ -36,9 +36,14 @@
       - docker/ddns-nsupdate/app.py
       - playbooks/mail-relay.yml
       - docs/mail-relay-runbook.md
+      - docs/ldap-vip-runbook.md
+      - docs/authelia-runbook.md
       - docs/nut-runbook.md
       - roles/mail_relay/tasks/main.yml
       - roles/samba_dc/tasks/dns_mail_relay.yml
+      - roles/samba_dc/tasks/dns_ldap_vip.yml
+      - roles/keepalived_ldap/tasks/main.yml
+      - docs/ldap-vip-runbook.md
       - roles/domain_join/tasks/postfix_relayclient.yml
       - inventories/production/group_vars/mail_relay/vars.yml.example
       - scripts/dhcp-ddns-hook.sh

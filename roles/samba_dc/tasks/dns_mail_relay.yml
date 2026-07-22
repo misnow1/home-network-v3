@@ -64,3 +64,48 @@
     - samba_sam_ldb.stat.exists
     - not ansible_check_mode
   tags: [samba_dns, samba_converge]
+
+- name: Samba DC mail relay DNS | Require secondary target IP when enabled
+  ansible.builtin.assert:
+    that:
+      - mail_relay_secondary_target_ip | length > 0
+    fail_msg: >-
+      Set mail_relay_secondary_target_ip when mail_relay_secondary_enabled is true.
+  when: mail_relay_secondary_enabled | bool
+  tags: [samba_dns, samba_converge]
+
+- name: Samba DC mail relay DNS | Ensure secondary relay A record
+  ansible.builtin.shell: |
+    set -euo pipefail
+    zone="{{ dc_domain_name }}"
+    host="{{ mail_relay_secondary_dns_name }}"
+    ip="{{ mail_relay_secondary_target_ip }}"
+    changed=0
+
+    if ! samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
+      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}[[:space:]]*$"; then
+      if samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
+        | grep -qE '^[[:space:]]+A:'; then
+        old_ip=$(samba-tool dns query localhost "$zone" "$host" A --machine-pass \
+          | awk '/^[[:space:]]+A:/ {print $2; exit}')
+        samba-tool dns delete localhost "$zone" "$host" A "$old_ip" --machine-pass
+      fi
+      samba-tool dns add localhost "$zone" "$host" A "$ip" --machine-pass
+      echo "added-a: $host -> $ip"
+      changed=1
+    else
+      echo "ok-a: $host"
+    fi
+
+    if [[ "$changed" -eq 1 ]]; then
+      echo "changed: yes"
+    fi
+  args:
+    executable: /bin/bash
+  register: samba_dc_mail_relay_secondary_dns_result
+  changed_when: "'changed: yes' in samba_dc_mail_relay_secondary_dns_result.stdout"
+  when:
+    - mail_relay_secondary_enabled | bool
+    - samba_sam_ldb.stat.exists
+    - not ansible_check_mode
+  tags: [samba_dns, samba_converge]

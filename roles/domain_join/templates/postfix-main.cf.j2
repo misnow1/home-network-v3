@@ -10,6 +10,9 @@ inet_protocols = ipv4
 mydestination = $myhostname, localhost.$mydomain, localhost
 
 relayhost = [{{ mail_relay_hostname }}]:587
+{% if mail_relay_fallback_hostname | length > 0 %}
+smtp_fallback_relay = [{{ mail_relay_fallback_hostname }}]:587
+{% endif %}
 smtp_use_tls = yes
 smtp_tls_security_level = may
 smtp_tls_loglevel = 1

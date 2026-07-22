@@ -105,3 +105,14 @@ mail_relay_hostname: mail.home.2123studios.com
 mail_relay_dns_name: "{{ mail_relay_hostname.split('.')[0] }}"
 mail_relay_target_ip: ""
 mail_relay_mx_priority: 10
+# Secondary relay A record (no MX — members use smtp_fallback_relay, not MX lookup).
+mail_relay_secondary_enabled: false
+mail_relay_secondary_hostname: mail2.home.2123studios.com
+mail_relay_secondary_dns_name: "{{ mail_relay_secondary_hostname.split('.')[0] }}"
+mail_relay_secondary_target_ip: ""
+
+# LDAP/LDAPS VIP (keepalived on DC pair) — docs/ldap-vip-runbook.md
+ldap_vip_enabled: false
+ldap_vip_address: 192.168.1.12
+ldap_vip_hostname: ldap.home.2123studios.com
+ldap_vip_dns_name: "{{ ldap_vip_hostname.split('.')[0] }}"

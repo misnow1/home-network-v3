@@ -60,6 +60,9 @@ CentOS/Rocky today and will be **repaved as Ubuntu** rather than in-place migrat
 | `group_vars/pihole/*.example` | [pihole-runbook.md](../docs/pihole-runbook.md) |
 | `group_vars/reverse_proxy/vars.yml.example` | [reverse-proxy-runbook.md](../docs/reverse-proxy-runbook.md) |
 | `group_vars/mail_relay/vars.yml.example` | [mail-relay-runbook.md](../docs/mail-relay-runbook.md) |
+| `host_vars/dc1.../vars.yml.example`, `host_vars/dc2.../vars.yml` | [ldap-vip-runbook.md](../docs/ldap-vip-runbook.md), [dc-runbook.md](../docs/dc-runbook.md) |
+| `host_vars/mail2.../vars.yml.example` | [mail-relay-runbook.md](../docs/mail-relay-runbook.md) |
+| Manual Authelia on kif | [authelia-runbook.md](../docs/authelia-runbook.md) |
 | `group_vars/fileservers/vars.yml.example` | [fileserver-runbook.md](../docs/fileserver-runbook.md) |
 | `host_vars/kif.../vars.yml.example` | [nut-runbook.md](../docs/nut-runbook.md), [hypervisor-runbook.md](../docs/hypervisor-runbook.md) |
 | `host_vars/kvm01.../vars.yml.example` | [hypervisor-runbook.md](../docs/hypervisor-runbook.md) |

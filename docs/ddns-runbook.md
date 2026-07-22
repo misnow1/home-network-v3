@@ -36,9 +36,22 @@ dnsmasq (router) --dhcp-script--> dhcp-ddns-hook.sh --HTTP POST-->
 
 ## Production deployment — DC
 
+Deploy the DDNS API on **both** DCs so the router hook can fall back when dc1 (kvm01) is
+unavailable:
+
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'
 
+${PROD} playbooks/dc-converge.yml -e allow_production=true \
+  --limit 'dc1.home.2123studios.com,dc2.home.2123studios.com'
+
+${PROD} playbooks/ddns-api.yml -e allow_production=true \
+  --limit 'dc1.home.2123studios.com,dc2.home.2123studios.com'
+```
+
+Single-DC deploy (legacy / first cutover):
+
+```bash
 ${PROD} playbooks/dc-converge.yml -e allow_production=true \
   --limit dc1.home.2123studios.com
 
@@ -92,7 +105,8 @@ Router configuration is **manual** — not Ansible-managed.
 DDNS_UPDATE_URL="http://<dc-ip>:8765/ddns/v1/lease"
 DDNS_BEARER_TOKEN="<same as vault_ddns_shared_secret>"
 DDNS_DNS_DOMAIN="<your-domain>"
-# Optional: DDNS_UPDATE_URL_FALLBACK="http://<replica-dc-ip>:8765/ddns/v1/lease"
+# Recommended when both DCs run the DDNS API (see Production deployment — DC):
+DDNS_UPDATE_URL_FALLBACK="http://<replica-dc-ip>:8765/ddns/v1/lease"
 ```
 
 3. Configure dnsmasq:

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# keepalived vrrp_script — LDAPS must answer on localhost for this DC to hold the VIP.
+set -euo pipefail
+
+exec timeout 5 openssl s_client \
+  -connect 127.0.0.1:636 \
+  -servername {{ ldap_vip_hostname }} \
+  </dev/null 2>/dev/null \
+  | grep -q 'Verify return code: 0 (ok)'

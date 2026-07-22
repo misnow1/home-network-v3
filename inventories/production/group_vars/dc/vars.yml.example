@@ -46,16 +46,24 @@ ddns_nsupdate_enabled: true
 
 certbot_enabled: true
 certbot_provider: dreamhost_dns
-certbot_domains:
-  - dc1.home.2123studios.com
+# certbot_domains — set per DC in host_vars (dc FQDN + ldap.home SAN)
 certbot_email: sno.sno@gmail.com
 certbot_staging: true   # flip false after staging dry-run succeeds
 samba_dc_tls_enabled: true
 
+# LDAP/LDAPS VIP (keepalived) — docs/ldap-vip-runbook.md
+ldap_vip_enabled: true
+ldap_vip_address: 192.168.1.12
+ldap_vip_hostname: ldap.home.2123studios.com
+# Reserve 192.168.1.12 in UniFi DHCP — not assigned to any VM.
+
 # Internal mail relay (Slice 16+) — docs/mail-relay-runbook.md
 mail_relay_dns_enabled: true
 mail_relay_hostname: mail.home.2123studios.com
-mail_relay_target_ip: 192.168.1.15   # mail.home.2123studios.com VM — adjust to live IP
+mail_relay_target_ip: 192.168.1.15   # mail.home.2123studios.com VM on kvm01
+mail_relay_secondary_enabled: true
+mail_relay_secondary_hostname: mail2.home.2123studios.com
+mail_relay_secondary_target_ip: 192.168.1.17   # mail2.home.2123studios.com VM on kif
 
 # Replica join — set on the joining DC before dc-replica-join.yml (see docs/dc-runbook.md)
 # samba_dc_migration_host: true
