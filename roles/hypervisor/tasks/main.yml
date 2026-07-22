@@ -17,6 +17,11 @@
   ansible.builtin.include_tasks: libvirt.yml
   tags: [libvirt]
 
+- name: Hypervisor | Configure Cursor Remote SSH sandbox
+  ansible.builtin.include_tasks: cursor_sandbox.yml
+  when: hypervisor_cursor_sandbox_enabled | bool
+  tags: [cursor_sandbox, libvirt]
+
 - name: Hypervisor | Configure libvirt users
   ansible.builtin.include_tasks: users.yml
   tags: [libvirt]
