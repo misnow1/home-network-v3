@@ -1,0 +1,21 @@
+---
+- name: Hypervisor | Install Cursor sandbox packages
+  ansible.builtin.apt:
+    name: "{{ hypervisor_cursor_sandbox_packages }}"
+    state: present
+  tags: [cursor_sandbox, libvirt]
+
+- name: Hypervisor | Deploy Cursor remote sandbox AppArmor profile
+  ansible.builtin.copy:
+    src: cursor-sandbox-remote
+    dest: /etc/apparmor.d/cursor-sandbox-remote
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload AppArmor cursor sandbox profile
+  tags: [cursor_sandbox, libvirt]
+
+- name: Hypervisor | Apply Cursor sandbox AppArmor profile
+  ansible.builtin.meta: flush_handlers
+  when: not ansible_check_mode
+  tags: [cursor_sandbox, libvirt]

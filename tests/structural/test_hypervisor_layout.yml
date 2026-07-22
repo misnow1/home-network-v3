@@ -43,6 +43,16 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Hypervisor | assert Cursor sandbox defaults and tasks exist
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_cursor_sandbox_enabled' "{{ libvirt_defaults }}" &&
+        grep -q 'hypervisor_cursor_sandbox_packages' "{{ libvirt_defaults }}" &&
+        grep -q 'cursor_sandbox.yml' "{{ hypervisor_role }}/tasks/main.yml" &&
+        test -f "{{ hypervisor_role }}/files/cursor-sandbox-remote"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Hypervisor | assert performance tuning defaults exist
       ansible.builtin.shell: |
         grep -q 'hypervisor_perf_tuning_enabled' "{{ libvirt_defaults }}" &&
@@ -86,6 +96,7 @@
         - directories.yml
         - pools.yml
         - networks.yml
+        - cursor_sandbox.yml
 
     - name: Hypervisor | assert defaults define libvirt storage variables
       ansible.builtin.shell: |

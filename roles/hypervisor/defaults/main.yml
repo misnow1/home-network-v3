@@ -22,6 +22,11 @@ hypervisor_dev_tool_packages:
   - genisoimage
   - gettext-base
 
+# Cursor Remote SSH terminal sandbox (Landlock/Bubblewrap on Ubuntu 24.04+).
+hypervisor_cursor_sandbox_enabled: true
+hypervisor_cursor_sandbox_packages:
+  - bubblewrap
+
 hypervisor_libvirt_users:
   - ansible
 

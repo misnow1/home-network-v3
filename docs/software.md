@@ -96,6 +96,15 @@ switching. Enable per host or group — production currently sets
 | `genisoimage` | Cloud-init seed ISOs (`scripts/vm/vm-lib.sh`) |
 | `gettext-base` | `envsubst` for templated VM/autoinstall assets |
 
+**Cursor Remote SSH sandbox** (`hypervisor_cursor_sandbox_enabled: true` on development hypervisors):
+
+| Package / file | Purpose |
+|---|---|
+| `bubblewrap` | Cursor sandbox fallback backend (`bwrap`) |
+| `/etc/apparmor.d/cursor-sandbox-remote` | AppArmor `userns` allowance for `cursorsandbox` on Ubuntu 24.04+ |
+
+One-shot install on an already-provisioned host: `sudo ./scripts/hypervisor/install-cursor-sandbox-apparmor.sh`
+
 Python/Ansible lint and playbooks use the repo `.venv` (`./scripts/bootstrap-dev.sh`), not apt.
 
 **Performance tuning** (`hypervisor_perf_packages` — when `hypervisor_perf_tuning_enabled: true`):
