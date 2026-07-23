@@ -47,7 +47,11 @@
   ansible.builtin.import_tasks: dns_hosts.yml
   tags: [samba_dns, samba_converge]
 
-- name: DC converge | Restrict Samba to primary LAN interface for DNS registration
+- name: DC converge | Deploy managed smb.conf
+  ansible.builtin.import_tasks: smb_conf_deploy.yml
+  tags: [samba_smb_conf, samba_dns, samba_converge]
+
+- name: DC converge | Prune stale DC hostname DNS records
   ansible.builtin.import_tasks: samba_interfaces.yml
   tags: [samba_dns, samba_converge]
 

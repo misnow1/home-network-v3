@@ -1,0 +1,144 @@
+---
+# Own the full Samba AD DC smb.conf via template. Provision/join still generate an
+# initial file; converge and certbot TLS re-render from smb.conf.j2 thereafter.
+# On content change: timestamped backup, testparm validate, install, restart Samba.
+
+- name: Samba DC smb.conf | Resolve path
+  ansible.builtin.import_tasks: samba_smb_conf.yml
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Resolve interface list
+  ansible.builtin.import_tasks: samba_interfaces_resolve.yml
+  when: samba_dc_bind_interfaces_only | bool
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Derive netbios and workgroup defaults
+  ansible.builtin.set_fact:
+    samba_dc_netbios_name: >-
+      {{ samba_dc_netbios_name
+         | default(inventory_hostname.split('.')[0] | upper, true) }}
+    samba_dc_workgroup: >-
+      {{ samba_dc_workgroup
+         | default(dc_domain_name.split('.')[0] | upper, true) }}
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Stat TLS certificate material
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ samba_dc_tls_cert_dir }}/fullchain.pem"
+    - "{{ samba_dc_tls_cert_dir }}/privkey.pem"
+  register: samba_dc_smb_conf_tls_stats
+  when: samba_dc_tls_enabled | bool
+  tags: [samba_smb_conf, samba_converge, samba_tls]
+
+- name: Samba DC smb.conf | Require TLS material when enabled
+  ansible.builtin.assert:
+    that:
+      - samba_dc_smb_conf_tls_stats.results | map(attribute='stat.exists') | list is all
+    fail_msg: >-
+      samba_dc_tls_enabled is true but certificate material is missing under
+      {{ samba_dc_tls_cert_dir }}. Run playbooks/certbot.yml first.
+  when: samba_dc_tls_enabled | bool
+  tags: [samba_smb_conf, samba_converge, samba_tls]
+
+- name: Samba DC smb.conf | Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ samba_dc_smb_conf_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Render candidate configuration
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: "{{ samba_dc_smb_conf_candidate_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  changed_when: false
+  check_mode: false
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Compare candidate to live config
+  ansible.builtin.command:
+    argv:
+      - diff
+      - -q
+      - "{{ samba_dc_smb_conf }}"
+      - "{{ samba_dc_smb_conf_candidate_path }}"
+  register: samba_dc_smb_conf_diff
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Record whether deploy is required
+  ansible.builtin.set_fact:
+    samba_dc_smb_conf_deploy_needed: "{{ samba_dc_smb_conf_diff.rc != 0 }}"
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Validate candidate with testparm
+  ansible.builtin.command:
+    argv:
+      - testparm
+      - -s
+      - "{{ samba_dc_smb_conf_candidate_path }}"
+  register: samba_dc_smb_conf_testparm
+  changed_when: false
+  when:
+    - samba_dc_smb_conf_deploy_needed | bool
+    - not ansible_check_mode
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Timestamp for backup filename
+  ansible.builtin.command:
+    argv: [date, -u, +%Y%m%dT%H%M%SZ]
+  register: samba_dc_smb_conf_backup_ts
+  changed_when: false
+  check_mode: false
+  when:
+    - samba_dc_smb_conf_deploy_needed | bool
+    - not ansible_check_mode
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Backup live config before replace
+  ansible.builtin.copy:
+    src: "{{ samba_dc_smb_conf }}"
+    dest: >-
+      {{ samba_dc_smb_conf_backup_dir }}/smb.conf.{{ samba_dc_smb_conf_backup_ts.stdout }}
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - samba_dc_smb_conf_deploy_needed | bool
+    - not ansible_check_mode
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Install managed configuration
+  ansible.builtin.copy:
+    src: "{{ samba_dc_smb_conf_candidate_path }}"
+    dest: "{{ samba_dc_smb_conf }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - samba_dc_smb_conf_deploy_needed | bool
+    - not ansible_check_mode
+  notify: restart samba-ad-dc
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]
+
+- name: Samba DC smb.conf | Report check-mode change
+  ansible.builtin.debug:
+    msg: >-
+      smb.conf would change (diff rc={{ samba_dc_smb_conf_diff.rc }}).
+      Backup would be written under {{ samba_dc_smb_conf_backup_dir }}/.
+  changed_when: true
+  when:
+    - samba_dc_smb_conf_deploy_needed | bool
+    - ansible_check_mode
+  tags: [samba_smb_conf, samba_dns, samba_converge, samba_provision, samba_tls]

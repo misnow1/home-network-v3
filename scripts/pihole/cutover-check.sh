@@ -134,17 +134,22 @@ check_pihole_aaaa_forward() {
   local label="$2"
   local dc_aaaa pihole_aaaa
 
-  dc_aaaa="$(dig +time=2 +tries=1 "@${DC1}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+  # DNS answer ordering is not stable. Compare normalized sets so hosts with
+  # multiple valid AAAA records do not fail when resolvers return a different
+  # record first.
+  dc_aaaa="$(dig +time=2 +tries=1 "@${DC1}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null \
+    | sort -u || true)"
   if [[ -z "${dc_aaaa}" ]]; then
     warn "dc1 has no AAAA — skip AAAA forward test for ${label}"
     return 0
   fi
 
-  pihole_aaaa="$(dig +time=2 +tries=1 "@${pihole_ip}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null | head -1 || true)"
+  pihole_aaaa="$(dig +time=2 +tries=1 "@${pihole_ip}" "dc1.${AD_DOMAIN}" AAAA +short 2>/dev/null \
+    | sort -u || true)"
   if [[ "${pihole_aaaa}" == "${dc_aaaa}" ]]; then
-    pass "${label}: forwards AD AAAA for dc1"
+    pass "${label}: forwards complete AD AAAA set for dc1"
   else
-    fail "${label}: dc1.${AD_DOMAIN} AAAA via Pi-hole (got '${pihole_aaaa:-empty}', want ${dc_aaaa})"
+    fail "${label}: dc1.${AD_DOMAIN} AAAA set via Pi-hole differs from dc1"
   fi
 }
 

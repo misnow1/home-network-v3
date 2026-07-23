@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Managed by Ansible (samba_dc). Prune stale DC hostname A/AAAA records and refresh.
+set -uo pipefail
+
+ZONE="{{ dc_domain_name }}"
+HOST="{{ inventory_hostname.split('.')[0] }}"
+CACHE="/var/lib/samba/private/dns_update_cache"
+EXPECTED_IP="{{ ansible_host }}"
+LDAP_VIP_ENABLED="{{ ldap_vip_enabled | default(false) | bool | lower }}"
+LDAP_VIP_ADDRESS="{{ ldap_vip_address | default('') }}"
+# Space-separated interface names and/or bind addresses from Ansible.
+INTERFACE_ENTRIES=( {{ samba_dc_effective_interfaces | map('quote') | join(' ') }} )
+
+declare -A ALLOWED=()
+
+# samba-tool / nsupdate / ip(8) disagree on IPv6 compression and leading zeros.
+# Compare membership with Python's canonical form; delete with the on-wire value.
+canonicalize_ip() {
+  python3 -c 'import ipaddress, sys; print(ipaddress.ip_address(sys.argv[1]))' "$1" 2>/dev/null \
+    || printf '%s\n' "$1"
+}
+
+allow_ip() {
+  local raw="$1"
+  local canon
+  [[ -z "$raw" ]] && return 0
+  canon="$(canonicalize_ip "$raw")"
+  ALLOWED["$canon"]=1
+}
+
+deny_ip() {
+  local raw="$1"
+  local canon
+  [[ -z "$raw" ]] && return 0
+  canon="$(canonicalize_ip "$raw")"
+  unset "ALLOWED[${canon}]" || true
+}
+
+wait_for_samba() {
+  local i
+  for i in $(seq 1 30); do
+    if samba-tool domain info 127.0.0.1 >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+dns_errors_only_already_exist() {
+  local output="$1"
+  grep -q 'ERROR(runtime):' <<<"$output" || return 1
+  ! grep 'ERROR(runtime):' <<<"$output" | grep -qv 'WERR_DNS_ERROR_RECORD_ALREADY_EXISTS'
+}
+
+run_samba_dnsupdate() {
+  local output rc=0 attempt
+  for attempt in 1 2 3; do
+    output=$(samba_dnsupdate --verbose 2>&1) || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    if dns_errors_only_already_exist "$output"; then
+      rm -f "$CACHE"
+      printf '%s\n' "$output" >&2
+      systemctl restart named 2>/dev/null || true
+      sleep 3
+      wait_for_samba || true
+      continue
+    fi
+    if grep -q 'Cannot contact any KDC' <<<"$output"; then
+      printf '%s\n' "$output" >&2
+      sleep 5
+      wait_for_samba || true
+      continue
+    fi
+    printf '%s\n' "$output" >&2
+    return "$rc"
+  done
+  if dns_errors_only_already_exist "$output"; then
+    rm -f "$CACHE"
+    printf '%s\n' "$output" >&2
+    echo "dns-update-cache-resynced"
+    return 0
+  fi
+  printf '%s\n' "$output" >&2
+  return "$rc"
+}
+
+for entry in "${INTERFACE_ENTRIES[@]}"; do
+  # Address binding (LDAP VIP path) lists IPs; NIC binding lists interface names.
+  if [[ ! -d "/sys/class/net/${entry}" ]]; then
+    allow_ip "$entry"
+    continue
+  fi
+  while read -r ip; do
+    allow_ip "$ip"
+  done < <(ip -4 -o addr show dev "$entry" scope global 2>/dev/null \
+    | awk '{print $4}' | cut -d/ -f1 || true)
+  while read -r ip; do
+    allow_ip "$ip"
+  done < <(ip -6 -o addr show dev "$entry" scope global 2>/dev/null \
+    | awk '{print $4}' | cut -d/ -f1 || true)
+done
+
+# The keepalived VIP must never be registered under this DC's hostname.
+if [[ "${LDAP_VIP_ENABLED}" == "true" && -n "${LDAP_VIP_ADDRESS}" ]]; then
+  deny_ip "${LDAP_VIP_ADDRESS}"
+fi
+
+wait_for_samba || true
+run_samba_dnsupdate || {
+  if dig +short @127.0.0.1 "${HOST}.${ZONE}" A | grep -qx "${EXPECTED_IP}"; then
+    echo "dns-records-verified-via-dig"
+    rm -f "$CACHE"
+  else
+    exit 1
+  fi
+}
+
+# Prune after samba_dnsupdate because it may still discover leftover addresses.
+changed=0
+while read -r rtype ip; do
+  [[ -z "$rtype" || -z "$ip" ]] && continue
+  canon="$(canonicalize_ip "$ip")"
+  if [[ -z "${ALLOWED[$canon]:-}" ]]; then
+    samba-tool dns delete localhost "$ZONE" "$HOST" "$rtype" "$ip" --machine-pass
+    echo "deleted-${rtype}: ${HOST} -> ${ip}"
+    changed=1
+  fi
+done < <(samba-tool dns query localhost "$ZONE" "$HOST" ALL --machine-pass 2>/dev/null \
+  | awk '/^[[:space:]]+(A|AAAA):/ { gsub(/:/, "", $1); print $1, $2 }' || true)
+
+if [[ "$changed" -eq 1 ]]; then
+  echo "dns-records-pruned"
+else
+  echo "dns-records-ok"
+fi

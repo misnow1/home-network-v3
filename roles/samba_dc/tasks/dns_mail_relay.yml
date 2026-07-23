@@ -28,8 +28,10 @@
     mx_prio="{{ mail_relay_mx_priority }}"
     changed=0
 
+    # samba-tool prints "A: <ip> (flags=..., serial=..., ttl=...)" — match IP then
+    # whitespace/EOL, not end-of-line only (that never matches and re-adds every run).
     if ! samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
-      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}[[:space:]]*$"; then
+      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}([[:space:]]|$)"; then
       if samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
         | grep -qE '^[[:space:]]+A:'; then
         old_ip=$(samba-tool dns query localhost "$zone" "$host" A --machine-pass \
@@ -82,8 +84,10 @@
     ip="{{ mail_relay_secondary_target_ip }}"
     changed=0
 
+    # samba-tool prints "A: <ip> (flags=..., serial=..., ttl=...)" — match IP then
+    # whitespace/EOL, not end-of-line only (that never matches and re-adds every run).
     if ! samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
-      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}[[:space:]]*$"; then
+      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}([[:space:]]|$)"; then
       if samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
         | grep -qE '^[[:space:]]+A:'; then
         old_ip=$(samba-tool dns query localhost "$zone" "$host" A --machine-pass \

@@ -7,3 +7,10 @@ certbot_domains:
 
 ldap_vip_state: MASTER
 ldap_vip_priority: 100
+
+# Optional SMB share served from this DC only.
+samba_dc_shares:
+  - name: images
+    path: /export/images
+    read_only: true
+    guest_ok: true

@@ -1,44 +1,24 @@
 ---
-- name: Samba DC TLS | Resolve smb.conf path
-  ansible.builtin.import_tasks: samba_smb_conf.yml
-
-- name: Samba DC TLS | Stat certificate fullchain
-  ansible.builtin.stat:
-    path: "{{ samba_dc_tls_cert_dir }}/fullchain.pem"
-  register: samba_dc_tls_fullchain
-
-- name: Samba DC TLS | Stat certificate private key
-  ansible.builtin.stat:
-    path: "{{ samba_dc_tls_cert_dir }}/privkey.pem"
-  register: samba_dc_tls_privkey
+# Samba LDAP TLS — cert material must exist; smb.conf is rendered by smb_conf_deploy.
 
 - name: Samba DC TLS | Require certificate material
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ samba_dc_tls_cert_dir }}/fullchain.pem"
+    - "{{ samba_dc_tls_cert_dir }}/privkey.pem"
+  register: samba_dc_tls_material
+
+- name: Samba DC TLS | Assert certificate material present
   ansible.builtin.assert:
     that:
-      - samba_dc_tls_fullchain.stat.exists
-      - samba_dc_tls_privkey.stat.exists
+      - samba_dc_tls_material.results | map(attribute='stat.exists') | list is all
     fail_msg: >-
       TLS certificate not found under {{ samba_dc_tls_cert_dir }}.
       Run playbooks/certbot.yml on this DC first.
 
-- name: Samba DC TLS | Remove misplaced TLS block appended outside [global]
-  ansible.builtin.blockinfile:
-    path: "{{ samba_dc_smb_conf }}"
-    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-tls"
-    state: absent
-  notify: restart samba-ad-dc
-
-- name: Samba DC TLS | Configure LDAP TLS in smb.conf [global]
-  ansible.builtin.blockinfile:
-    path: "{{ samba_dc_smb_conf }}"
-    block: |
-      tls enabled  = yes
-      tls keyfile  = {{ samba_dc_tls_cert_dir }}/privkey.pem
-      tls certfile = {{ samba_dc_tls_cert_dir }}/fullchain.pem
-      tls cafile   =
-    marker: "# {mark} ANSIBLE MANAGED BLOCK: samba-dc-tls"
-    insertafter: "^\\[global\\]"
-  notify: restart samba-ad-dc
+- name: Samba DC TLS | Deploy smb.conf with TLS settings
+  ansible.builtin.import_tasks: smb_conf_deploy.yml
 
 - name: Samba DC TLS | Verify testparm reads custom certificate path
   ansible.builtin.shell: |
