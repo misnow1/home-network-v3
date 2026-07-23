@@ -8,6 +8,7 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     keepalived_role: "{{ repo_root }}/roles/keepalived_ldap/tasks/main.yml"
     dns_ldap_vip: "{{ repo_root }}/roles/samba_dc/tasks/dns_ldap_vip.yml"
+    samba_interfaces: "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces.yml"
     converge_tasks: "{{ repo_root }}/roles/samba_dc/tasks/converge.yml"
     dc_converge: "{{ repo_root }}/playbooks/dc-converge.yml"
     runbook: "{{ repo_root }}/docs/ldap-vip-runbook.md"
@@ -20,6 +21,7 @@
       loop:
         - "{{ keepalived_role }}"
         - "{{ dns_ldap_vip }}"
+        - "{{ samba_interfaces }}"
         - "{{ repo_root }}/roles/keepalived_ldap/templates/keepalived.conf.j2"
         - "{{ repo_root }}/roles/keepalived_ldap/templates/check_ldaps.sh.j2"
         - "{{ repo_root }}/roles/keepalived_ldap/templates/ldap-vip-notify.sh.j2"
@@ -43,6 +45,25 @@
         grep -q 'notify_master' "{{ repo_root }}/roles/keepalived_ldap/templates/keepalived.conf.j2"
         grep -q 'dnat to' "{{ repo_root }}/roles/keepalived_ldap/templates/ldap-vip-notify.sh.j2"
         grep -q 'nftables DNAT' "{{ runbook }}"
+        grep -q 'deny_ip "${LDAP_VIP_ADDRESS}"' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
+        grep -q 'canonicalize_ip' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
+        grep -q 'ipaddress.ip_address' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
+        grep -q 'dns-records-pruned' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
+        grep -q 'samba_dc_dns_prune_script' "{{ samba_interfaces }}"
+        grep -q 'ldap_vip_enabled' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+        grep -q 'prune-dc-dns.sh.j2' "{{ samba_interfaces }}"
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: LDAP VIP | assert A-record match allows samba-tool metadata
+      vars:
+        dns_ldap_vip_src: "{{ lookup('ansible.builtin.file', dns_ldap_vip) }}"
+      ansible.builtin.assert:
+        that:
+          - "'samba-tool prints' in dns_ldap_vip_src"
+          - "'flags=' in dns_ldap_vip_src"
+          - "'whitespace/EOL' in dns_ldap_vip_src"
+        fail_msg: >-
+          dns_ldap_vip.yml A-record grep must match IP followed by whitespace/EOL
+          (samba-tool appends flags metadata); do not require end-of-line after the IP.

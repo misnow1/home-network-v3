@@ -1,0 +1,39 @@
+# Global parameters
+# Managed by Ansible (samba_dc). Do not edit by hand — changes are overwritten on converge.
+# Timestamped backups: {{ samba_dc_smb_conf_backup_dir }}/smb.conf.<timestamp>
+[global]
+	netbios name = {{ samba_dc_netbios_name }}
+	realm = {{ dc_realm }}
+	server role = active directory domain controller
+	server services = -smb +s3fs -dns
+	workgroup = {{ samba_dc_workgroup }}
+{% if samba_dc_bind_interfaces_only | bool %}
+	interfaces = {{ samba_dc_interfaces_smb_conf_value }}
+	bind interfaces only = yes
+{% endif %}
+{% if samba_dc_tls_enabled | bool %}
+	tls enabled  = yes
+	tls keyfile  = {{ samba_dc_tls_cert_dir }}/privkey.pem
+	tls certfile = {{ samba_dc_tls_cert_dir }}/fullchain.pem
+	tls cafile   =
+{% endif %}
+{% if samba_dc_log_level | default('') | string | length > 0 %}
+	log level = {{ samba_dc_log_level }}
+{% endif %}
+
+[sysvol]
+	path = /var/lib/samba/sysvol
+	read only = No
+
+[netlogon]
+	path = /var/lib/samba/sysvol/{{ dc_domain_name }}/scripts
+	read only = No
+{% for share in samba_dc_shares | default([]) %}
+
+[{{ share.name }}]
+	path = {{ share.path }}
+	read only = {{ 'Yes' if (share.read_only | default(true) | bool) else 'No' }}
+{% if share.guest_ok is defined %}
+	guest ok = {{ 'Yes' if (share.guest_ok | bool) else 'No' }}
+{% endif %}
+{% endfor %}

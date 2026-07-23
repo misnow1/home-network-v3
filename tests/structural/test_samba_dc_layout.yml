@@ -124,16 +124,30 @@
         that:
           - samba_interfaces_stat.stat.exists
 
-    - name: Samba DC | assert dns_bind_dlz imports samba_interfaces
+    - name: Samba DC | assert dns_bind_dlz deploys managed smb.conf
       ansible.builtin.shell: |
-        grep -q 'import_tasks: samba_interfaces.yml' "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
+        grep -q 'import_tasks: smb_conf_deploy.yml' "{{ repo_root }}/roles/samba_dc/tasks/dns_bind_dlz.yml"
       args:
         executable: /bin/bash
       changed_when: false
 
-    - name: Samba DC | assert converge imports samba_interfaces
+    - name: Samba DC | assert converge deploys managed smb.conf then prunes DNS
       ansible.builtin.shell: |
+        grep -q 'import_tasks: smb_conf_deploy.yml' "{{ converge_tasks }}"
         grep -q 'import_tasks: samba_interfaces.yml' "{{ converge_tasks }}"
+        test "$(grep -n 'smb_conf_deploy.yml' "{{ converge_tasks }}" | head -1 | cut -d: -f1)" \
+          -lt "$(grep -n 'samba_interfaces.yml' "{{ converge_tasks }}" | head -1 | cut -d: -f1)"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert smb.conf template and backup deploy task exist
+      ansible.builtin.shell: |
+        test -f "{{ repo_root }}/roles/samba_dc/templates/smb.conf.j2"
+        grep -q 'samba_dc_smb_conf_backup_dir' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        grep -q 'testparm' "{{ repo_root }}/roles/samba_dc/tasks/smb_conf_deploy.yml"
+        grep -q 'server services = -smb +s3fs -dns' "{{ repo_root }}/roles/samba_dc/templates/smb.conf.j2"
+        ! grep -q 'blockinfile' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces.yml"
       args:
         executable: /bin/bash
       changed_when: false

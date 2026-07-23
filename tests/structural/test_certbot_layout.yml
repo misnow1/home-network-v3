@@ -38,12 +38,12 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Certbot | assert Samba TLS task configures smb.conf
+    - name: Certbot | assert Samba TLS task deploys managed smb.conf
       ansible.builtin.shell: |
-        grep -q 'blockinfile' "{{ samba_tls_tasks }}"
-        grep -q 'tls certfile' "{{ samba_tls_tasks }}"
-        grep -q 'insertafter' "{{ samba_tls_tasks }}"
+        grep -q 'smb_conf_deploy.yml' "{{ samba_tls_tasks }}"
         grep -q 'testparm' "{{ samba_tls_tasks }}"
+        grep -q 'tls certfile' "{{ samba_tls_tasks }}"
+        ! grep -q 'blockinfile' "{{ samba_tls_tasks }}"
       args:
         executable: /bin/bash
       changed_when: false

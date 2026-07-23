@@ -1,6 +1,6 @@
 ---
 # Resolve Samba interface list for smb.conf and samba-tool --option.
-# Imported before domain provision/join and from samba_interfaces.yml.
+# Imported before domain provision/join and from smb_conf_deploy.yml.
 
 - name: Samba DC interfaces | Resolve from explicit list
   ansible.builtin.set_fact:
@@ -8,7 +8,7 @@
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length > 0
-  tags: [samba_dns, samba_converge, samba_provision]
+  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
 
 - name: Samba DC interfaces | Assert primary IPv4 interface is available
   ansible.builtin.assert:
@@ -16,15 +16,18 @@
       - ansible_facts['default_ipv4'] is defined
       - ansible_facts['default_ipv4']['interface'] is defined
       - ansible_facts['default_ipv4']['interface'] | length > 0
+      - ansible_facts['default_ipv4']['address'] is defined
+      - ansible_facts['default_ipv4']['address'] | length > 0
     fail_msg: >-
-      samba_dc_interfaces is empty and default_ipv4.interface is unavailable.
-      Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]).
+      samba_dc_interfaces is empty and default_ipv4 is unavailable.
+      Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]
+      or [lo, 192.168.1.10]).
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length == 0
-  tags: [samba_dns, samba_converge, samba_provision]
+  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
 
-- name: Samba DC interfaces | Auto-detect primary NIC
+- name: Samba DC interfaces | Auto-detect primary NIC name
   ansible.builtin.set_fact:
     samba_dc_effective_interfaces:
       - lo
@@ -32,10 +35,41 @@
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length == 0
-  tags: [samba_dns, samba_converge, samba_provision]
+    - not (ldap_vip_enabled | default(false) | bool)
+  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
+
+# When keepalived places the LDAP VIP on the same NIC, binding Samba to the NIC
+# name makes samba_dnsupdate register the VIP under this DC hostname. Bind to
+# concrete addresses instead (primary IPv4 + global IPv6 on that NIC, minus VIP).
+- name: Samba DC interfaces | Auto-detect addresses when LDAP VIP enabled
+  ansible.builtin.set_fact:
+    samba_dc_effective_interfaces: >-
+      {{
+        (
+          ['lo', ansible_facts['default_ipv4']['address']]
+          + (
+              (
+                ansible_facts[ansible_facts['default_ipv4']['interface']]['ipv6']
+                | default([])
+              )
+              | selectattr('scope', 'defined')
+              | selectattr('scope', 'equalto', 'global')
+              | map(attribute='address')
+              | reject('equalto', ldap_vip_address | default(''))
+              | list
+            )
+        )
+        | unique
+        | list
+      }}
+  when:
+    - samba_dc_bind_interfaces_only | bool
+    - samba_dc_interfaces | length == 0
+    - ldap_vip_enabled | default(false) | bool
+  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
 
 - name: Samba DC interfaces | Build smb.conf interfaces value
   ansible.builtin.set_fact:
     samba_dc_interfaces_smb_conf_value: "{{ samba_dc_effective_interfaces | join(' ') }}"
   when: samba_dc_bind_interfaces_only | bool
-  tags: [samba_dns, samba_converge, samba_provision]
+  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]

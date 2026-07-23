@@ -16,9 +16,10 @@ See also:
 | Component | Location |
 |---|---|
 | Postfix relay (primary) | `mail.home.2123studios.com` — kvm01 (192.168.1.15) |
-| Postfix relay (fallback) | `mail2.home.2123studios.com` — kif (192.168.1.17) |
+| Postfix relay (fallback) | `mail2.home.2123studios.com` — kif (192.168.1.16) |
 | TLS | Certbot snap on each mail VM (`certbot` inventory group) |
-| DNS A + MX | AD DNS on DCs (Ansible `dns_mail_relay.yml`) — MX → primary only |
+| DNS A | AD DNS on DCs (Ansible `dns_mail_relay.yml`) — `mail` + `mail2` A records |
+| DNS MX (legacy) | Manual: `mail` and `pdc` host MX → mail (10) + mail2 (20); zone apex has no MX |
 | Member `relayhost` | Ansible `domain_join` role when `mail_relay_client_enabled: true` |
 | Member fallback | `smtp_fallback_relay` → `mail2` when primary unreachable |
 | Upstream | Gmail SMTP (`smtp.gmail.com:587`) with app password |
@@ -73,8 +74,12 @@ mail_relay_hostname: mail.home.2123studios.com
 mail_relay_target_ip: 192.168.1.15   # mail VM on kvm01
 mail_relay_secondary_enabled: true
 mail_relay_secondary_hostname: mail2.home.2123studios.com
-mail_relay_secondary_target_ip: 192.168.1.17   # mail2 VM on kif
+mail_relay_secondary_target_ip: 192.168.1.16   # mail2 VM on kif
 ```
+
+Ansible ensures the `mail` / `mail2` **A** records (and optionally zone-apex MX →
+primary). Dual MX on **`mail`** and legacy **`pdc`** (priority 10/20) is maintained
+manually for clients that still do MX lookup; domain-joined members do **not** use MX.
 
 5. Linux member group vars (when ready to cut over):
 
@@ -218,7 +223,8 @@ baseline.yml → domain-join.yml                                  (members — r
 ```
 
 Members use bracketed `relayhost` / `smtp_fallback_relay` hostnames — **not MX lookup**.
-Dual MX records would not help LAN submission; Postfix fallback is the correct mechanism.
+Dual MX on `mail` / `pdc` is for legacy submitters; Postfix `smtp_fallback_relay` is the
+mechanism for Ansible-managed members.
 
 ## Troubleshooting
 

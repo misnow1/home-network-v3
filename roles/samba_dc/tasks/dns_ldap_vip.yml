@@ -24,8 +24,10 @@
     ip="{{ ldap_vip_address }}"
     changed=0
 
+    # samba-tool prints "A: <ip> (flags=..., serial=..., ttl=...)" — match IP then
+    # whitespace/EOL, not end-of-line only (that never matches and re-adds every run).
     if ! samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
-      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}[[:space:]]*$"; then
+      | grep -qE "^[[:space:]]+A:[[:space:]]+${ip//./\\.}([[:space:]]|$)"; then
       if samba-tool dns query localhost "$zone" "$host" A --machine-pass 2>/dev/null \
         | grep -qE '^[[:space:]]+A:'; then
         old_ip=$(samba-tool dns query localhost "$zone" "$host" A --machine-pass \

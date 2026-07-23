@@ -260,6 +260,16 @@ echo 'misnow1:!::0:99999:7:::' | sudo tee -a /etc/shadow
 
 Then retry `ssh misnow1@<dc-ip>`.
 
+## smb.conf management
+
+After provision/join, **dc-converge** owns `/etc/samba/smb.conf` (or the Samba state
+path it resolves to) via `roles/samba_dc/templates/smb.conf.j2`. Re-runs are
+idempotent: the candidate is compared to the live file; on change Ansible writes a
+timestamped backup under `/var/backups/samba/smb.conf.<UTC>` before replacing.
+
+Per-DC differences (TLS paths, optional shares such as `[images]`) come from
+inventory — see `samba_dc_shares` in host_vars examples.
+
 ## LDAP TLS (Slice 10)
 
 Samba AD DC ships with a self-signed LDAP certificate by default. Tools that validate

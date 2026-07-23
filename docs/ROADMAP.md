@@ -28,19 +28,19 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 |---|---|---|
 | — | AD migration (pdc → dc1/dc2) | Legacy Fedora `pdc` retired; dc1/dc2 authoritative |
 | 19 | kif/kvm01 Ubuntu reimage | Both hypervisors on Ubuntu 24.04, Ansible-managed |
+| 25+ | Hypervisor host networking | Netplan-managed br0 + VLAN 3 bridges on kif/kvm01; production converge is idempotent — [hypervisor-runbook.md](hypervisor-runbook.md) |
+| 27 | LDAP VIP (keepalived) | `ldap.home` fails over between dc1/dc2; Authelia authentication survives failover; production converge is idempotent — [ldap-vip-runbook.md](ldap-vip-runbook.md) |
+| 10+ | Pi-hole / DNS forwarders | Dual Ubuntu Pi-hole VMs; AD forwarding, filtering, UCG DHCP, DDNS, and IPv4/IPv6 validation complete; production converge is idempotent — [pihole-runbook.md](pihole-runbook.md) |
+| 16 | Internal mail relay | Dual Postfix relays (`mail` + `mail2`); member fallback, AD DNS, production TLS, and primary-outage delivery verified; production converge is idempotent — [mail-relay-runbook.md](mail-relay-runbook.md) |
 
-**Platform policy:** Remaining non-Ubuntu VMs (e.g. Pi-hole on CentOS/Rocky) will be
+**Platform policy:** Remaining non-Ubuntu VMs will be
 **repaved as Ubuntu** and converged with existing playbooks — not in-place migrated.
 
 ## Active — production cutover
 
 | Priority | Slice | Name | Status | Notes |
 |---|---|---|---|---|
-| 1 | 10+ | Pi-hole / DNS forwarders | **in progress** | Config-only Ansible role; Pi-hole → dc1/dc2; UCG DHCP — [pihole-runbook.md](pihole-runbook.md) |
-| 2 | 16 | Internal mail relay | **in progress** | Dual relay (`mail` + `mail2`), Postfix fallback, AD DNS — [mail-relay-runbook.md](mail-relay-runbook.md) |
-| 3 | 27 | LDAP VIP (keepalived) | **in progress** | Floating `ldap.home` on dc1/dc2; Authelia + single-URL LDAP clients — [ldap-vip-runbook.md](ldap-vip-runbook.md), [authelia-runbook.md](authelia-runbook.md) |
-| 4 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth — [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
-| 5 | 25+ | Hypervisor host networking | **in progress** | Netplan/Ansible for br0 + VLAN bridges on kif/kvm01 — [hypervisor-runbook.md](hypervisor-runbook.md) |
+| 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth — [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
 
 ## Active — automation backlog (post-reimage)
 

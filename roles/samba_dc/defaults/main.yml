@@ -78,12 +78,24 @@ samba_dc_smb_conf_candidates:
   - /etc/samba/smb.conf
 # Resolved at runtime by samba_smb_conf.yml.
 samba_dc_smb_conf: /etc/samba/smb.conf
+# Converge owns smb.conf via templates/smb.conf.j2 after provision/join.
+samba_dc_smb_conf_candidate_path: /var/tmp/samba-dc-smb.conf.ansible
+samba_dc_smb_conf_backup_dir: /var/backups/samba
+# Optional overrides (defaults derived from inventory_hostname / dc_domain_name).
+# samba_dc_netbios_name: DC1
+# samba_dc_workgroup: HOME
+# samba_dc_log_level: "1"
+# Extra SMB shares (e.g. dc1 images). Empty on most DCs.
+samba_dc_shares: []
 
 # Restrict Samba (and samba_dnsupdate) to primary LAN NIC + loopback so Docker
 # bridge IPs are not registered as DC A/AAAA records. See samba_interfaces.yml.
 samba_dc_bind_interfaces_only: true
 # Empty list = auto-detect lo + ansible_facts['default_ipv4']['interface'] at runtime.
+# When ldap_vip_enabled, auto-detect uses addresses (not NIC names) so the VIP is
+# never registered under this DC hostname.
 samba_dc_interfaces: []
+samba_dc_dns_prune_script: /usr/local/sbin/samba-dc-prune-dns
 
 # LDAPS / START-TLS — apply with playbooks/certbot.yml (requires cert material first).
 samba_dc_tls_enabled: false

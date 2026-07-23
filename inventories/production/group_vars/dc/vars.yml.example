@@ -44,6 +44,12 @@ ddns_nsupdate_enabled: true
 # Samba interface binding — auto-detects lo + primary NIC; override if wrong:
 # samba_dc_interfaces: [lo, enp1s0]
 
+# With ldap_vip_enabled, auto-detect binds to addresses (not NIC names) so the
+# keepalived VIP is never registered under the DC hostname.
+
+# Optional per-DC SMB shares (e.g. images) — set in host_vars, not here.
+# samba_dc_shares: []
+
 certbot_enabled: true
 certbot_provider: dreamhost_dns
 # certbot_domains — set per DC in host_vars (dc FQDN + ldap.home SAN)
@@ -63,7 +69,7 @@ mail_relay_hostname: mail.home.2123studios.com
 mail_relay_target_ip: 192.168.1.15   # mail.home.2123studios.com VM on kvm01
 mail_relay_secondary_enabled: true
 mail_relay_secondary_hostname: mail2.home.2123studios.com
-mail_relay_secondary_target_ip: 192.168.1.17   # mail2.home.2123studios.com VM on kif
+mail_relay_secondary_target_ip: 192.168.1.16   # mail2.home.2123studios.com VM on kif
 
 # Replica join — set on the joining DC before dc-replica-join.yml (see docs/dc-runbook.md)
 # samba_dc_migration_host: true
