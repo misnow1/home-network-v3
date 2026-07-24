@@ -46,7 +46,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 
 | Slice | Name | Depends on | Notes |
 |---|---|---|---|
-| 15+ | NFS exports (kif server) | Slice 19 | kif exports `/home`, `/media`, `/archive` for Linux clients; Ansible role or fileserver companion |
+| 15+ | NFS exports (kif server) | Slice 19 | **`nfs_server` role + `nfs-server.yml` ready** — production converge/idempotency proof on kif pending; see [nfs-server-runbook.md](nfs-server-runbook.md) |
 | 19+ | Production fileserver (kif shares) | 15+, Slice 5 | Extend `samba_fileserver`: `[homes]`, `[archive]`, `[shared]`, `[media]`, `[paperless]`; **wsdd** |
 | — | nfs_client integration test | 15+ | Structural tests exist; tier-3 VM proof pending |
 
@@ -57,6 +57,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 11+ | Observability (Prometheus/Grafana) | Slices 1–5 hosts | Monitoring is separate concern |
 | 12+ | Bare-metal install (PXE/kickstart) | Slice 1 baseline | Lab uses cloud-init; prod install later |
 | 14+ | Windows provisioning | Slice 2 AD | Manual/docs only — Windows clients out of scope |
+| 29+ | Stable IPv6-first LAN addressing | Slice 17, gateway topology | Replace ISP-PD-dependent inventory ACLs with stable internal IPv6 addressing (evaluate ULA and alternatives); research Windows RFC 6724 address selection, AAAA/AD DNS behavior, and dual-stack failure modes; apply consistently to NFS, firewalls, and fleet services |
 | 20+ | Mac Time Machine + avahi | Production fileserver | `vfs_fruit`, avahi `_adisk._tcp` / `_device-info._tcp`; Finder discovery for personal Macs |
 | 22+ | backup-libvirt automation | Slice 7 | `backup-libvirt.sh` honoring scope manifest (`offline_copy`, `snapshot`, `exclude`) |
 | 23+ | Restic scheduling + offsite | Slice 7, hypervisors | systemd timers; repos on kif `/archive/restic/`; SFTP/NAS backend; quarterly restore drill; 3-2-1 offsite copy |

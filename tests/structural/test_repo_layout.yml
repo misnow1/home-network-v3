@@ -39,6 +39,10 @@
       - docs/ldap-vip-runbook.md
       - docs/authelia-runbook.md
       - docs/nut-runbook.md
+      - docs/nfs-server-runbook.md
+      - docs/nfs-client-runbook.md
+      - playbooks/nfs-server.yml
+      - playbooks/nfs-client.yml
       - roles/mail_relay/tasks/main.yml
       - roles/samba_dc/tasks/dns_mail_relay.yml
       - roles/samba_dc/tasks/dns_ldap_vip.yml

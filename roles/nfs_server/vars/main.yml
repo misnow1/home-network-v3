@@ -1,0 +1,8 @@
+---
+nfs_server_packages:
+  - nfs-kernel-server
+  - rpcbind
+
+nfs_server_services:
+  - rpc-svcgssd
+  - nfs-server

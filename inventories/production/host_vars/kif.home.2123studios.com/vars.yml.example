@@ -11,6 +11,12 @@
 # Restore from /archive/pre-reimage-kif-2026-06-29/samba/smb.conf if Ansible overwrote it.
 fileserver_samba_enabled: false
 
+# Kerberos NFS exports for Linux clients — playbooks/nfs-server.yml (ROADMAP 15+).
+# Capture /etc/exports before first converge if migrating from hand-maintained config.
+nfs_server_enabled: true
+nfs_server_client_networks:
+  - 192.168.1.0/24
+
 mdadm_monitor_enabled: true
 
 nut_ups_mode: netserver

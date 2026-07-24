@@ -1,0 +1,75 @@
+---
+- name: NFS server | Assert join credentials for SPN management
+  ansible.builtin.assert:
+    that:
+      - (vault_ad_join_user | default('')) | length > 0
+      - (vault_ad_join_password | default('')) | length > 0
+    fail_msg: >-
+      vault_ad_join_user and vault_ad_join_password required when nfs_server_manage_spn is true.
+  tags: [always]
+
+- name: NFS server | List registered SPNs
+  ansible.builtin.command: net ads setspn list
+  register: nfs_server_spn_list
+  changed_when: false
+  failed_when: false
+
+- name: NFS server | Register NFS SPN (FQDN)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    net ads setspn add "{{ nfs_server_spn_fqdn }}" -U "${JOIN_USER}"
+  args:
+    executable: /bin/bash
+  environment:
+    JOIN_USER: "{{ vault_ad_join_user }}"
+    PASSWD: "{{ vault_ad_join_password }}"
+  register: nfs_server_spn_add_fqdn
+  changed_when: nfs_server_spn_add_fqdn.rc == 0
+  failed_when: >-
+    nfs_server_spn_add_fqdn.rc != 0
+    and 'Conflicting' not in (nfs_server_spn_add_fqdn.stderr | default(''))
+    and 'already registered' not in (nfs_server_spn_add_fqdn.stderr | default('') | lower)
+  when: nfs_server_spn_fqdn not in nfs_server_spn_list.stdout
+  no_log: true
+  notify: restart nfs server
+
+- name: NFS server | Register NFS SPN (short host name)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    net ads setspn add "{{ nfs_server_spn_short }}" -U "${JOIN_USER}"
+  args:
+    executable: /bin/bash
+  environment:
+    JOIN_USER: "{{ vault_ad_join_user }}"
+    PASSWD: "{{ vault_ad_join_password }}"
+  register: nfs_server_spn_add_short
+  changed_when: nfs_server_spn_add_short.rc == 0
+  failed_when: >-
+    nfs_server_spn_add_short.rc != 0
+    and 'Conflicting' not in (nfs_server_spn_add_short.stderr | default(''))
+    and 'already registered' not in (nfs_server_spn_add_short.stderr | default('') | lower)
+  when: nfs_server_spn_short not in nfs_server_spn_list.stdout
+  no_log: true
+  notify: restart nfs server
+
+- name: NFS server | Inspect keytab for NFS principals
+  ansible.builtin.command: klist -ke /etc/krb5.keytab
+  register: nfs_server_keytab_list
+  changed_when: false
+  failed_when: false
+
+- name: NFS server | Add NFS entries to keytab
+  ansible.builtin.shell: |
+    set -euo pipefail
+    net ads keytab add nfs -U "${JOIN_USER}"
+  args:
+    executable: /bin/bash
+  environment:
+    JOIN_USER: "{{ vault_ad_join_user }}"
+    PASSWD: "{{ vault_ad_join_password }}"
+  register: nfs_server_keytab_add
+  changed_when: nfs_server_keytab_add.rc == 0
+  failed_when: nfs_server_keytab_add.rc != 0
+  when: nfs_server_spn_fqdn not in (nfs_server_keytab_list.stdout | default(''))
+  no_log: true
+  notify: restart nfs server

@@ -1,0 +1,40 @@
+---
+- name: NFS server | Assert export paths exist
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  register: nfs_server_export_paths
+  loop: "{{ nfs_server_exports }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: NFS server | Require export directories on disk
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+    fail_msg: "NFS export path {{ item.item.path }} must exist as a directory before exports are deployed."
+  loop: "{{ nfs_server_export_paths.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: NFS server | Enable rpc.svcgssd in nfs-kernel-server defaults
+  ansible.builtin.lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: '^#?NEED_SVCGSSD='
+    line: NEED_SVCGSSD=yes
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nfs server
+
+- name: NFS server | Deploy /etc/exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload nfs exports
+    - restart nfs server

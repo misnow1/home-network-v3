@@ -34,7 +34,7 @@ Never commit `hosts.yml`, `vars.yml`, `vault.yml`, or `ansible.yml` under
 |---|---|---|
 | `dc` | Samba AD DC — name **must** be `dc` | `dc-bootstrap.yml`, `dc-replica-join.yml`, `dc-converge.yml`, `ddns-api.yml` |
 | `hypervisors` | KVM + Docker + backup client | `hypervisor.yml`, `backup.yml` |
-| `fileservers` | Samba member file servers (winbind) | `fileserver.yml` |
+| `fileservers` | Samba member file servers (winbind) | `fileserver.yml`, `nfs-server.yml` (opt-in) |
 | `nut_servers` | NUT UPS monitoring | `nut-converge.yml` |
 | `bastion` | Edge jump hosts | `bastion.yml` (after domain-join) |
 | `reverse_proxy` | nginx + Authelia edge proxy | `reverse-proxy.yml`, `certbot.yml` |
@@ -64,7 +64,7 @@ CentOS/Rocky today and will be **repaved as Ubuntu** rather than in-place migrat
 | `host_vars/mail2.../vars.yml.example` | [mail-relay-runbook.md](../docs/mail-relay-runbook.md) |
 | Manual Authelia on kif | [authelia-runbook.md](../docs/authelia-runbook.md) |
 | `group_vars/fileservers/vars.yml.example` | [fileserver-runbook.md](../docs/fileserver-runbook.md) |
-| `host_vars/kif.../vars.yml.example` | [nut-runbook.md](../docs/nut-runbook.md), [hypervisor-runbook.md](../docs/hypervisor-runbook.md) |
+| `host_vars/kif.../vars.yml.example` | [nut-runbook.md](../docs/nut-runbook.md), [hypervisor-runbook.md](../docs/hypervisor-runbook.md), [nfs-server-runbook.md](../docs/nfs-server-runbook.md) |
 | `host_vars/kvm01.../vars.yml.example` | [hypervisor-runbook.md](../docs/hypervisor-runbook.md) |
 | `host_vars/cka-sim.../vars.yml.example` | [software.md](../docs/software.md), [cka-runbook.md](../docs/cka-runbook.md) |
 ## Platform policy

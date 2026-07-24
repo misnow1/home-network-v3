@@ -1,0 +1,8 @@
+---
+- name: NFS server | Enable and start GSS and NFS services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ nfs_server_services }}"
+  when: not ansible_check_mode
