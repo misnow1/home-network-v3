@@ -1,0 +1,9 @@
+# Managed by Ansible (roles/hypervisor). Sourced by grub-mkconfig after /etc/default/grub.
+# Put all desired kernel cmdline extras in hypervisor_grub_cmdline_linux_extra (this
+# drop-in sets GRUB_CMDLINE_LINUX and overrides any value from /etc/default/grub).
+
+GRUB_TIMEOUT={{ hypervisor_grub_timeout }}
+GRUB_TIMEOUT_STYLE={{ hypervisor_grub_timeout_style }}
+{% if hypervisor_grub_cmdline_linux_extra | length > 0 %}
+GRUB_CMDLINE_LINUX="{{ hypervisor_grub_cmdline_linux_extra | join(' ') }}"
+{% endif %}

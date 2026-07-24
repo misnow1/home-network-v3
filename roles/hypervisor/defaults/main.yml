@@ -111,3 +111,11 @@ docker_engine_enabled: true
 
 docker_engine_users:
   - ansible
+
+# Opt-in GRUB drop-in (/etc/default/grub.d/) — IOMMU cmdline + menu timeout.
+# Enable per host (e.g. kif) after validating; requires reboot to apply cmdline.
+hypervisor_grub_manage: false
+hypervisor_grub_timeout: 5
+hypervisor_grub_timeout_style: menu
+hypervisor_grub_cmdline_linux_extra: []
+hypervisor_grub_config_path: /etc/default/grub.d/99-home-network-hypervisor.cfg

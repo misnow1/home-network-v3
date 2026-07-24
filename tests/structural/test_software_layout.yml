@@ -97,6 +97,15 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Software | assert root console break-glass defaults and tasks exist
+      ansible.builtin.shell: |
+        grep -q 'linux_baseline_root_console_enabled: false' "{{ baseline_defaults }}" &&
+        grep -q 'root_console.yml' "{{ baseline_tasks }}" &&
+        test -f "{{ repo_root }}/roles/linux_baseline/tasks/root_console.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Software | assert DC packages include ldb-tools and debug tools
       ansible.builtin.shell: |
         grep -q 'ldb-tools' "{{ samba_defaults }}"

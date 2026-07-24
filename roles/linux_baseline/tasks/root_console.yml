@@ -1,0 +1,49 @@
+---
+# Opt-in local root password for physical/IPMI console break-glass.
+# Does not enable SSH root login (PermitRootLogin stays distro-default / role policy).
+# Hashes with openssl (yescrypt/sha512 via -6) so the control node does not need passlib.
+
+- name: Baseline | Require vault_root_password when root console is enabled
+  ansible.builtin.assert:
+    that:
+      - vault_root_password is defined
+      - vault_root_password | length > 0
+    fail_msg: >-
+      linux_baseline_root_console_enabled is true but vault_root_password is
+      unset/empty — add it to group_vars/all/vault.yml (see docs/vault-schema.md).
+  when: linux_baseline_root_console_enabled | bool
+  tags: [root_console]
+
+# Salt must be [a-zA-Z0-9./] and ≤16 chars for openssl passwd -6; derive stably per host.
+- name: Baseline | Derive stable openssl salt for root password
+  ansible.builtin.set_fact:
+    linux_baseline_root_password_salt: >-
+      {{ (inventory_hostname | hash('sha256'))[:16]
+         | regex_replace('[^a-zA-Z0-9./]', 'x') }}
+  when: linux_baseline_root_console_enabled | bool
+  tags: [root_console]
+
+- name: Baseline | Hash root password with openssl
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - passwd
+      - -6
+      - -salt
+      - "{{ linux_baseline_root_password_salt }}"
+      - -stdin
+    stdin: "{{ vault_root_password }}"
+  register: linux_baseline_root_password_hash
+  changed_when: false
+  no_log: true
+  when: linux_baseline_root_console_enabled | bool
+  tags: [root_console]
+
+- name: Baseline | Set root password for console break-glass
+  ansible.builtin.user:
+    name: root
+    password: "{{ linux_baseline_root_password_hash.stdout }}"
+    update_password: always
+  when: linux_baseline_root_console_enabled | bool
+  no_log: true
+  tags: [root_console]

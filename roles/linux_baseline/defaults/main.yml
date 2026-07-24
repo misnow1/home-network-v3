@@ -7,6 +7,10 @@ linux_baseline_ansible_user_enabled: true
 linux_baseline_ansible_user_name: ansible
 linux_baseline_ansible_user_home: /var/lib/ansible
 
+# Opt-in root password for physical/IPMI console break-glass (not SSH).
+# Requires vault_root_password in group_vars/all/vault.yml — see docs/vault-schema.md.
+linux_baseline_root_console_enabled: false
+
 # NTP servers for chrony — override in group_vars when needed.
 chrony_ntp_servers:
   - 0.pool.ntp.org

@@ -3,6 +3,11 @@
   ansible.builtin.meta: end_host
   when: not hypervisor_libvirt_enabled | bool
 
+- name: Hypervisor | Configure GRUB (IOMMU / menu timeout)
+  ansible.builtin.include_tasks: grub.yml
+  when: hypervisor_grub_manage | bool
+  tags: [hypervisor_grub]
+
 - name: Hypervisor | Configure host networking
   ansible.builtin.include_tasks: netplan.yml
   when: hypervisor_netplan_enabled | bool
