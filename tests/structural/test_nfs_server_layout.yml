@@ -1,0 +1,67 @@
+---
+# Structural tests for nfs_server role layout.
+
+- name: Structural — nfs_server layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    nfs_defaults: "{{ repo_root }}/roles/nfs_server/defaults/main.yml"
+    nfs_tasks: "{{ repo_root }}/roles/nfs_server/tasks/main.yml"
+    nfs_playbook: "{{ repo_root }}/playbooks/nfs-server.yml"
+    nfs_runbook: "{{ repo_root }}/docs/nfs-server-runbook.md"
+    kif_host_vars_example: >-
+      {{ repo_root }}/inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example
+  tasks:
+    - name: NFS server | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: nfs_server_paths
+      loop:
+        - "{{ nfs_defaults }}"
+        - "{{ nfs_tasks }}"
+        - "{{ repo_root }}/roles/nfs_server/handlers/main.yml"
+        - "{{ repo_root }}/roles/nfs_server/templates/exports.j2"
+        - "{{ repo_root }}/roles/nfs_server/tasks/spn.yml"
+        - "{{ repo_root }}/roles/nfs_server/tasks/krb5.yml"
+        - "{{ nfs_playbook }}"
+        - "{{ nfs_runbook }}"
+        - "{{ kif_host_vars_example }}"
+
+    - name: NFS server | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ nfs_server_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: NFS server | assert playbook targets fileservers group
+      ansible.builtin.shell: |
+        grep -q 'hosts: fileservers' "{{ nfs_playbook }}"
+        grep -q 'nfs_server_enabled' "{{ nfs_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NFS server | assert defaults include krb5i exports and SPN management
+      ansible.builtin.shell: |
+        grep -q 'nfs_server_export_sec: krb5i' "{{ nfs_defaults }}"
+        grep -q 'nfs_server_exports:' "{{ nfs_defaults }}"
+        grep -q '/archive' "{{ nfs_defaults }}"
+        grep -q 'nfs_server_manage_spn' "{{ nfs_defaults }}"
+        grep -q 'net ads setspn add' "{{ repo_root }}/roles/nfs_server/tasks/spn.yml"
+        grep -q 'NEED_SVCGSSD=yes' "{{ repo_root }}/roles/nfs_server/tasks/exports.yml"
+        grep -q 'sec=' "{{ repo_root }}/roles/nfs_server/templates/exports.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NFS server | assert kif example enables nfs server
+      ansible.builtin.shell: |
+        grep -q 'nfs_server_enabled: true' "{{ kif_host_vars_example }}"
+        grep -q 'nfs_server_client_networks' "{{ kif_host_vars_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

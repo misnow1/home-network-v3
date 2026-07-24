@@ -1,0 +1,14 @@
+---
+- name: Reload NFS exports
+  ansible.builtin.command: exportfs -rav
+  listen: reload nfs exports
+  when: not ansible_check_mode
+
+- name: Restart NFS GSS and server services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: true
+  loop: "{{ nfs_server_services }}"
+  listen: restart nfs server
+  when: not ansible_check_mode

@@ -1,0 +1,27 @@
+---
+- name: NFS server | Assert winbind AD join
+  ansible.builtin.command: net ads testjoin
+  register: nfs_server_testjoin
+  changed_when: false
+  failed_when: nfs_server_testjoin.rc != 0
+
+- name: NFS server | Check krb5.conf for krb5.conf.d includedir
+  ansible.builtin.command: grep -q 'includedir /etc/krb5.conf.d/' /etc/krb5.conf
+  register: nfs_server_krb5_includedir
+  changed_when: false
+  failed_when: false
+
+- name: NFS server | Ensure krb5.conf.d directory exists
+  ansible.builtin.file:
+    path: /etc/krb5.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: nfs_server_krb5_includedir.rc == 0
+
+- name: NFS server | Load rpcsec_gss_krb5 kernel module
+  community.general.modprobe:
+    name: rpcsec_gss_krb5
+    state: present
+  when: not ansible_check_mode

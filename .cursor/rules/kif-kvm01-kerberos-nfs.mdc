@@ -1,6 +1,6 @@
 ---
 description: kif / kvm01 Kerberos NFS production lessons
-globs: docs/nfs-client-runbook.md,docs/hypervisor-runbook.md,roles/nfs_client/**,roles/domain_join/**,roles/hypervisor/**
+globs: docs/nfs-client-runbook.md,docs/nfs-server-runbook.md,docs/hypervisor-runbook.md,roles/nfs_client/**,roles/nfs_server/**,roles/domain_join/**,roles/hypervisor/**
 alwaysApply: false
 ---
 
@@ -11,8 +11,8 @@ alwaysApply: false
 1. **`/etc/krb5.conf` from archive** — if it has `includedir /etc/krb5.conf.d/`, create that directory on Ubuntu or all krb5 (including `klist`, `rpc-svcgssd`) fails.
 2. **NFS SPN in AD** — `net ads keytab add nfs` alone is insufficient; register `nfs/kif.home.2123studios.com` and `nfs/KIF` on `KIF$` via `net ads setspn add`, then keytab add and restart `rpc-svcgssd` + `nfs-server`. Clients verify with `kvno nfs/kif.home.2123studios.com`.
 3. **Server GSS** — `modprobe rpcsec_gss_krb5`; `rpc-svcgssd` must be active for `sec=krb5*`.
-4. **Exports** — restore `/etc/exports` only; do not restore `/var/lib/nfs/etab` from old OS; use `exportfs -rav`. Optional stable `fsid=1/2/3` per export.
-5. **`krb5.conf` is not Ansible-managed yet** on kif.
+4. **Exports** — Ansible-managed `/etc/exports` via `nfs_server` role when `nfs_server_enabled: true`; do not restore `/var/lib/nfs/etab` from old OS; use `exportfs -rav`. Stable `fsid=1/2/3` per export.
+5. **`krb5.conf` is not fully Ansible-managed** on kif — role ensures `/etc/krb5.conf.d/` exists when `includedir` is present.
 
 ## kvm01 (NFS client, sssd + nfs_client role)
 

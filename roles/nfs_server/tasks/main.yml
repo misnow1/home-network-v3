@@ -1,0 +1,32 @@
+---
+- name: NFS server | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not nfs_server_enabled | bool
+
+- name: NFS server | Assert host is not a DC
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname not in groups.get('dc', [])
+    fail_msg: nfs_server role must not run on DC hosts.
+  tags: [always]
+
+- name: NFS server | Install packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [nfs_server, nfs_server_packages]
+
+- name: NFS server | Configure Kerberos prerequisites
+  ansible.builtin.include_tasks: krb5.yml
+  tags: [nfs_server, nfs_server_krb5]
+
+- name: NFS server | Register NFS service principals
+  ansible.builtin.include_tasks: spn.yml
+  when: nfs_server_manage_spn | bool
+  tags: [nfs_server, nfs_server_spn]
+
+- name: NFS server | Deploy exports and enable services
+  ansible.builtin.include_tasks: exports.yml
+  tags: [nfs_server, nfs_server_exports]
+
+- name: NFS server | Enable GSS and NFS services
+  ansible.builtin.include_tasks: services.yml
+  tags: [nfs_server, nfs_server_services]

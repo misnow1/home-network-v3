@@ -38,8 +38,9 @@ ${PROD} playbooks/nfs-client.yml --limit "${HOST}"
 ${PROD} playbooks/hypervisor.yml --limit "${HOST}"
 ```
 
-kif **exports** remain manual until ROADMAP slice 15+; client config must match
-kif `/etc/exports` (`sec=`, paths).
+kif **exports** are managed by [`playbooks/nfs-server.yml`](../playbooks/nfs-server.yml)
+when `nfs_server_enabled: true` — see [nfs-server-runbook.md](nfs-server-runbook.md).
+Client config must match kif `/etc/exports` (`sec=krb5i`, paths).
 
 ## When kif is down
 
@@ -130,8 +131,9 @@ sudo systemctl restart rpc-svcgssd nfs-server
 
 Re-test `kvno` from the client, then `mount ... sec=krb5i`.
 
-kif's NFS/Kerberos server config is **manual** until ROADMAP slice 15+, so it must
-be re-established after a kif reimage before any `krb5*` client mount can succeed.
+kif's NFS/Kerberos server config is managed by the **`nfs_server` role** when
+`nfs_server_enabled: true` — see [nfs-server-runbook.md](nfs-server-runbook.md).
+After a kif reimage, run `nfs-server.yml` before any `krb5*` client mount can succeed.
 
 ## Troubleshooting: `Stale file handle` with `sec=krb5*`
 

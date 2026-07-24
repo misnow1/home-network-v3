@@ -1,0 +1,15 @@
+---
+# Kerberos NFS server exports (/home, /media, /archive on kif).
+# Requires baseline.yml and a working winbind AD join on the target host.
+#
+# Enable per host: nfs_server_enabled: true
+# Production:
+#   ./scripts/prod-run.sh --confirm-production -- playbooks/nfs-server.yml \
+#     --limit kif.home.2123studios.com
+
+- name: Configure NFS servers
+  hosts: fileservers
+  become: true
+  roles:
+    - role: nfs_server
+      when: nfs_server_enabled | default(false) | bool

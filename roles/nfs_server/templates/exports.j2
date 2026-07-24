@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Kerberos NFS exports — sec={{ nfs_server_export_sec }} only. Managed by Ansible (ROADMAP 15+).
+{% for export in nfs_server_exports %}
+{% set opts = (export.options | default(nfs_server_export_options)) + ['sec=' ~ (export.sec | default(nfs_server_export_sec)), 'fsid=' ~ (export.fsid | string)] %}
+{% set clients = export.clients | default(nfs_server_client_networks) %}
+{{ export.path }}{% for client in clients %} {{ client }}({{ opts | join(',') }}){% endfor %}
+{% endfor %}

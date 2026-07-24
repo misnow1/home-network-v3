@@ -1,0 +1,35 @@
+---
+# Kerberos NFS server (kif exports for Linux domain members).
+# Requires winbind AD join before converge — see docs/nfs-server-runbook.md.
+
+nfs_server_enabled: false
+
+# Client subnets allowed to mount (must match nfs_client hosts' LAN reachability).
+nfs_server_client_networks:
+  - 192.168.1.0/24
+
+# Integrity-only Kerberos — matches roles/nfs_client defaults (sec=krb5i).
+nfs_server_export_sec: krb5i
+
+# Stable fsid values survive export reloads; do not restore /var/lib/nfs/etab from backups.
+nfs_server_exports:
+  - path: /home
+    fsid: 1
+  - path: /media
+    fsid: 2
+  - path: /archive
+    fsid: 3
+
+# Per-export option tokens (joined in exports.j2). sec= is appended from nfs_server_export_sec.
+nfs_server_export_options:
+  - rw
+  - async
+  - root_squash
+
+# Register nfs/<fqdn> and nfs/<HOST> SPNs and refresh keytab (needs vault join creds).
+nfs_server_manage_spn: true
+
+# Override when ansible_fqdn / hostname differ from AD computer object naming.
+nfs_server_spn_fqdn: "nfs/{{ ansible_fqdn | default(inventory_hostname) }}"
+nfs_server_spn_short: >-
+  nfs/{{ (ansible_hostname | default(inventory_hostname.split('.')[0])) | upper }}
