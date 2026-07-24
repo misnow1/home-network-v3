@@ -70,6 +70,17 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Hypervisor | assert GRUB defaults and tasks exist
+      ansible.builtin.shell: |
+        grep -q 'hypervisor_grub_manage' "{{ libvirt_defaults }}" &&
+        grep -q 'hypervisor_grub_cmdline_linux_extra' "{{ libvirt_defaults }}" &&
+        grep -q 'grub.yml' "{{ hypervisor_role }}/tasks/main.yml" &&
+        test -f "{{ hypervisor_role }}/tasks/grub.yml" &&
+        test -f "{{ hypervisor_role }}/templates/grub-hypervisor.cfg.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Hypervisor | assert performance baseline script exists
       ansible.builtin.stat:
         path: "{{ repo_root }}/scripts/hypervisor/perf-baseline.sh"
@@ -92,6 +103,7 @@
         - storage.yml
         - storage_volume.yml
         - performance.yml
+        - grub.yml
         - users.yml
         - directories.yml
         - pools.yml

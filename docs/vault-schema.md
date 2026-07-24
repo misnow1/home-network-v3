@@ -64,6 +64,7 @@ Variables below are added as slices land. Placeholder exists for Slice 0.
 | `vault_pushover_user_key` | 21 | Pushover user key for UPS notifications | production only |
 | `vault_pushover_api_token` | 21 | Pushover application API token | production only |
 | `vault_pihole_web_password` | 10+ | Pi-hole web UI / API password (both hosts) | production only |
+| `vault_root_password` | — | Root password for opt-in console break-glass (`linux_baseline_root_console_enabled`) | `LabRootBreak1!glass` / production secret |
 
 ## Recreate the lab vault
 

@@ -1,0 +1,17 @@
+---
+# Opt-in GRUB drop-in under /etc/default/grub.d/ (Ubuntu sources these after
+# /etc/default/grub). Used for IOMMU workarounds and a visible menu timeout.
+
+- name: Hypervisor | Deploy GRUB drop-in
+  ansible.builtin.template:
+    src: grub-hypervisor.cfg.j2
+    dest: "{{ hypervisor_grub_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update grub
+  tags: [hypervisor_grub]
+
+- name: Hypervisor | Flush handlers so GRUB is updated before reboot advice
+  ansible.builtin.meta: flush_handlers
+  tags: [hypervisor_grub]

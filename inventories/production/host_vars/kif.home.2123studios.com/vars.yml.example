@@ -72,6 +72,18 @@ hypervisor_libvirt_pools_extra:
     owner: root
     group: root
 
+# GRUB — IOMMU passthrough (broken ASMedia RMRR + DMA PTE WARNs on X10SRi-F EOL BIOS)
+# and a short menu timeout for IPMI/console recovery. Requires reboot to apply cmdline.
+hypervisor_grub_manage: true
+hypervisor_grub_timeout: 5
+hypervisor_grub_timeout_style: menu
+hypervisor_grub_cmdline_linux_extra:
+  - intel_iommu=on
+  - iommu=pt
+
+# Console break-glass root password (vault_root_password). Does not enable SSH root.
+linux_baseline_root_console_enabled: true
+
 # Libvirt storage — only /var/lib/libvirt/images on a dedicated LV (kif2/libvirt-images).
 hypervisor_libvirt_volume_group: kif2
 hypervisor_libvirt_data_volumes:

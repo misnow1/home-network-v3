@@ -1,4 +1,10 @@
 ---
+- name: Update grub
+  ansible.builtin.command: update-grub
+  listen: Update grub
+  changed_when: true
+  when: not ansible_check_mode
+
 - name: Apply sysctl
   ansible.builtin.command: sysctl --system
   listen: Apply sysctl

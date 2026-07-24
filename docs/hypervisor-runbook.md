@@ -50,7 +50,63 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_volume_group` | `""` | LVM VG name (required when `data_volumes` set) |
 | `hypervisor_libvirt_data_volumes` | `[]` | Opt-in libvirt mounts: `lv`, `mount`, `size` per entry |
 | `hypervisor_perf_tuning_enabled` | `false` | Enable tuned/sysctl/THP host tuning (see [`hypervisor-performance.md`](hypervisor-performance.md)) |
+| `hypervisor_grub_manage` | `false` | Deploy `/etc/default/grub.d/99-home-network-hypervisor.cfg` (timeout + cmdline) |
+| `hypervisor_grub_timeout` | `5` | GRUB menu timeout seconds (when managed) |
+| `hypervisor_grub_timeout_style` | `menu` | `menu` / `countdown` / `hidden` |
+| `hypervisor_grub_cmdline_linux_extra` | `[]` | Kernel cmdline tokens (e.g. `intel_iommu=on`, `iommu=pt`) |
 | `docker_engine_enabled` | `true` | Include `docker_engine` role |
+
+### GRUB menu timeout (kif + kvm01)
+
+Both production hypervisors enable a 5s **menu** timeout (replacing Ubuntu's hidden/0
+default) so IPMI/console can pick a kernel or edit cmdline:
+
+```yaml
+hypervisor_grub_manage: true
+hypervisor_grub_timeout: 5
+hypervisor_grub_timeout_style: menu
+```
+
+**kif only** also sets IOMMU passthrough (X10SRi-F is EOL; latest BIOS still reports a
+broken RMRR for the ASMedia USB controller, which collided with KVM `vhost_net` →
+Mellanox DMA — `DMAR: ERROR: DMA PTE for vPFN … already set`):
+
+```yaml
+# kif host_vars only — do not set on kvm01
+hypervisor_grub_cmdline_linux_extra:
+  - intel_iommu=on
+  - iommu=pt
+```
+
+`iommu=pt` keeps VT-d available but identity-maps devices. **Reboot required** after
+first converge for cmdline changes to apply (timeout alone is written immediately to
+`grub.cfg`).
+
+```bash
+./scripts/prod-run.sh --confirm-production -- playbooks/hypervisor.yml \
+  --limit kif.home.2123studios.com,kvm01.home.2123studios.com --tags hypervisor_grub
+# after kif reboot:
+#   cat /proc/cmdline   # expect intel_iommu=on iommu=pt
+#   dmesg | grep -iE 'DMA PTE|RMRR|iommu=pt'
+```
+
+### Console break-glass root (baseline)
+
+Root has no password after Ubuntu reimage (`shadow` `*`). For physical/IPMI console
+when AD/SSH is wedged, kif and kvm01 enable:
+
+```yaml
+linux_baseline_root_console_enabled: true   # host_vars
+# vault_root_password in group_vars/all/vault.yml (shared secret)
+```
+
+```bash
+./scripts/prod-run.sh --confirm-production -- playbooks/baseline.yml \
+  --limit kif.home.2123studios.com,kvm01.home.2123studios.com --tags root_console
+```
+
+This sets the root password only — it does **not** enable SSH `PermitRootLogin`.
+Retrieve the secret with `ansible-vault view …/vault.yml` (never commit plaintext).
 
 ### Libvirt storage host profiles
 

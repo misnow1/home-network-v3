@@ -32,3 +32,8 @@
   ansible.builtin.include_tasks: ansible_user.yml
   when: linux_baseline_ansible_user_enabled | bool
   tags: [ansible_user]
+
+- name: Configure root console break-glass password
+  ansible.builtin.include_tasks: root_console.yml
+  when: linux_baseline_root_console_enabled | bool
+  tags: [root_console]

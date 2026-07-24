@@ -55,5 +55,13 @@ docker_engine_data_volumes:
 # RTX 3050 — install driver on reimage; toolkit auto-detects the GPU.
 docker_engine_nvidia_install_driver: true
 
+# GRUB menu timeout for console recovery (no IOMMU cmdline extras on kvm01).
+hypervisor_grub_manage: true
+hypervisor_grub_timeout: 5
+hypervisor_grub_timeout_style: menu
+
+# Console break-glass root password (vault_root_password). Does not enable SSH root.
+linux_baseline_root_console_enabled: true
+
 # Backup scope — declare docker volumes and VM disks as needed (Slice 7).
 # backup_libvirt_vms: []
