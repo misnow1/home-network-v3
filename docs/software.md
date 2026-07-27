@@ -174,16 +174,30 @@ Postfix relay client is a prerequisite — applied via `domain-join.yml --tags d
 ### Bastion (`bastion`)
 
 **Playbook:** [`playbooks/bastion.yml`](../playbooks/bastion.yml) (run `baseline.yml` + `domain-join.yml` first)  
-**Role:** [`roles/bastion`](../roles/bastion/) — variable `bastion_packages`
+**Roles:** [`roles/bastion`](../roles/bastion/), [`roles/unattended_upgrades`](../roles/unattended_upgrades/)
+
+| Package | Purpose |
+|---|---|
+| `ufw` | Host firewall (SSH-only inbound) |
+| `fail2ban` | sshd brute-force protection |
+
+Also deploys sshd drop-in and fail2ban jail templates. Security patching is applied by
+the shared `unattended_upgrades` role (also available fleet-wide via
+[`playbooks/security-updates.yml`](../playbooks/security-updates.yml)). See
+[bastion-runbook.md](bastion-runbook.md) and [security-updates-runbook.md](security-updates-runbook.md).
+
+### Fleet security updates (`linux`)
+
+**Playbook:** [`playbooks/security-updates.yml`](../playbooks/security-updates.yml) (run `baseline.yml` first)  
+**Role:** [`roles/unattended_upgrades`](../roles/unattended_upgrades/)
 
 | Package | Purpose |
 |---|---|
 | `unattended-upgrades` | Automatic security patching |
-| `ufw` | Host firewall (SSH-only inbound) |
-| `fail2ban` | sshd brute-force protection |
 
-Also deploys sshd drop-in, unattended-upgrades config, and fail2ban jail templates. See
-[bastion-runbook.md](bastion-runbook.md).
+Deploys APT periodic upgrade configuration, inventory-driven reboot windows, and
+email to `root` on package changes (`MailReport: on-change`). See
+[security-updates-runbook.md](security-updates-runbook.md).
 
 ### Reverse proxy (`reverse_proxy`)
 
@@ -228,9 +242,9 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 
 | Host type | Order |
 |---|---|
-| DC | `linux_baseline` inline in DC playbooks |
-| Hypervisor, fileserver, domain member | `baseline.yml` → role playbook |
-| Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` |
+| DC | `linux_baseline` inline in DC playbooks; `security-updates.yml` for ongoing patching |
+| Hypervisor, fileserver, domain member | `baseline.yml` → `security-updates.yml` → role playbook |
+| Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` (includes `unattended_upgrades`) |
 | Reverse proxy | `baseline.yml` → `domain-join.yml` → `bastion.yml` → `certbot.yml` → `reverse-proxy.yml` |
 | CKA | `cka-converge.yml` (baseline + `cka_node`) |
 

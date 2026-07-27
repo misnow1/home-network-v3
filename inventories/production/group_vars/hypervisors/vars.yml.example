@@ -48,6 +48,10 @@ backup_docker_script_path: /usr/local/bin/backup-docker.sh
 # Declare docker volumes and VM disks in host_vars/{hostname}/vars.yml.
 # SFTP/NAS repositories deferred — see docs/backup-runbook.md.
 
+# Hypervisor OS reboot stops all local VMs — install security updates but reboot manually.
+# See docs/security-updates-runbook.md.
+unattended_upgrades_auto_reboot: false
+
 # Host performance tuning (tuned, sysctl, THP) — off by default on production.
 # Enable after lab validation; see docs/hypervisor-performance.md.
 # hypervisor_perf_tuning_enabled: true

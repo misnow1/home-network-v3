@@ -43,11 +43,11 @@ Never commit `hosts.yml`, `vars.yml`, `vault.yml`, or `ansible.yml` under
 | `certbot` | Hosts needing DNS-01 certificates | `certbot.yml` |
 | `linux_members` | Domain-joined members (sssd) | `domain-join.yml`, `nfs-client.yml` |
 | `windows` | Windows guests (not Ansible-managed) | `vm-create.sh` (`vm_perf_profile: windows11`) |
-| `linux` | Parent of Ubuntu apt-managed groups | `baseline.yml` |
+| `linux` | Parent of Ubuntu apt-managed groups | `baseline.yml`, `security-updates.yml` |
 | `deferred` | Legacy/transitional — empty post-migration | None by default |
 
-Pi-hole hosts are **not** in `linux` — they use curl-installed Pi-hole on
-CentOS/Rocky today and will be **repaved as Ubuntu** rather than in-place migrated.
+Pi-hole hosts are in `linux` — they receive `baseline.yml` and `security-updates.yml`
+alongside `pihole-converge.yml` for Pi-hole-specific configuration.
 
 ## Template → runbook index
 
@@ -55,7 +55,8 @@ CentOS/Rocky today and will be **repaved as Ubuntu** rather than in-place migrat
 |---|---|
 | `hosts.yml.example` | [production-runbook.md](../docs/production-runbook.md) |
 | `group_vars/dc/vars.yml.example` | [dc-runbook.md](../docs/dc-runbook.md), [ad-sites.md](../docs/ad-sites.md) |
-| `group_vars/linux/vars.yml.example` | [domain-join-runbook.md](../docs/domain-join-runbook.md), [bastion-runbook.md](../docs/bastion-runbook.md) |
+| `group_vars/linux/vars.yml.example` | [domain-join-runbook.md](../docs/domain-join-runbook.md), [bastion-runbook.md](../docs/bastion-runbook.md), [security-updates-runbook.md](../docs/security-updates-runbook.md) |
+| `group_vars/bastion/vars.yml.example` | [bastion-runbook.md](../docs/bastion-runbook.md), [security-updates-runbook.md](../docs/security-updates-runbook.md) |
 | `group_vars/hypervisors/vars.yml.example` | [hypervisor-runbook.md](../docs/hypervisor-runbook.md), [nfs-client-runbook.md](../docs/nfs-client-runbook.md) |
 | `group_vars/pihole/*.example` | [pihole-runbook.md](../docs/pihole-runbook.md) |
 | `group_vars/reverse_proxy/vars.yml.example` | [reverse-proxy-runbook.md](../docs/reverse-proxy-runbook.md) |

@@ -29,3 +29,6 @@ mail_relay_mynetworks:
 # mail_relay_manage_ufw: true
 # mail_relay_ufw_allow_cidrs:
 #   - 192.168.1.0/24
+
+# Security updates — stagger reboot windows in host_vars (mail / mail2).
+unattended_upgrades_auto_reboot: true

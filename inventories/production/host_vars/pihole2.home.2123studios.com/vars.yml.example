@@ -1,0 +1,7 @@
+---
+# pihole-2 (kvm01) — copy to vars.yml (gitignored alongside production inventory).
+#
+# Stagger reboot window before pihole-1. Local time: America/New_York.
+
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "03:00"

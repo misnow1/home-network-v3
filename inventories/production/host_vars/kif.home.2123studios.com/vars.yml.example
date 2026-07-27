@@ -189,3 +189,6 @@ docker_engine_volume_group: kif2
 docker_engine_data_volumes:
   - { lv: docker, mount: /srv/docker, size: 50G }
   - { lv: docker-volumes, mount: /var/lib/docker/volumes, size: 200G }
+
+# Hypervisor OS reboot stops all local VMs — install updates, reboot manually.
+unattended_upgrades_auto_reboot: false

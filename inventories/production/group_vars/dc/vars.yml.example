@@ -57,6 +57,10 @@ certbot_email: sno.sno@gmail.com
 certbot_staging: true   # flip false after staging dry-run succeeds
 samba_dc_tls_enabled: true
 
+# Security updates — stagger reboot windows in host_vars (dc1/dc2).
+# See docs/security-updates-runbook.md.
+unattended_upgrades_auto_reboot: true
+
 # LDAP/LDAPS VIP (keepalived) — docs/ldap-vip-runbook.md
 ldap_vip_enabled: true
 ldap_vip_address: 192.168.1.12

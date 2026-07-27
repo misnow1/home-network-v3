@@ -4,8 +4,8 @@
 #   cp inventories/production/group_vars/pihole/vars.yml.example \
 #      inventories/production/group_vars/pihole/vars.yml
 #
-# Config-only: assumes curl/basic-install on each host. Do not add pihole to the
-# linux group (apt-only playbooks).
+# Pi-hole hosts are in the linux group — baseline.yml and security-updates.yml apply.
+# Config-only Pi-hole converge: playbooks/pihole-converge.yml.
 
 pihole_dc_servers:
   - 192.168.1.10
@@ -47,3 +47,6 @@ pihole_enable_ipv6: false
 
 nfs_client_enabled: true
 nfs_client_static_mounts: []   # skip default /archive and /media
+
+# Security updates — stagger reboot windows in host_vars (pihole-1 / pihole-2).
+unattended_upgrades_auto_reboot: true

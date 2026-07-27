@@ -1,0 +1,7 @@
+---
+# mail (primary relay, kvm01) — copy to vars.yml (gitignored alongside production inventory).
+#
+# Stagger reboot window after mail2. Local time: America/New_York.
+
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "04:30"

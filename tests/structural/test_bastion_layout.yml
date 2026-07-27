@@ -21,7 +21,6 @@
         - "{{ bastion_tasks }}"
         - "{{ repo_root }}/roles/bastion/handlers/main.yml"
         - "{{ repo_root }}/roles/bastion/templates/99-bastion.conf.j2"
-        - "{{ repo_root }}/roles/bastion/templates/50unattended-upgrades.j2"
         - "{{ repo_root }}/roles/bastion/templates/jail.local.j2"
         - "{{ bastion_playbook }}"
         - "{{ bastion_runbook }}"
@@ -50,10 +49,16 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Bastion | assert defaults include unattended reboot settings
+    - name: Bastion | assert defaults include fail2ban settings
       ansible.builtin.shell: |
-        grep -q 'bastion_unattended_auto_reboot' "{{ bastion_defaults }}"
         grep -q 'bastion_fail2ban_maxretry' "{{ bastion_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Bastion | assert playbook includes shared unattended-upgrades role
+      ansible.builtin.shell: |
+        grep -q 'role: unattended_upgrades' "{{ bastion_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false

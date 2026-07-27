@@ -65,3 +65,6 @@ linux_baseline_root_console_enabled: true
 
 # Backup scope — declare docker volumes and VM disks as needed (Slice 7).
 # backup_libvirt_vms: []
+
+# Hypervisor OS reboot stops all local VMs — install updates, reboot manually.
+unattended_upgrades_auto_reboot: false

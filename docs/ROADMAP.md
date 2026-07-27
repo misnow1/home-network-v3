@@ -19,7 +19,8 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 10 | Certbot DNS validation | Samba LDAPS/START-TLS; optional DDNS nginx TLS |
 | 13 | DC replica | `dc02.lab.test` replica join; `INTEGRATION_SLICE=dc_replica`; CI nightly |
 | 17 | Cross-site DNS + IPv6 | `dc_trusted_networks`, BIND `localnets` + IPv6, multi-VLAN/remote-site docs |
-| 18 | Bastion hardening | Edge jump host — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban — [bastion-runbook.md](bastion-runbook.md) |
+| 18 | Bastion hardening | Edge jump host — sshd/GSSAPI, UFW, fail2ban — [bastion-runbook.md](bastion-runbook.md) |
+| 30 | Fleet security updates | Shared `unattended_upgrades` role + `security-updates.yml`; role-based reboot windows — [security-updates-runbook.md](security-updates-runbook.md) |
 | 21 | NUT / UPS (kif) | `nut_ups` role, `nut-converge.yml`; kifups monitored on kif — [nut-runbook.md](nut-runbook.md) |
 
 ## Completed — production migrations

@@ -4,7 +4,7 @@ Edge jump host hardening for domain-joined Ubuntu members. The bastion sits on t
 network perimeter and provides SSH access into the internal network.
 
 **Playbook:** [`playbooks/bastion.yml`](../playbooks/bastion.yml)  
-**Role:** [`roles/bastion`](../roles/bastion/)  
+**Roles:** [`roles/bastion`](../roles/bastion/), [`roles/unattended_upgrades`](../roles/unattended_upgrades/)  
 **Inventory group:** `bastion` (child of `linux`)
 
 ## Prerequisites
@@ -24,7 +24,7 @@ via the DDNS API on the DC.
 |---|---|
 | **sshd** | Drop-in: no root, no password auth, GSSAPI/Kerberos enabled |
 | **UFW** | Default deny incoming; allow OpenSSH only; outbound unrestricted |
-| **unattended-upgrades** | Security updates; automatic reboot at configured time |
+| **unattended-upgrades** | Shared role — security updates; automatic reboot at configured time |
 | **fail2ban** | sshd jail with management-network `ignoreip` |
 
 No kerberized NFS autofs mounts — bastion is a lean jump host. Homedirs are local via
@@ -116,15 +116,25 @@ Uses `member01.lab.test` as a bastion subset after domain join.
 
 ## Variables
 
+Bastion hardening variables (`roles/bastion`):
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `bastion_unattended_auto_reboot` | `true` | Reboot after security updates when required |
-| `bastion_unattended_reboot_time` | `03:30` | Reboot window (local time) |
 | `bastion_fail2ban_maxretry` | `5` | sshd failures before ban |
 | `bastion_fail2ban_bantime` | `3600` | Ban duration (seconds) |
 | `bastion_fail2ban_ignoreip` | lab subnet + localhost | Ansible/management CIDRs to never ban |
 | `bastion_gssapi_strict_acceptor_check` | `false` | Relaxed for DHCP edge hostname/SPN |
 | `bastion_ufw_enabled` | `true` | Set `false` only for debugging |
+
+Security update variables (`roles/unattended_upgrades`) — set in
+[`group_vars/bastion/vars.yml.example`](../inventories/production/group_vars/bastion/vars.yml.example):
+
+| Variable | Bastion default | Purpose |
+|---|---|---|
+| `unattended_upgrades_auto_reboot` | `true` | Reboot after security updates when required |
+| `unattended_upgrades_reboot_time` | `03:30` | Reboot window (local time) |
+
+See [security-updates-runbook.md](security-updates-runbook.md) for fleet-wide policy.
 
 ## Deferred follow-up
 
@@ -136,4 +146,5 @@ Uses `member01.lab.test` as a bastion subset after domain join.
 
 - [domain-join-runbook.md](domain-join-runbook.md) — SSSD and group access
 - [production-runbook.md](production-runbook.md) — wrapper and apply order
+- [security-updates-runbook.md](security-updates-runbook.md) — fleet patching policy
 - [software.md](software.md) — package list

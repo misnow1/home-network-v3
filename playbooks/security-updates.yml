@@ -1,0 +1,12 @@
+---
+# Fleet-wide Ubuntu security patching via unattended-upgrades.
+# Lab integration: scripts/test-integration.sh (INTEGRATION_SLICE=security_updates).
+#
+# Run after baseline.yml on all linux hosts. Re-run idempotently anytime.
+# Reboot windows are inventory-driven — see docs/security-updates-runbook.md.
+
+- name: Fleet security updates
+  hosts: linux
+  become: true
+  roles:
+    - role: unattended_upgrades

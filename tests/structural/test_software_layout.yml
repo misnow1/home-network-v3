@@ -114,3 +114,12 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Software | assert unattended upgrades role and docs are referenced
+      ansible.builtin.shell: |
+        grep -q 'unattended_upgrades' "{{ repo_root }}/playbooks/security-updates.yml" &&
+        grep -q 'unattended-upgrades' "{{ software_doc }}" &&
+        test -f "{{ repo_root }}/roles/unattended_upgrades/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false

@@ -56,6 +56,7 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | Step | Host group | Playbook | Notes |
 |---|---|---|---|
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
+| 1s | All Linux | `security-updates.yml` | Fleet unattended security patching — [security-updates-runbook.md](security-updates-runbook.md) |
 | 2 | `dc` | `dc-bootstrap.yml` | **Greenfield only** — once; break-glass |
 | 2m | `dc` | `dc-replica-join.yml` | Join existing domain — replica DC |
 | 2r | `dc` | `dc-restore.yml` | Join existing domain — offline backup restore |
@@ -258,9 +259,9 @@ do not define it (unlike lab `home-dc-lab`).
 | `dc` | Samba AD DC — name **must** be `dc` (roles assert on `groups['dc']`); hosts named `dc1`, `dc2`, … |
 | `hypervisors` | KVM + Docker + backup client |
 | `fileservers` | Samba member file servers |
-| `bastion` | Edge jump hosts — sshd/GSSAPI, UFW, unattended-upgrades, fail2ban |
+| `bastion` | Edge jump hosts — sshd/GSSAPI, UFW, fail2ban; security updates via shared role |
 | `ddns_clients` | Hosts that run GSS-TSIG nsupdate |
-| `linux` | Parent of member groups (optional organizational group) |
+| `linux` | Parent of Ubuntu apt-managed groups — `baseline.yml`, `security-updates.yml` |
 | `deferred` | Legacy or transitional hosts — not targeted by default apt playbooks (empty post-migration) |
 
 See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.example`.
@@ -276,6 +277,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |
+| Security updates | [security-updates-runbook.md](security-updates-runbook.md) |
 | Pi-hole | [pihole-runbook.md](pihole-runbook.md) |
 | Mail relay | [mail-relay-runbook.md](mail-relay-runbook.md) |
 | Reverse proxy | [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |

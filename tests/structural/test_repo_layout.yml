@@ -8,11 +8,13 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     required_paths:
       - playbooks/baseline.yml
+      - playbooks/security-updates.yml
       - playbooks/dc-bootstrap.yml
       - playbooks/dc-restore.yml
       - playbooks/dc-converge.yml
       - playbooks/domain-leave.yml
       - roles/linux_baseline/tasks/main.yml
+      - roles/unattended_upgrades/tasks/main.yml
       - roles/samba_dc/tasks/bootstrap.yml
       - roles/samba_dc/tasks/restore.yml
       - docs/dc-runbook.md
@@ -23,6 +25,7 @@
       - docs/ddns-runbook.md
       - docs/backup-runbook.md
       - docs/production-runbook.md
+      - docs/security-updates-runbook.md
       - playbooks/hypervisor.yml
       - playbooks/fileserver.yml
       - playbooks/ddns-client.yml
