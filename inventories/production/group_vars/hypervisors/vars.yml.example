@@ -44,9 +44,14 @@ backup_restic_repository: /var/lib/restic/prod-backup
 backup_restic_password_file: /root/.restic-password
 backup_scope_path: /etc/ansible-managed/backup_scope.yml
 backup_docker_script_path: /usr/local/bin/backup-docker.sh
+backup_run_script_path: /usr/local/bin/backup-run.sh
+backup_prune_enabled: true
+backup_prune_keep_daily: 7
+backup_prune_keep_weekly: 4
+backup_prune_keep_monthly: 6
 
 # Declare docker volumes and VM disks in host_vars/{hostname}/vars.yml.
-# SFTP/NAS repositories deferred — see docs/backup-runbook.md.
+# Scheduled backups and offsite copy: see docs/backup-runbook.md (production section).
 
 # Hypervisor OS reboot stops all local VMs — install security updates but reboot manually.
 # See docs/security-updates-runbook.md.

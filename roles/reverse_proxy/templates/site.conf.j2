@@ -73,6 +73,9 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 {% endif %}
+{% if loc.rate_limit is defined %}
+        limit_req zone={{ loc.rate_limit.zone }} burst={{ loc.rate_limit.burst | default(20) }}{% if loc.rate_limit.nodelay | default(true) %} nodelay{% endif %};
+{% endif %}
 {% if loc.extra_config is defined %}
         {{ loc.extra_config | indent(8) }}
 {% endif %}

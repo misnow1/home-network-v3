@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Run {{ backup_systemd_description }} on schedule
+Documentation=file:///usr/share/doc/home-network-v3/backup-runbook.md
+
+[Timer]
+OnCalendar={{ backup_schedule_on_calendar }}
+RandomizedDelaySec={{ backup_schedule_randomized_delay_sec }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

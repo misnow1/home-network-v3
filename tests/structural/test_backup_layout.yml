@@ -31,3 +31,13 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Backup | assert scheduled backup tasks and units exist
+      ansible.builtin.shell: |
+        grep -q 'backup_schedule' "{{ repo_root }}/roles/backup/tasks/main.yml"
+        test -f "{{ repo_root }}/roles/backup/tasks/schedule.yml"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        test -f "{{ repo_root }}/roles/backup/templates/backup.timer.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false

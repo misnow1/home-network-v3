@@ -51,6 +51,59 @@ cd /srv/docker/authelia && sudo docker compose up -d
 
 Verify login at `https://auth.2123studios.com` after changing LDAP settings.
 
+## Access control for proxied apps
+
+Authelia `access_control` rules must match every nginx vhost/path with
+`auth_required: true`. After changing [reverse_proxy_sites](../inventories/production/group_vars/reverse_proxy/vars.yml.example),
+update `/srv/docker/authelia/config/configuration.yml` on kif.
+
+Example rules for the production edge layout (adjust groups to match your AD):
+
+```yaml
+access_control:
+  default_policy: deny
+  rules:
+    - domain: auth.2123studios.com
+      policy: bypass
+    - domain: guacamole.2123studios.com
+      policy: one_factor
+      subject:
+        - "group:domain users"
+    - domain:
+        - bastion.2123studios.com
+        - kif.2123studios.com
+      resources:
+        - "^/guacamole/.*"
+        - "^/transmission/.*"
+      policy: one_factor
+      subject:
+        - "group:domain users"
+```
+
+Paperless stays **out** of Authelia: the Paperless-ngx iOS app does not support auth
+redirects. Rely on Paperless native credentials, nginx rate limits, and kif Docker
+port UFW (bastion-only). See [edge-access-model.md](edge-access-model.md).
+
+Apply on kif:
+
+```bash
+sudo nano /srv/docker/authelia/config/configuration.yml
+cd /srv/docker/authelia && sudo docker compose up -d
+```
+
+### MFA (recommended)
+
+Guacamole grants remote desktop into the LAN — require **two_factor** for Guacamole
+rules above when TOTP/WebAuthn is configured for your users:
+
+```yaml
+    - domain: guacamole.2123studios.com
+      policy: two_factor
+```
+
+Review Authelia registration policy and ensure admin-capable AD accounts use MFA.
+Password-only AD auth behind Authelia is weaker than Kerberos SSH on the bastion.
+
 ## Notifier — use the mail relay (not pdc)
 
 Replace legacy `pdc.home.2123studios.com:25` SMTP with the internal mail relay:

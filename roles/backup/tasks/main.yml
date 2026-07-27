@@ -18,3 +18,13 @@
 - name: Deploy backup scripts
   ansible.builtin.include_tasks: scripts.yml
   tags: [backup_scripts]
+
+- name: Initialize offsite restic repository
+  ansible.builtin.include_tasks: offsite.yml
+  when: backup_offsite_copy_enabled | bool
+  tags: [backup_offsite]
+
+- name: Configure scheduled backups
+  ansible.builtin.include_tasks: schedule.yml
+  when: backup_schedule_enabled | bool
+  tags: [backup_schedule]

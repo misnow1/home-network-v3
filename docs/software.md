@@ -210,7 +210,8 @@ email to `root` on package changes (`MailReport: on-change`). See
 
 Typically colocated on the bastion host. Serves data-driven, TLS-protected virtual hosts
 that proxy to Docker containers (on `kif`) and other LAN backends, with optional Authelia
-forward-auth per location. TLS uses a single Let's Encrypt SAN certificate issued by the
+forward-auth per location. Optional nginx rate limiting via
+`reverse_proxy_rate_limit_zones`. TLS uses a single Let's Encrypt SAN certificate issued by the
 [`certbot`](../roles/certbot/) role (DNS-01 via Dreamhost) and reloaded through the certbot
 deploy hook (`certbot_deploy_hook_reload_nginx`). See
 [reverse-proxy-runbook.md](reverse-proxy-runbook.md).
@@ -237,6 +238,18 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 | Package | Purpose |
 |---|---|
 | `restic` | Backup client |
+
+When `backup_schedule_enabled: true`, deploys `ansible-backup.timer` (docker volume backup,
+retention prune, optional offsite `restic copy`). See [backup-runbook.md](backup-runbook.md).
+
+### Docker workload hosts (`docker_engine` with UFW)
+
+When `docker_engine_manage_ufw: true`, restricts published container ports to edge proxy
+hosts. See [edge-access-model.md](edge-access-model.md).
+
+| Package | Purpose |
+|---|---|
+| `ufw` | Host firewall for Docker port isolation |
 
 ## Apply order
 

@@ -61,6 +61,7 @@ Key variables (full list in [`roles/reverse_proxy/defaults/main.yml`](../roles/r
 | `reverse_proxy_resolvers` | DC IPs | DNS resolvers for runtime upstream resolution |
 | `reverse_proxy_trusted_proxies` | LAN CIDRs | `set_real_ip_from` for Authelia trusted proxies |
 | `reverse_proxy_manage_ufw` | `true` | Add UFW allow rules for 80/443 |
+| `reverse_proxy_rate_limit_zones` | `[]` | nginx `limit_req_zone` definitions (http context) |
 | `reverse_proxy_sites` | `[]` | List of proxied vhosts (schema below) |
 
 ### Site schema
@@ -89,6 +90,7 @@ Each `locations` entry:
 | `return` | no | e.g. `301 /guacamole/` (instead of proxying) |
 | `auth_required` | no | Include Authelia forward-auth for this location |
 | `websocket` | no | Add `Upgrade`/`Connection` headers |
+| `rate_limit` | no | Dict: `zone`, `burst`, `nodelay` — references `reverse_proxy_rate_limit_zones` |
 | `include_proxy_snippet` | no | Include shared `proxy.conf` (default `true`) |
 | `extra_config` | no | Raw directives inside the location (escape hatch) |
 
@@ -116,6 +118,24 @@ ${PROD} playbooks/reverse-proxy.yml --limit "${PROXY}" -e allow_production=true
 2. Re-run `certbot.yml` so the SAN cert covers the new name.
 3. Re-run `reverse-proxy.yml`.
 
+## Security
+
+Edge exposure decisions: [edge-access-model.md](edge-access-model.md).
+
+| Control | Configuration |
+|---|---|
+| Authelia forward-auth | `auth_required: true` per location; rules in [authelia-runbook.md](authelia-runbook.md) |
+| Rate limiting | `reverse_proxy_rate_limit_zones` + `locations[].rate_limit` |
+| Backend isolation | kif `docker_engine_manage_ufw` — Docker ports only from reverse-proxy IP |
+| TLS | SAN cert via certbot DNS-01; HSTS on all vhosts |
+
+Production example enables Authelia on Guacamole (all paths) and Transmission.
+Paperless and Plex stay public with native app auth — Paperless because the iOS
+Paperless-ngx app cannot follow Authelia redirects (see [edge-access-model.md](edge-access-model.md)).
+
+After changing `auth_required`, update Authelia `access_control` on kif and re-run
+`reverse-proxy.yml`.
+
 ## Lab integration
 
 ```bash
@@ -131,6 +151,7 @@ The lab fixture uses loopback upstreams and a self-signed bootstrap certificate
 - [ ] `systemctl is-active nginx` — active
 - [ ] Each vhost file present under `/etc/nginx/conf.d/`
 - [ ] Snippets present in `/etc/nginx/snippets/` (`proxy.conf`, `authelia-location.conf`, `authelia-authrequest.conf`)
+- [ ] `rate-limit-zones.conf` present when zones configured
 - [ ] `ufw status` — 80/tcp and 443/tcp allowed
 - [ ] Protected vhost redirects unauthenticated users to Authelia
 - [ ] Second `reverse-proxy.yml` run reports `changed=0`
@@ -145,5 +166,6 @@ layout from `reverse_proxy_sites` with DNS-01 TLS (no port-80 dependency).
 ## Related docs
 
 - [bastion-runbook.md](bastion-runbook.md) — host hardening the proxy sits on
+- [edge-access-model.md](edge-access-model.md) — public vs Authelia-protected services
 - [certbot-runbook.md](certbot-runbook.md) — SAN certificate issuance
 - [software.md](software.md) — package list

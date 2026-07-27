@@ -1,0 +1,38 @@
+---
+- name: Backup | Deploy scheduled backup wrapper script
+  ansible.builtin.template:
+    src: backup-run.sh.j2
+    dest: "{{ backup_run_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_schedule]
+
+- name: Backup | Deploy systemd service unit
+  ansible.builtin.template:
+    src: backup.service.j2
+    dest: "/etc/systemd/system/{{ backup_systemd_unit }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd backup units
+  tags: [backup_schedule]
+
+- name: Backup | Deploy systemd timer unit
+  ansible.builtin.template:
+    src: backup.timer.j2
+    dest: "/etc/systemd/system/{{ backup_systemd_unit }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd backup units
+  tags: [backup_schedule]
+
+- name: Backup | Enable and start backup timer
+  ansible.builtin.systemd:
+    name: "{{ backup_systemd_unit }}.timer"
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
+  tags: [backup_schedule]

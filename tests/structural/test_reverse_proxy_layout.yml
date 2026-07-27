@@ -34,6 +34,7 @@
         - "{{ repo_root }}/roles/reverse_proxy/templates/authelia-location.conf.j2"
         - "{{ repo_root }}/roles/reverse_proxy/templates/authelia-authrequest.conf.j2"
         - "{{ repo_root }}/roles/reverse_proxy/templates/default-redirect.conf.j2"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/rate-limit-zones.conf.j2"
         - "{{ rp_playbook }}"
         - "{{ rp_runbook }}"
         - "{{ rp_example }}"
@@ -72,6 +73,17 @@
         grep -q 'certbot_deploy_hook_reload_nginx' "{{ certbot_defaults }}"
         grep -q 'certbot_deploy_hook_reload_nginx' "{{ certbot_hook }}"
         grep -q 'reload nginx' "{{ certbot_hook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Reverse proxy | assert production example Authelia and Paperless mobile-app exception
+      ansible.builtin.shell: |
+        # Guacamole paths require Authelia
+        grep -A8 '/guacamole' "{{ rp_example }}" | grep -q 'auth_required: true'
+        # Paperless must NOT use Authelia (iOS Paperless-ngx app cannot follow redirects)
+        ! grep -A8 'name: paperless.2123studios.com' "{{ rp_example }}" | grep -q 'auth_required: true'
+        grep -q 'reverse_proxy_rate_limit_zones' "{{ rp_example }}"
       args:
         executable: /bin/bash
       changed_when: false

@@ -59,6 +59,20 @@ docker_engine_nvidia_driver_package: ""
 # to let Ansible reboot the host and continue.
 docker_engine_nvidia_auto_reboot: false
 
+# Opt-in UFW: restrict published Docker host ports to edge reverse-proxy hosts.
+# Prevents LAN clients from bypassing nginx Authelia by hitting kif:PORT directly.
+docker_engine_manage_ufw: false
+# Edge proxy host IPs/CIDRs (shell-clt01 today; add keepalived VIP when deployed).
+docker_engine_ufw_edge_proxy_cidrs: []
+# Published container ports reachable only from edge proxy CIDRs above.
+docker_engine_ufw_published_ports: []
+# Deny these ports from non-edge sources (works without default-deny policy).
+docker_engine_ufw_deny_unlisted_published_ports: true
+# Optional explicit allows (required when default_deny is true — SMB, NFS, NUT, etc.).
+docker_engine_ufw_allow_rules: []
+# When true, default deny incoming — only OpenSSH, allow_rules, and edge docker ports.
+docker_engine_ufw_default_deny: false
+
 docker_engine_nvidia_repo_key_url: >-
   https://nvidia.github.io/libnvidia-container/gpgkey
 # Maps ansible architecture to Debian multiarch name for the NVIDIA apt repo.

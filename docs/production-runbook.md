@@ -64,7 +64,7 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
 | 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
 | 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
-| 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
+| 6 | `hypervisors` | `backup.yml` | restic client + scope manifest + optional systemd timer/offsite copy |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind; kif multi-share when `fileserver_samba_enabled: true` — [fileserver-runbook.md](fileserver-runbook.md) |
 | 7n | `fileservers` (opt-in) | `nfs-server.yml` | Kerberos NFS exports on kif when `nfs_server_enabled` — [nfs-server-runbook.md](nfs-server-runbook.md); run **before** step 8n |
 | 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
@@ -281,6 +281,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Pi-hole | [pihole-runbook.md](pihole-runbook.md) |
 | Mail relay | [mail-relay-runbook.md](mail-relay-runbook.md) |
 | Reverse proxy | [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
+| Edge access model | [edge-access-model.md](edge-access-model.md) |
 | DDNS | [ddns-runbook.md](ddns-runbook.md) |
 | Certbot / LDAP TLS | [certbot-runbook.md](certbot-runbook.md) |
 | Backups | [backup-runbook.md](backup-runbook.md) |
