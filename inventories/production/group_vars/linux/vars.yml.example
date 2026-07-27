@@ -7,6 +7,15 @@
 
 linux_baseline_timezone: America/New_York
 
+# Fleet security updates — playbooks/security-updates.yml
+# Opt hosts into automatic reboot via group_vars or host_vars (default: install-only).
+# Mail goes to root; mail-relay rewrites root@<host> to vault_mail_default_recipient.
+unattended_upgrades_enabled: true
+unattended_upgrades_auto_reboot: false
+unattended_upgrades_reboot_time: "04:30"
+unattended_upgrades_mail: root
+unattended_upgrades_mail_report: on-change
+
 domain_name: home.example
 # domain_join_manage_resolv_conf: false
 # domain_join_dns_servers:

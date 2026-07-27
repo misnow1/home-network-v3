@@ -9,3 +9,4 @@
   become: true
   roles:
     - role: bastion
+    - role: unattended_upgrades

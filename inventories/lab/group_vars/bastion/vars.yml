@@ -1,0 +1,5 @@
+---
+# Lab bastion — auto-reboot enabled for integration tests (member01.lab.test).
+
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "03:30"

@@ -12,10 +12,6 @@
   when: bastion_ufw_enabled | bool
   tags: [bastion_ufw]
 
-- name: Bastion | Configure unattended-upgrades
-  ansible.builtin.include_tasks: unattended.yml
-  tags: [bastion_unattended]
-
 - name: Bastion | Configure fail2ban
   ansible.builtin.include_tasks: fail2ban.yml
   tags: [bastion_fail2ban]

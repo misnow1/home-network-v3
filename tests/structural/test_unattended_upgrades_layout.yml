@@ -1,0 +1,90 @@
+---
+# Structural tests for unattended_upgrades role and security-updates playbook.
+
+- name: Structural — unattended upgrades layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    role_defaults: "{{ repo_root }}/roles/unattended_upgrades/defaults/main.yml"
+    role_tasks: "{{ repo_root }}/roles/unattended_upgrades/tasks/main.yml"
+    role_template: "{{ repo_root }}/roles/unattended_upgrades/templates/50unattended-upgrades.j2"
+    security_playbook: "{{ repo_root }}/playbooks/security-updates.yml"
+    bastion_playbook: "{{ repo_root }}/playbooks/bastion.yml"
+    runbook: "{{ repo_root }}/docs/security-updates-runbook.md"
+    linux_vars_example: "{{ repo_root }}/inventories/production/group_vars/linux/vars.yml.example"
+    bastion_vars_example: "{{ repo_root }}/inventories/production/group_vars/bastion/vars.yml.example"
+    hypervisor_vars_example: "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example"
+    kif_host_vars_example: "{{ repo_root }}/inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example"
+  tasks:
+    - name: Unattended upgrades | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: unattended_paths
+      loop:
+        - "{{ role_defaults }}"
+        - "{{ role_tasks }}"
+        - "{{ role_template }}"
+        - "{{ security_playbook }}"
+        - "{{ runbook }}"
+        - "{{ linux_vars_example }}"
+        - "{{ bastion_vars_example }}"
+
+    - name: Unattended upgrades | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ unattended_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Unattended upgrades | assert playbook targets linux group
+      ansible.builtin.shell: |
+        grep -q 'hosts: linux' "{{ security_playbook }}"
+        grep -q 'unattended_upgrades' "{{ security_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Unattended upgrades | assert bastion playbook includes shared role
+      ansible.builtin.shell: |
+        grep -q 'role: bastion' "{{ bastion_playbook }}"
+        grep -q 'role: unattended_upgrades' "{{ bastion_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Unattended upgrades | assert defaults include reboot and mail policy knobs
+      ansible.builtin.shell: |
+        grep -q 'unattended_upgrades_enabled' "{{ role_defaults }}"
+        grep -q 'unattended_upgrades_auto_reboot: false' "{{ role_defaults }}"
+        grep -q 'unattended_upgrades_reboot_time' "{{ role_defaults }}"
+        grep -q 'unattended_upgrades_mail: root' "{{ role_defaults }}"
+        grep -q 'unattended_upgrades_mail_report: on-change' "{{ role_defaults }}"
+        grep -q 'Unattended-Upgrade::Mail' "{{ role_template }}"
+        grep -q 'Unattended-Upgrade::MailReport' "{{ role_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Unattended upgrades | assert fleet and hypervisor inventory examples
+      ansible.builtin.shell: |
+        grep -q 'unattended_upgrades_auto_reboot: false' "{{ linux_vars_example }}"
+        grep -q 'unattended_upgrades_auto_reboot: false' "{{ hypervisor_vars_example }}"
+        grep -q 'unattended_upgrades_auto_reboot: false' "{{ kif_host_vars_example }}"
+        grep -q 'unattended_upgrades_auto_reboot: true' "{{ bastion_vars_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Unattended upgrades | assert bastion role no longer owns template
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/roles/bastion/templates/50unattended-upgrades.j2"
+      register: bastion_unattended_template
+
+    - name: Unattended upgrades | assert bastion template removed
+      ansible.builtin.assert:
+        that:
+          - not bastion_unattended_template.stat.exists
+        fail_msg: "Bastion must delegate unattended-upgrades config to shared role"

@@ -61,8 +61,8 @@ Normal converge playbooks (baseline, hypervisor, etc.) may run against productio
 ### Greenfield
 
 See [production-runbook.md](production-runbook.md) § Apply order — steps 1–10 cover
-baseline → DC → hypervisors → fileservers → domain join → bastion → DDNS → Pi-hole →
-certbot → mail relay.
+baseline → security updates → DC → hypervisors → fileservers → domain join → bastion →
+DDNS → Pi-hole → certbot → mail relay.
 
 ### Additional DC replicas
 

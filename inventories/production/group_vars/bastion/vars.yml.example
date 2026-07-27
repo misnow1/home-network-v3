@@ -1,0 +1,11 @@
+---
+# Bastion group variables — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/bastion/vars.yml.example \
+#      inventories/production/group_vars/bastion/vars.yml
+#
+# Security updates are applied by playbooks/security-updates.yml (fleet) or
+# playbooks/bastion.yml (includes unattended_upgrades role).
+
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "03:30"

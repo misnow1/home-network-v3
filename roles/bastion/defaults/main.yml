@@ -1,11 +1,7 @@
 ---
 bastion_packages:
-  - unattended-upgrades
   - ufw
   - fail2ban
-
-bastion_unattended_auto_reboot: true
-bastion_unattended_reboot_time: "03:30"
 
 bastion_fail2ban_maxretry: 5
 bastion_fail2ban_bantime: 3600

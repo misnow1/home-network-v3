@@ -1,0 +1,56 @@
+---
+# Post-converge checks for security-updates integration tests.
+
+- name: Integration — security updates convergence
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Assert unattended-upgrades package is installed
+      ansible.builtin.command: dpkg -s unattended-upgrades
+      register: unattended_pkg
+      changed_when: false
+      failed_when: unattended_pkg.rc != 0
+
+    - name: Assert periodic apt upgrades are enabled
+      ansible.builtin.shell: |
+        grep -q 'APT::Periodic::Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Assert security origins are configured
+      ansible.builtin.shell: |
+        grep -q '${distro_codename}-security' /etc/apt/apt.conf.d/50unattended-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Assert automatic reboot policy matches inventory
+      ansible.builtin.shell: |
+        set -euo pipefail
+        expected="{{ 'true' if unattended_upgrades_auto_reboot | bool else 'false' }}"
+        grep -q "Unattended-Upgrade::Automatic-Reboot \"${expected}\"" /etc/apt/apt.conf.d/50unattended-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Assert reboot time is set when automatic reboot is enabled
+      ansible.builtin.shell: |
+        grep -q 'Unattended-Upgrade::Automatic-Reboot-Time "{{ unattended_upgrades_reboot_time }}"' \
+          /etc/apt/apt.conf.d/50unattended-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: unattended_upgrades_auto_reboot | bool
+
+    - name: Assert mail notifications are configured
+      ansible.builtin.shell: |
+        set -euo pipefail
+        grep -q 'Unattended-Upgrade::Mail "{{ unattended_upgrades_mail }}"' \
+          /etc/apt/apt.conf.d/50unattended-upgrades
+        grep -q 'Unattended-Upgrade::MailReport "{{ unattended_upgrades_mail_report }}"' \
+          /etc/apt/apt.conf.d/50unattended-upgrades
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: unattended_upgrades_mail | length > 0

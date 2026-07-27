@@ -1,0 +1,15 @@
+---
+unattended_upgrades_enabled: true
+
+unattended_upgrades_packages:
+  - unattended-upgrades
+
+# Opt in per group/host — fleet default is install-only until a reboot window is set.
+unattended_upgrades_auto_reboot: false
+unattended_upgrades_reboot_time: "03:30"
+
+# Email via local MTA (postfix relay client → mail.home). Empty disables mail.
+# Relies on mail-relay virtual_alias_maps rewriting root@<host> to the admin.
+# MailReport: always | only-on-error | on-change (packages installed / reboot needed).
+unattended_upgrades_mail: root
+unattended_upgrades_mail_report: on-change

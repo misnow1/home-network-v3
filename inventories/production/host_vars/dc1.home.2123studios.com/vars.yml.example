@@ -8,6 +8,10 @@ certbot_domains:
 ldap_vip_state: MASTER
 ldap_vip_priority: 100
 
+# Security updates — reboot after dc2 (BACKUP). Local time: America/New_York.
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "02:45"
+
 # Optional SMB share served from this DC only.
 samba_dc_shares:
   - name: images

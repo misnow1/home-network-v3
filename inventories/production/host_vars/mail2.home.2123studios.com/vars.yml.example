@@ -7,3 +7,7 @@ certbot_domains:
   - mail2.home.2123studios.com
 
 mail_relay_hostname: mail2.home.2123studios.com
+
+# Security updates — reboot before primary mail relay. Local time: America/New_York.
+unattended_upgrades_auto_reboot: true
+unattended_upgrades_reboot_time: "04:00"
