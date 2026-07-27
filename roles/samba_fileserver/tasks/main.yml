@@ -14,3 +14,8 @@
 - name: Configure winbind NSS/PAM and Samba services
   ansible.builtin.include_tasks: configure.yml
   tags: [fileserver_configure]
+
+- name: Configure wsdd for Windows network discovery
+  ansible.builtin.include_tasks: wsdd.yml
+  when: fileserver_wsdd_enabled | default(false) | bool
+  tags: [fileserver_wsdd]

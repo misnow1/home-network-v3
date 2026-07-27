@@ -64,7 +64,7 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
 | 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest |
-| 7 | `fileservers` | `fileserver.yml` | Samba member + winbind; kif keeps `fileserver_samba_enabled: false` |
+| 7 | `fileservers` | `fileserver.yml` | Samba member + winbind; kif multi-share when `fileserver_samba_enabled: true` — [fileserver-runbook.md](fileserver-runbook.md) |
 | 7n | `fileservers` (opt-in) | `nfs-server.yml` | Kerberos NFS exports on kif when `nfs_server_enabled` — [nfs-server-runbook.md](nfs-server-runbook.md); run **before** step 8n |
 | 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
 | 8n | `linux:!dc` (opt-in) | `nfs-client.yml` | After domain-join when `nfs_client_enabled` — [nfs-client-runbook.md](nfs-client-runbook.md) |

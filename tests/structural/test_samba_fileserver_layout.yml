@@ -8,6 +8,7 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     join_tasks: "{{ repo_root }}/roles/samba_fileserver/tasks/join.yml"
     smb_template: "{{ repo_root }}/roles/samba_fileserver/templates/smb.conf.j2"
+    wsdd_tasks: "{{ repo_root }}/roles/samba_fileserver/tasks/wsdd.yml"
     fileserver_playbook: "{{ repo_root }}/playbooks/fileserver.yml"
   tasks:
     - name: File server | assert join task excludes DC hosts
@@ -50,6 +51,32 @@
     - name: File server | assert configure enables pam_winbind
       ansible.builtin.shell: |
         grep -q 'pam_winbind.so' "{{ repo_root }}/roles/samba_fileserver/tasks/configure.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert smb.conf supports multi-share inventory
+      ansible.builtin.shell: |
+        grep -q 'fileserver_shares' "{{ smb_template }}"
+        grep -q 'render_share' "{{ smb_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert legacy single-share path remains for lab
+      ansible.builtin.shell: |
+        grep -q 'fileserver_share_name' "{{ smb_template }}"
+        grep -q 'fileserver_share_path' "{{ smb_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: File server | assert wsdd tasks exist
+      ansible.builtin.shell: |
+        test -f "{{ wsdd_tasks }}"
+        grep -q 'fileserver_wsdd_enabled' "{{ repo_root }}/roles/samba_fileserver/tasks/main.yml"
+        grep -q 'wsdd.j2' "{{ wsdd_tasks }}"
+        grep -q 'fileserver_wsdd_service' "{{ repo_root }}/roles/samba_fileserver/vars/main.yml"
       args:
         executable: /bin/bash
       changed_when: false

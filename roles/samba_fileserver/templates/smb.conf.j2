@@ -1,5 +1,64 @@
-# {{ ansible_managed }}
+# Managed by Ansible (samba_fileserver role)
 # Samba member server — winbind + idmap_ad (RFC2307).
+
+{% macro samba_bool(value) -%}
+{{- 'yes' if value | bool else 'no' -}}
+{%- endmacro %}
+
+{% macro render_user_list(value) -%}
+{%- if value is string -%}
+{{- value -}}
+{%- else -%}
+{{- value | join(' ') -}}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro render_share(share) %}
+[{{ share.name }}]
+{% if share.name != 'homes' and share.path is defined %}
+   path = {{ share.path }}
+{% endif %}
+{% if share.comment is defined %}
+   comment = {{ share.comment }}
+{% endif %}
+{% if share.browseable is defined %}
+   browseable = {{ samba_bool(share.browseable) }}
+{% endif %}
+{% if share.read_only is defined %}
+   read only = {{ samba_bool(share.read_only) }}
+{% endif %}
+{% if share.guest_ok is defined %}
+   guest ok = {{ samba_bool(share.guest_ok) }}
+{% endif %}
+{% if share.valid_users is defined %}
+   valid users = {{ render_user_list(share.valid_users) }}
+{% endif %}
+{% if share.write_list is defined %}
+   write list = {{ render_user_list(share.write_list) }}
+{% endif %}
+{% if share.force_group is defined %}
+   force group = {% if ' ' in share.force_group %}"{{ share.force_group }}"{% else %}{{ share.force_group }}{% endif %}
+
+{% endif %}
+{% if share.create_mask is defined %}
+   create mask = {{ share.create_mask }}
+{% endif %}
+{% if share.directory_mask is defined %}
+   directory mask = {{ share.directory_mask }}
+{% endif %}
+{% if share.force_create_mode is defined %}
+   force create mode = {{ share.force_create_mode }}
+{% endif %}
+{% if share.force_directory_mode is defined %}
+   force directory mode = {{ share.force_directory_mode }}
+{% endif %}
+{% if share.extra_options is defined %}
+{% for key, value in share.extra_options | dictsort %}
+   {{ key | replace('_', ' ') }} = {% if value is string %}{{ value }}{% else %}{{ value | join(' ') }}{% endif %}
+
+{% endfor %}
+{% endif %}
+{% endmacro %}
 
 [global]
    workgroup = {{ samba_workgroup }}
@@ -11,6 +70,7 @@
    idmap config {{ samba_workgroup }} : range = {{ fileserver_idmap_ad_range }}
    idmap config {{ samba_workgroup }} : unix_nss_info = yes
    idmap config {{ samba_workgroup }} : unix_primary_group = yes
+   idmap config {{ samba_workgroup }} : default = yes
 
    idmap config * : backend = tdb
    idmap config * : range = {{ fileserver_idmap_tdb_range }}
@@ -26,10 +86,22 @@
 
    kerberos method = secrets and keytab
 
+   load printers = no
+   disable spoolss = yes
+   printcap name = /dev/null
+
    logging = file
    log file = /var/log/samba/log.%m
    max log size = 1000
+{% for key, value in fileserver_global_options | dictsort %}
+   {{ key | replace('_', ' ') }} = {% if value is string %}{{ value }}{% else %}{{ value | join(' ') }}{% endif %}
 
+{% endfor %}
+{% if fileserver_shares | length > 0 %}
+{% for share in fileserver_shares %}
+{{ render_share(share) }}
+{% endfor %}
+{% else %}
 [{{ fileserver_share_name }}]
    path = {{ fileserver_share_path }}
    browseable = yes
@@ -39,3 +111,4 @@
    force group = {{ fileserver_valid_users_group }}
    create mask = 0664
    directory mask = 0775
+{% endif %}

@@ -14,12 +14,27 @@ fileserver_samba_enabled: true
 
 fileserver_idmap_ad_range: "10000-999999"
 fileserver_idmap_tdb_range: "2000-9999"
+
+# Legacy single-share vars (lab Slice 5). When fileserver_shares is empty, smb.conf
+# renders one share from these values.
 fileserver_share_name: labshare
 fileserver_share_path: /srv/samba/labshare
 fileserver_valid_users_group: "labusers"
 
+# Multi-share production model (ROADMAP 19+). Non-empty list replaces the legacy
+# single-share stanza. See docs/fileserver-runbook.md for entry shape.
+fileserver_shares: []
+
+# Optional [global] overrides merged after role defaults (host-specific signing, vfs, etc.).
+fileserver_global_options: {}
+
 fileserver_template_homedir: /home/%U
 fileserver_template_shell: /bin/bash
+
+# Windows network discovery (WS-Discovery).
+fileserver_wsdd_enabled: false
+fileserver_wsdd_workgroup: "{{ samba_workgroup | lower }}"
+fileserver_wsdd_host: "{{ inventory_hostname_short | upper }}"
 
 # Lab inventory sets samba_workgroup / samba_realm in group_vars/all/vars.yml.
 samba_workgroup: LAB

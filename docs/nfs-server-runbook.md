@@ -16,8 +16,8 @@ Kerberos NFS server on **kif** (or other `fileservers` hosts): exports `/home`,
 4. Vault join credentials when `nfs_server_manage_spn: true` (default):
    `vault_ad_join_user`, `vault_ad_join_password`
 
-Samba shares on the same paths remain hand-maintained until ROADMAP **19+**;
-`fileserver_samba_enabled: false` on kif is unchanged.
+Samba shares on the same paths are Ansible-managed via `fileserver.yml` when
+`fileserver_samba_enabled: true` — see [fileserver-runbook.md](fileserver-runbook.md).
 
 ## Enable
 
@@ -112,5 +112,5 @@ sudo systemctl restart rpc-svcgssd nfs-server
 ## Related
 
 - [nfs-client-runbook.md](nfs-client-runbook.md) — kvm01 mounts and troubleshooting
-- [fileserver-runbook.md](fileserver-runbook.md) — kif Samba (still manual until 19+)
+- [fileserver-runbook.md](fileserver-runbook.md) — kif Samba multi-share + wsdd
 - [production-runbook.md](production-runbook.md) — fleet apply order

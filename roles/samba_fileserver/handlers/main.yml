@@ -6,3 +6,10 @@
   loop: "{{ fileserver_services }}"
   listen: restart samba fileserver
   when: not ansible_check_mode
+
+- name: Restart wsdd
+  ansible.builtin.service:
+    name: "{{ fileserver_wsdd_service }}"
+    state: restarted
+  listen: restart wsdd
+  when: not ansible_check_mode

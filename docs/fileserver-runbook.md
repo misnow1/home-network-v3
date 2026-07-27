@@ -45,7 +45,8 @@ Re-run `fileserver.yml` twice — second run must report `changed=0`.
 |---|---|
 | **winbind** | AD auth, NSS (`getent`), PAM (shell login) |
 | **idmap_ad** | RFC2307 POSIX IDs from AD (`schema_mode = rfc2307`) |
-| **smbd** | SMB share `labshare` at `/srv/samba/labshare` (ACL: `@LAB\labusers`) |
+| **smbd** | SMB share(s) — lab: single `labshare`; production kif: `[homes]`, `[archive]`, `[shared]`, `[media]`, `[paperless]` |
+| **wsdd** | Optional Windows network discovery when `fileserver_wsdd_enabled: true` |
 | **PAM** | `pam_winbind` + `pam_mkhomedir` for domain user homedirs |
 
 ## Identity model
@@ -72,23 +73,81 @@ See [sssd-config.md](sssd-config.md) for the member-server (sssd) vs file-server
 
 DC hosts (`dc` group) are excluded — they never run `samba_fileserver`.
 
-### kif (hand-maintained Samba)
+## Multi-share inventory (ROADMAP 19+)
 
-kif uses `fileserver_samba_enabled: false` in host_vars. The pre-reimage config at
-`/archive/pre-reimage-kif-2026-06-29/samba/smb.conf` defines `[homes]`, `[archive]`,
-`[shared]`, `[media]`, and `[paperless]` — not the lab single-share template. ROADMAP **19+**
-will Ansible-manage those shares.
+When `fileserver_shares` is non-empty, the role renders one Samba stanza per entry
+instead of the legacy single-share vars (`fileserver_share_name` / `fileserver_share_path`).
 
-`fileserver.yml` on kif runs only `mdadm_monitor` (and hypervisor when tagged). It does **not**
-deploy `smb.conf`.
+Each share supports common ACL/mask keys plus optional `manage_path` (directory
+ownership on disk) and `extra_options` for uncommon Samba keys:
 
-**Recovery** if smb.conf was overwritten:
+```yaml
+fileserver_samba_enabled: true
+fileserver_wsdd_enabled: true
+fileserver_manage_resolv_conf: false   # kif — do not clobber working DNS
+
+fileserver_global_options:
+  server_signing: required
+  vfs_objects: acl_xattr
+
+fileserver_shares:
+  - name: homes
+    browseable: false
+    read_only: false
+    valid_users: "%S %D%w%S"
+  - name: media
+    path: /media
+    read_only: false
+    force_group: media
+    write_list: ['"@domain users"', "@media"]
+    manage_path:
+      path: /media
+      owner: root
+      group: media
+      mode: "0755"
+```
+
+See [`inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example`](../inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example) for the full kif inventory.
+
+### kif production cutover
+
+kif is in `fileservers` and uses winbind (not sssd). Enable Samba via host_vars, then:
 
 ```bash
-sudo cp /archive/pre-reimage-kif-2026-06-29/samba/smb.conf /etc/samba/smb.conf
-sudo testparm -s
-sudo systemctl restart smbd nmbd winbind
+PROD='./scripts/prod-run.sh --confirm-production --'
+HOST=kif.home.2123studios.com
+
+# Backup before first converge
+ssh "${HOST}" 'sudo cp /etc/samba/smb.conf /root/smb.conf.pre-19plus && sudo testparm -s | sudo tee /root/testparm.pre-19plus >/dev/null'
+
+${PROD} playbooks/baseline.yml --limit "${HOST}"
+${PROD} playbooks/fileserver.yml --limit "${HOST}"
+${PROD} playbooks/fileserver.yml --limit "${HOST}"   # idempotency proof
 ```
+
+**`[shared]` fix:** the hand-maintained config had broken directory modes (`0700 root:root`,
+masks without traverse bits, `@users` = local Unix group). Inventory uses `"@domain users"`,
+`2770` on `/home/shared`, and normalized `0664`/`2775` masks.
+
+**Validation on kif:**
+
+- [ ] `sudo net ads testjoin`
+- [ ] `testparm -s` — five shares present
+- [ ] `systemctl is-active smbd nmbd winbind wsdd-server`
+- [ ] Domain-user SMB smoke test per share
+- [ ] Kerberos NFS clients still mount (`exportfs -v` on kif; `klist` on client)
+
+**Rollback:**
+
+```bash
+sudo cp /root/smb.conf.pre-19plus /etc/samba/smb.conf
+sudo testparm -s
+sudo systemctl restart smbd nmbd winbind wsdd-server
+```
+
+Set `fileserver_samba_enabled: false` only if Ansible must stop managing `smb.conf` immediately.
+
+Samba shares coexist with Kerberos NFS on the same paths — see [nfs-server-runbook.md](nfs-server-runbook.md).
 
 ## MD array monitoring (optional)
 

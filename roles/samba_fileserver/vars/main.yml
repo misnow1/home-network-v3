@@ -12,3 +12,5 @@ fileserver_services:
   - smbd
   - nmbd
   - winbind
+
+fileserver_wsdd_service: wsdd-server
