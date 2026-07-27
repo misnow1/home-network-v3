@@ -68,6 +68,23 @@
   when: reverse_proxy_authelia_url | length > 0
   notify: reload nginx
 
+- name: Reverse proxy | Deploy rate limit zones
+  ansible.builtin.template:
+    src: rate-limit-zones.conf.j2
+    dest: "{{ reverse_proxy_conf_dir }}/rate-limit-zones.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: reverse_proxy_rate_limit_zones | length > 0
+  notify: reload nginx
+
+- name: Reverse proxy | Remove stale rate limit zones file
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_conf_dir }}/rate-limit-zones.conf"
+    state: absent
+  when: reverse_proxy_rate_limit_zones | length == 0
+  notify: reload nginx
+
 - name: Reverse proxy | Deploy HTTP-to-HTTPS redirect default server
   ansible.builtin.template:
     src: default-redirect.conf.j2

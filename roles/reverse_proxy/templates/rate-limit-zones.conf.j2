@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Rate limit zones for reverse proxy vhosts.
+{% for zone in reverse_proxy_rate_limit_zones %}
+
+limit_req_zone $binary_remote_addr zone={{ zone.name }}:{{ zone.size | default('10m') }} rate={{ zone.rate }};
+{% endfor %}

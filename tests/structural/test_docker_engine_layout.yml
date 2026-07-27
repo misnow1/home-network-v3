@@ -22,6 +22,7 @@
         - install.yml
         - nvidia.yml
         - daemon.yml
+        - ufw.yml
 
     - name: Docker engine | assert template and handlers exist
       ansible.builtin.stat:
@@ -55,6 +56,15 @@
     - name: Docker engine | assert storage is gated on data_volumes length
       ansible.builtin.shell: |
         grep -q 'docker_engine_data_volumes | length > 0' "{{ docker_engine_main }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Docker engine | assert edge firewall variables exist
+      ansible.builtin.shell: |
+        grep -q 'docker_engine_manage_ufw' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_ufw_published_ports' "{{ docker_engine_role }}/defaults/main.yml" &&
+        grep -q 'docker_engine_ufw' "{{ docker_engine_main }}"
       args:
         executable: /bin/bash
       changed_when: false

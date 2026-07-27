@@ -41,6 +41,7 @@
       - docs/mail-relay-runbook.md
       - docs/ldap-vip-runbook.md
       - docs/authelia-runbook.md
+      - docs/edge-access-model.md
       - docs/nut-runbook.md
       - docs/nfs-server-runbook.md
       - docs/nfs-client-runbook.md

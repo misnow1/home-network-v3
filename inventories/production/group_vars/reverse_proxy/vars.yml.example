@@ -30,6 +30,15 @@ reverse_proxy_authelia_url: http://kif.home.2123studios.com:9191
 # All vhosts share the SAN cert lineage (matches certbot_domains[0]).
 reverse_proxy_cert_name: auth.2123studios.com
 
+# Brute-force throttling for auth portal and forward-auth subrequests.
+reverse_proxy_rate_limit_zones:
+  - name: auth_portal
+    rate: 10r/s
+    size: 10m
+  - name: proxied_apps
+    rate: 30r/s
+    size: 10m
+
 reverse_proxy_sites:
   # Authelia portal — the auth service itself (no forward-auth on itself).
   - name: auth.2123studios.com
@@ -38,12 +47,21 @@ reverse_proxy_sites:
     locations:
       - path: /
         proxy_pass: http://kif.home.2123studios.com:9191
+        rate_limit:
+          zone: auth_portal
+          burst: 30
       - path: "= /api/verify"
         proxy_pass: http://kif.home.2123studios.com:9191
         include_proxy_snippet: false
+        rate_limit:
+          zone: auth_portal
+          burst: 20
       - path: /api/authz/
         proxy_pass: http://kif.home.2123studios.com:9191
         include_proxy_snippet: false
+        rate_limit:
+          zone: auth_portal
+          burst: 40
 
   # Guacamole — protected by Authelia.
   - name: guacamole.2123studios.com
@@ -55,8 +73,13 @@ reverse_proxy_sites:
       - path: /guacamole
         proxy_pass: http://kif.home.2123studios.com:4080/guacamole
         auth_required: true
+        websocket: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 20
 
-  # Paperless — websocket backend, Authelia currently disabled (matches legacy).
+  # Paperless — no Authelia: Paperless-ngx iOS app cannot follow auth redirects.
+  # Relies on Paperless native login + nginx rate_limit; keep docker port bastion-only.
   - name: paperless.2123studios.com
     server_names:
       - paperless.2123studios.com
@@ -64,6 +87,9 @@ reverse_proxy_sites:
       - path: /
         proxy_pass: http://kif.home.2123studios.com:8000
         websocket: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 30
 
   # Plex — https upstream with keepalive; bespoke tuning via escape hatches.
   - name: plex.2123studios.com
@@ -94,7 +120,7 @@ reverse_proxy_sites:
         include_proxy_snippet: false
         proxy_pass: https://plex_backend
 
-  # Bastion/kif landing — transmission (Authelia) + guacamole passthrough.
+  # Bastion/kif landing — transmission + guacamole (both Authelia-protected).
   - name: bastion.2123studios.com
     server_names:
       - bastion.2123studios.com
@@ -103,7 +129,15 @@ reverse_proxy_sites:
       - path: /transmission
         proxy_pass: http://kif.home.2123studios.com:9091/transmission
         auth_required: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 20
         extra_config: |
           proxy_pass_header X-Transmission-Session-Id;
       - path: /guacamole
         proxy_pass: http://kif.home.2123studios.com:4080/guacamole
+        auth_required: true
+        websocket: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 20

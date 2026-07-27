@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Scheduled backup entrypoint — docker volumes, retention, optional offsite copy.
+set -uo pipefail
+
+export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+
+DOCKER_SCRIPT="{{ backup_docker_script_path }}"
+OFFSITE_REPO="{{ backup_offsite_repository }}"
+OFFSITE_COPY="{{ backup_offsite_copy_enabled | lower }}"
+
+run_docker_backup() {
+  if [ ! -x "$DOCKER_SCRIPT" ]; then
+    echo "$(date -Iseconds) | ERROR: docker backup script missing: $DOCKER_SCRIPT" >&2
+    return 1
+  fi
+  "$DOCKER_SCRIPT"
+}
+
+run_prune() {
+{% if backup_prune_enabled %}
+  restic forget \
+    --keep-daily {{ backup_prune_keep_daily }} \
+    --keep-weekly {{ backup_prune_keep_weekly }} \
+    --keep-monthly {{ backup_prune_keep_monthly }} \
+    --prune
+{% else %}
+  echo "$(date -Iseconds) | prune | disabled"
+{% endif %}
+}
+
+run_offsite_copy() {
+  if [ "$OFFSITE_COPY" != "true" ] || [ -z "$OFFSITE_REPO" ]; then
+    return 0
+  fi
+  restic copy --from-repo "$RESTIC_REPOSITORY" --to-repo "$OFFSITE_REPO" --password-file "$RESTIC_PASSWORD_FILE"
+}
+
+main() {
+  run_docker_backup
+  run_prune
+  run_offsite_copy
+}
+
+main "$@"

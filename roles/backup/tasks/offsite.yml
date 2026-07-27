@@ -1,0 +1,57 @@
+---
+- name: Backup | Validate offsite repository path when copy enabled
+  ansible.builtin.assert:
+    that:
+      - backup_offsite_repository | length > 0
+    fail_msg: >-
+      backup_offsite_copy_enabled requires backup_offsite_repository (e.g.
+      /archive/restic/prod-backup-offsite on kif).
+  when: backup_offsite_copy_enabled | bool
+  tags: [backup_offsite]
+
+- name: Backup | Ensure offsite repository directory exists
+  ansible.builtin.file:
+    path: "{{ backup_offsite_repository }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when:
+    - backup_offsite_copy_enabled | bool
+    - backup_offsite_repository is match('^/')
+  tags: [backup_offsite]
+
+- name: Backup | Check whether offsite restic repository is initialized
+  ansible.builtin.command: restic cat config
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_offsite_repository }}"
+    RESTIC_PASSWORD_FILE: "{{ backup_restic_password_file }}"
+  register: backup_offsite_cat_config
+  changed_when: false
+  failed_when: false
+  when: backup_offsite_copy_enabled | bool
+  tags: [backup_offsite]
+
+- name: Backup | Fail for unexpected offsite repository check errors
+  ansible.builtin.fail:
+    msg: >-
+      Unexpected error while checking offsite restic repository (rc={{ backup_offsite_cat_config.rc }}):
+      {{ backup_offsite_cat_config.stderr | default('') }}
+  when:
+    - backup_offsite_copy_enabled | bool
+    - backup_offsite_cat_config.rc != 0
+    - backup_offsite_cat_config.rc != 10
+    - "'unable to open config file' not in (backup_offsite_cat_config.stderr | default('') | lower)"
+  tags: [backup_offsite]
+
+- name: Backup | Initialize offsite restic repository when missing
+  ansible.builtin.command: restic init
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_offsite_repository }}"
+    RESTIC_PASSWORD_FILE: "{{ backup_restic_password_file }}"
+  when:
+    - backup_offsite_copy_enabled | bool
+    - backup_offsite_init | bool
+    - backup_offsite_cat_config.rc == 10
+      or 'unable to open config file' in (backup_offsite_cat_config.stderr | default('') | lower)
+  tags: [backup_offsite]

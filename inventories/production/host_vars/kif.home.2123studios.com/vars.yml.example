@@ -192,3 +192,38 @@ docker_engine_data_volumes:
 
 # Hypervisor OS reboot stops all local VMs — install updates, reboot manually.
 unattended_upgrades_auto_reboot: false
+
+# --- Backups (Slice 23+) -----------------------------------------------------
+# Primary repo on local LV; offsite mirror on /archive (separate disk tier).
+backup_schedule_enabled: true
+backup_schedule_on_calendar: "02:30"
+backup_offsite_repository: /archive/restic/prod-backup-offsite
+backup_offsite_copy_enabled: true
+# Match names from `docker volume ls` on kif after compose is running.
+backup_docker_volumes:
+  - name: authelia_redis
+    backup_class: crash_consistent
+    notes: Authelia Valkey session cache
+  - name: guacamole_guacamole
+    backup_class: crash_consistent
+    notes: Guacamole config — verify compose project prefix
+  - name: paperless_data
+    backup_class: crash_consistent
+    notes: Paperless application data — verify compose project prefix
+  - name: transmission_config
+    backup_class: crash_consistent
+    notes: Transmission settings — verify compose project prefix
+
+# --- Edge exposure — Docker host port firewall -----------------------------
+# Restrict published ports to the nginx reverse proxy (shell-clt01).
+# Prevents LAN bypass of Authelia by hitting kif:PORT directly.
+docker_engine_manage_ufw: true
+docker_engine_ufw_edge_proxy_cidrs:
+  - 192.168.1.17/32   # shell-clt01.home.2123studios.com
+  # - 192.168.1.99/32 # edge keepalived VIP — add when Slice 28+ is deployed
+docker_engine_ufw_published_ports:
+  - 9191   # Authelia
+  - 4080   # Guacamole
+  - 8000   # Paperless
+  - 9091   # Transmission
+# docker_engine_ufw_default_deny stays false — kif also serves SMB/NFS/NUT on LAN.

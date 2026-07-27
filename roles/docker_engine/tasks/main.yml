@@ -27,3 +27,10 @@
   ansible.builtin.include_tasks: daemon.yml
   when: docker_engine_enabled | bool
   tags: [docker_engine]
+
+- name: Docker engine | Restrict published ports to edge proxy (UFW)
+  ansible.builtin.include_tasks: ufw.yml
+  when:
+    - docker_engine_enabled | bool
+    - docker_engine_manage_ufw | bool
+  tags: [docker_engine, docker_engine_ufw]

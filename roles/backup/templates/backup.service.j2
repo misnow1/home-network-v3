@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description={{ backup_systemd_description }}
+Documentation=file:///usr/share/doc/home-network-v3/backup-runbook.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ backup_run_script_path }}
+Nice=10
+IOSchedulingClass=best-effort
+
+[Install]
+WantedBy=multi-user.target

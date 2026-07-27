@@ -18,3 +18,25 @@ backup_valid_backup_policies:
 backup_valid_backup_classes:
   - crash_consistent
   - app_consistent
+
+# Scheduled backups (systemd timer). Off by default in lab.
+backup_schedule_enabled: false
+backup_schedule_on_calendar: daily
+backup_schedule_randomized_delay_sec: 1800
+
+# Wrapper invoked by systemd — docker volumes, prune, optional offsite copy.
+backup_run_script_path: /usr/local/bin/backup-run.sh
+backup_systemd_unit: ansible-backup
+backup_systemd_description: Restic backup (docker volumes + retention)
+
+# Retention applied after each successful backup run.
+backup_prune_enabled: true
+backup_prune_keep_daily: 7
+backup_prune_keep_weekly: 4
+backup_prune_keep_monthly: 6
+
+# Optional second restic repository on separate storage (e.g. kif /archive/restic/).
+# Uses the same RESTIC_PASSWORD_FILE. Enables restic copy after primary backup.
+backup_offsite_repository: ""
+backup_offsite_copy_enabled: false
+backup_offsite_init: true
