@@ -1,0 +1,26 @@
+---
+- name: File server | Install wsdd package
+  ansible.builtin.apt:
+    name: wsdd
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [fileserver_wsdd]
+
+- name: File server | Deploy wsdd defaults
+  ansible.builtin.template:
+    src: wsdd.j2
+    dest: /etc/default/wsdd
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart wsdd
+  tags: [fileserver_wsdd]
+
+- name: File server | Enable and start wsdd
+  ansible.builtin.service:
+    name: "{{ fileserver_wsdd_service }}"
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+  tags: [fileserver_wsdd]

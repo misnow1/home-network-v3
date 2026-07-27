@@ -32,6 +32,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 27 | LDAP VIP (keepalived) | `ldap.home` fails over between dc1/dc2; Authelia authentication survives failover; production converge is idempotent — [ldap-vip-runbook.md](ldap-vip-runbook.md) |
 | 10+ | Pi-hole / DNS forwarders | Dual Ubuntu Pi-hole VMs; AD forwarding, filtering, UCG DHCP, DDNS, and IPv4/IPv6 validation complete; production converge is idempotent — [pihole-runbook.md](pihole-runbook.md) |
 | 16 | Internal mail relay | Dual Postfix relays (`mail` + `mail2`); member fallback, AD DNS, production TLS, and primary-outage delivery verified; production converge is idempotent — [mail-relay-runbook.md](mail-relay-runbook.md) |
+| 19+ | Production fileserver (kif shares) | Ansible-managed `[homes]`, `[archive]`, `[shared]`, `[media]`, `[paperless]` + wsdd; production converge is idempotent and Windows mounts validated — [fileserver-runbook.md](fileserver-runbook.md) |
 
 **Platform policy:** Remaining non-Ubuntu VMs will be
 **repaved as Ubuntu** and converged with existing playbooks — not in-place migrated.
@@ -47,7 +48,6 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | Slice | Name | Depends on | Notes |
 |---|---|---|---|
 | 15+ | NFS exports (kif server) | Slice 19 | **`nfs_server` role + `nfs-server.yml` ready** — production converge/idempotency proof on kif pending; see [nfs-server-runbook.md](nfs-server-runbook.md) |
-| 19+ | Production fileserver (kif shares) | 15+, Slice 5 | Extend `samba_fileserver`: `[homes]`, `[archive]`, `[shared]`, `[media]`, `[paperless]`; **wsdd** |
 | — | nfs_client integration test | 15+ | Structural tests exist; tier-3 VM proof pending |
 
 ## Deferred (not forgotten)

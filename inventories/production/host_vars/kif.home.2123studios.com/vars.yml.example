@@ -7,9 +7,98 @@
 #
 # Secrets live in inventories/production/group_vars/all/vault.yml — see docs/vault-schema.md.
 
-# kif keeps hand-restored smb.conf ([homes], [archive], [media], etc.) until ROADMAP 19+.
-# Restore from /archive/pre-reimage-kif-2026-06-29/samba/smb.conf if Ansible overwrote it.
-fileserver_samba_enabled: false
+# Samba AD member file server — multi-share (ROADMAP 19+).
+# Backup before first converge: sudo cp /etc/samba/smb.conf /root/smb.conf.pre-19plus
+fileserver_samba_enabled: true
+fileserver_manage_resolv_conf: false
+fileserver_wsdd_enabled: true
+fileserver_wsdd_workgroup: home
+fileserver_wsdd_host: KIF
+
+fileserver_idmap_ad_range: "10000-9999999"
+
+fileserver_global_options:
+  client_signing: if_required
+  dedicated_keytab_file: /etc/krb5.keytab
+  server_signing: required
+  map_acl_inherit: "yes"
+  printing: bsd
+  vfs_objects: acl_xattr
+  log_file: /var/log/samba/samba.log
+
+fileserver_shares:
+  - name: homes
+    comment: Home Directories
+    browseable: false
+    read_only: false
+    valid_users: "%S %D%w%S"
+    extra_options:
+      map_archive: "no"
+
+  - name: archive
+    path: /archive/%U
+    comment: Archive Home Directories
+    read_only: false
+    create_mask: "0664"
+    directory_mask: "0750"
+    manage_path:
+      path: /archive
+      owner: root
+      group: root
+      mode: "0755"
+
+  - name: shared
+    path: /home/shared
+    comment: Shared Files
+    read_only: false
+    create_mask: "0664"
+    directory_mask: "2775"
+    force_create_mode: "0664"
+    force_directory_mode: "2775"
+    force_group: "domain users"
+    write_list:
+      - '"@domain users"'
+    manage_path:
+      path: /home/shared
+      owner: root
+      group: "domain users"
+      mode: "2770"
+
+  - name: media
+    path: /media
+    comment: Shared Media Files
+    read_only: false
+    create_mask: "0664"
+    directory_mask: "02775"
+    force_create_mode: "0664"
+    force_directory_mode: "02775"
+    force_group: media
+    write_list:
+      - "@users"
+      - '"@domain users"'
+      - "@media"
+    manage_path:
+      path: /media
+      owner: root
+      group: media
+      mode: "0755"
+
+  - name: paperless
+    path: /home/paperless/consume
+    comment: Paperless consume folder
+    read_only: false
+    create_mask: "0660"
+    directory_mask: "02770"
+    force_group: g-paperless
+    valid_users:
+      - "@g-paperless"
+    write_list:
+      - "@g-paperless"
+    manage_path:
+      path: /home/paperless/consume
+      owner: root
+      group: g-paperless
+      mode: "2775"
 
 # Kerberos NFS exports for Linux clients — playbooks/nfs-server.yml (ROADMAP 15+).
 # Capture /etc/exports before first converge if migrating from hand-maintained config.

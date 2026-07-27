@@ -32,22 +32,59 @@
     backrefs: false
   tags: [fileserver_configure]
 
-- name: File server | Wait for domain group to resolve via winbind NSS
+- name: File server | Wait for legacy domain group to resolve via winbind NSS
   ansible.builtin.command: getent group {{ fileserver_valid_users_group }}
   register: fileserver_group_lookup
   until: fileserver_group_lookup.rc == 0
   retries: 12
   delay: 5
   changed_when: false
+  when: fileserver_shares | length == 0
   tags: [fileserver_configure]
 
-- name: File server | Ensure share directory exists with domain group ownership
+- name: File server | Ensure legacy share directory exists with domain group ownership
   ansible.builtin.file:
     path: "{{ fileserver_share_path }}"
     state: directory
     owner: root
     group: "{{ fileserver_valid_users_group }}"
     mode: "2775"
+  when: fileserver_shares | length == 0
+  tags: [fileserver_configure]
+
+- name: File server | Wait for managed share domain groups to resolve via winbind NSS
+  ansible.builtin.command:
+    argv:
+      - getent
+      - group
+      - "{{ item.manage_path.group }}"
+  register: fileserver_share_group_lookup
+  until: fileserver_share_group_lookup.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  loop: "{{ fileserver_shares }}"
+  when:
+    - fileserver_shares | length > 0
+    - item.manage_path is defined
+    - item.manage_path.group is defined
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [fileserver_configure]
+
+- name: File server | Ensure managed share directories exist
+  ansible.builtin.file:
+    path: "{{ item.manage_path.path | default(item.path | regex_replace('/%U.*$', '')) }}"
+    state: directory
+    owner: "{{ item.manage_path.owner | default('root') }}"
+    group: "{{ item.manage_path.group | default(omit) }}"
+    mode: "{{ item.manage_path.mode | default('0755') }}"
+  loop: "{{ fileserver_shares }}"
+  when:
+    - fileserver_shares | length > 0
+    - item.manage_path is defined
+  loop_control:
+    label: "{{ item.name }}"
   tags: [fileserver_configure]
 
 - name: File server | Check whether pam_winbind is enabled

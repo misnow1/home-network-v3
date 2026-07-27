@@ -6,5 +6,31 @@
 domain_name: home.example
 fileserver_dns_servers:
   - 203.0.113.10
+
+# Legacy single-share (lab-style). When fileserver_shares is non-empty, these are ignored.
 fileserver_share_name: data
 fileserver_share_path: /srv/samba/data
+
+# Multi-share example (production kif uses host_vars). Empty list => legacy single share.
+# fileserver_shares:
+#   - name: homes
+#     comment: Home Directories
+#     browseable: false
+#     read_only: false
+#     valid_users: "%S %D%w%S"
+#   - name: media
+#     path: /media
+#     comment: Shared Media
+#     read_only: false
+#     force_group: media
+#     write_list: ['"@domain users"', "@media"]
+#     manage_path:
+#       path: /media
+#       owner: root
+#       group: media
+#       mode: "0755"
+#
+# fileserver_wsdd_enabled: true
+# fileserver_global_options:
+#   server_signing: required
+#   vfs_objects: acl_xattr
