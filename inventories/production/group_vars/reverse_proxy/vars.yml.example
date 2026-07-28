@@ -34,10 +34,11 @@ reverse_proxy_authelia_url: http://192.168.7.152:9191
 # All vhosts share the SAN cert lineage (matches certbot_domains[0]).
 reverse_proxy_cert_name: auth.2123studios.com
 
-# Authelia trusted proxies — proxy01 docker NIC and VLAN 4 segment.
-reverse_proxy_trusted_proxies:
-  - 192.168.7.0/24
-  - 192.168.1.0/24
+# No proxy/load balancer sits in front of nginx; Internet and LAN clients reach
+# proxy01 directly. Keep nginx's X-Forwarded-For trust boundary empty so clients
+# cannot spoof their source address. Add CIDRs only when deploying an upstream
+# proxy whose forwarded headers nginx should trust.
+reverse_proxy_trusted_proxies: []
 
 # Brute-force throttling for auth portal and forward-auth subrequests.
 reverse_proxy_rate_limit_zones:

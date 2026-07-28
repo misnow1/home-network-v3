@@ -48,7 +48,10 @@ Problems with the combined model:
 
 - Requires UniFi VLAN 4 trunk on hypervisor uplinks (manual, no gateway).
 - Hand-managed Compose on kif must use explicit `192.168.7.152:PORT` publish binds.
-- Authelia `trusted_proxies` must include `192.168.7.23/32`.
+- Authelia receives the client address in `X-Forwarded-For`, which nginx replaces
+  with its resolved `$remote_addr`. No Authelia-side `trusted_proxies` setting is
+  required. nginx trusts no incoming forwarded-header sources unless a real
+  upstream proxy is later added to `reverse_proxy_trusted_proxies`.
 - proxy01 is dual-homed (VLAN 1 public + VLAN 4 docker); ansible admin via LAN SSH.
 - Future edge HA (ADR 001) splits into SSH VIP vs HTTPS VIP; add vlan4 VIP for
   docker-side proxy when deploying keepalived on proxy01.

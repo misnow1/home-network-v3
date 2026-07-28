@@ -79,14 +79,19 @@ Restart stacks: `cd /srv/docker/<stack> && sudo docker compose up -d`
 
 Set Transmission `port_forwarding_enabled: false` if using explicit UniFi forward.
 
-### 5. kif — UFW + Authelia trusted proxies
+### 5. kif UFW + forwarded-header trust boundary
 
 ```bash
 ${PROD} playbooks/hypervisor.yml --limit kif.home.2123studios.com --tags docker_engine_ufw
 ```
 
-Update Authelia `configuration.yml` — add `192.168.7.23/32` to trusted proxies.
-Restart Authelia: `cd /srv/docker/authelia && sudo docker compose up -d`
+Authelia does not need a `trusted_proxies` entry in `configuration.yml`. With no
+proxy/load balancer in front of proxy01, keep
+`reverse_proxy_trusted_proxies: []`. nginx replaces any client-supplied
+`X-Forwarded-For` value with `$remote_addr` before forwarding to Authelia.
+
+After running `playbooks/reverse-proxy.yml`, verify that Authelia access logs show
+the actual public client address rather than proxy01's `192.168.7.23`.
 
 ### 6. Validate before cutover
 

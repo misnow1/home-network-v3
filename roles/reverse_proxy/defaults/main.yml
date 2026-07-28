@@ -29,10 +29,10 @@ reverse_proxy_resolvers:
   - 192.168.1.22
 reverse_proxy_resolver_timeout: 10s
 
-# Networks trusted to set X-Forwarded-For (Authelia trusted proxies).
-reverse_proxy_trusted_proxies:
-  - 192.168.0.0/16
-  - fe80::/16
+# Upstream proxies/load balancers nginx trusts to supply X-Forwarded-For.
+# Leave empty when clients reach nginx directly (including through NAT).
+# This is an nginx real-ip trust boundary, not an Authelia setting.
+reverse_proxy_trusted_proxies: []
 
 # HSTS header applied to each TLS vhost (per-site override via `hsts`).
 reverse_proxy_hsts_enabled: true

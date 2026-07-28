@@ -165,21 +165,23 @@ for `rpc_bind_address` / `bind_address_ipv4` when using `network_mode: host`.
 
 ## Trusted proxies
 
-Add proxy01's docker NIC to Authelia `configuration.yml` so forward-auth sees
-correct client IPs:
+Authelia does not have a `trusted_proxies` CIDR setting for this nginx
+integration. The trust boundary belongs on nginx:
 
 ```yaml
-identity_validation:
-  reset_password:
-    jwt_secret: '...'
-# ...
-# Under server / session trusted proxies (Authelia 4.x location varies):
-# trusted_proxies:
-#   - 192.168.7.23/32
+# inventories/production/group_vars/reverse_proxy/vars.yml
+reverse_proxy_trusted_proxies: []
 ```
 
-Consult the Authelia version docs for the exact key path. Add the keepalived VIP
-on vlan4 when edge HA (Slice 28+) is deployed.
+Keep the list empty while Internet and LAN clients reach proxy01 directly,
+including through UniFi NAT. The nginx role replaces client-supplied
+`X-Forwarded-For` with its resolved `$remote_addr` before forwarding requests to
+Authelia. Only add a CIDR when deploying a real upstream proxy or load balancer
+whose forwarded headers nginx should trust.
+
+Verify the contract in Authelia access logs: `remote_ip` should be the public
+client address, not proxy01's `192.168.7.23`. If edge HA later places a
+load-balancing proxy in front of nginx, add only that proxy or VIP source range.
 
 ## Session / Redis
 

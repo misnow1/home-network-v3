@@ -83,7 +83,7 @@ Key variables (full list in [`roles/reverse_proxy/defaults/main.yml`](../roles/r
 | `reverse_proxy_require_cert` | `true` | Fail if the certificate is missing (run certbot first) |
 | `reverse_proxy_bootstrap_selfsigned` | `false` | Lab only — self-sign missing lineages so `nginx -t` passes |
 | `reverse_proxy_resolvers` | Pi-hole IPs | DNS resolvers for runtime upstream resolution |
-| `reverse_proxy_trusted_proxies` | LAN + VLAN 4 CIDRs | `set_real_ip_from` for Authelia trusted proxies |
+| `reverse_proxy_trusted_proxies` | `[]` | Upstream proxy/load-balancer CIDRs allowed to supply `X-Forwarded-For`; keep empty for direct/NAT clients |
 | `reverse_proxy_manage_ufw` | `true` | Add UFW allow rules for 80/443 |
 | `reverse_proxy_manage_sshd` | `true` | Key-only sshd drop-in for standalone proxy hosts |
 | `reverse_proxy_rate_limit_zones` | `[]` | nginx `limit_req_zone` definitions (http context) |
@@ -91,6 +91,13 @@ Key variables (full list in [`roles/reverse_proxy/defaults/main.yml`](../roles/r
 
 Backend URLs in `reverse_proxy_sites` use **static VLAN 4 IPs** (`192.168.7.152`), not
 LAN hostnames — the docker NIC on proxy01 has no DNS requirement for backends.
+
+`reverse_proxy_trusted_proxies` controls nginx's **incoming** real-IP trust
+boundary; it does not identify proxy01 to Authelia. The role replaces
+client-supplied `X-Forwarded-For` with `$remote_addr` before proxying. Do not add
+LAN, VLAN 4, proxy01's own `192.168.7.23`, or UniFi NAT ranges unless one of those
+addresses is actually an upstream HTTP proxy supplying trusted forwarding
+headers.
 
 ### Site schema
 
