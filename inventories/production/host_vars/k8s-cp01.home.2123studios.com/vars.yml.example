@@ -1,0 +1,11 @@
+---
+# k8s-cp01 control-plane VM — copy to vars.yml (gitignored alongside production inventory).
+#
+#   mkdir -p inventories/production/host_vars/k8s-cp01.home.2123studios.com
+#   cp inventories/production/host_vars/k8s-cp01.home.2123studios.com/vars.yml.example \
+#      inventories/production/host_vars/k8s-cp01.home.2123studios.com/vars.yml
+#
+# Create VM: scripts/vm/vm-create.sh -i production k8s-cp01.home.2123studios.com
+# Requires hypervisor br9/vlan9 — see docs/kubernetes-runbook.md
+
+# Control-plane taint is applied at kubeadm init (runbook), not by Ansible in v1.

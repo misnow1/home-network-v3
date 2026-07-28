@@ -1,0 +1,72 @@
+---
+# Local break-glass SSH account for operator admin on Kubernetes nodes (not AD-joined).
+
+- name: Kubernetes operator SSH | Assert operator username is set
+  ansible.builtin.assert:
+    that:
+      - k8s_operator_user | length > 0
+    fail_msg: k8s_operator_user is empty — set in group_vars/k8s/vars.yml
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Assert SSH public keys are configured
+  ansible.builtin.assert:
+    that:
+      - k8s_operator_ssh_keys | length > 0
+    fail_msg: >-
+      k8s_operator_ssh_keys is empty — add your public key to group_vars/k8s/vars.yml
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Ensure local operator group exists
+  ansible.builtin.group:
+    name: "{{ k8s_operator_user }}"
+    gid: "{{ k8s_operator_gid }}"
+    state: present
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Ensure local operator user exists
+  ansible.builtin.user:
+    name: "{{ k8s_operator_user }}"
+    uid: "{{ k8s_operator_uid }}"
+    group: "{{ k8s_operator_user }}"
+    shell: "{{ k8s_operator_shell }}"
+    home: "{{ k8s_operator_home }}"
+    create_home: true
+    password_lock: true
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Ensure operator .ssh directory exists
+  ansible.builtin.file:
+    path: "{{ k8s_operator_home }}/.ssh"
+    state: directory
+    owner: "{{ k8s_operator_uid }}"
+    group: "{{ k8s_operator_gid }}"
+    mode: "0700"
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Install authorized keys for operator user
+  ansible.builtin.copy:
+    dest: "{{ k8s_operator_home }}/.ssh/authorized_keys"
+    content: "{{ k8s_operator_ssh_keys | join('\n') }}\n"
+    owner: "{{ k8s_operator_uid }}"
+    group: "{{ k8s_operator_gid }}"
+    mode: "0600"
+  when: k8s_operator_enabled | bool
+  tags: [k8s_node, k8s_operator]
+
+- name: Kubernetes operator SSH | Grant passwordless sudo to operator user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ k8s_operator_user }}"
+    content: "{{ k8s_operator_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  when:
+    - k8s_operator_enabled | bool
+    - k8s_operator_sudo | bool
+  tags: [k8s_node, k8s_operator]

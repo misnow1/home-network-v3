@@ -201,3 +201,12 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Hypervisor | assert VLAN 9 kubernetes network in production example
+      ansible.builtin.shell: |
+        grep -q 'vlan9' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'br9' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q "bridge_name == 'br9'" "{{ hypervisor_role }}/templates/netplan.yaml.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false

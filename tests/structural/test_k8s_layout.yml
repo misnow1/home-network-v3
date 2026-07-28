@@ -1,0 +1,86 @@
+---
+# Structural tests for Kubernetes node layout.
+
+- name: Structural — Kubernetes layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    k8s_playbook: "{{ repo_root }}/playbooks/k8s-node-prep.yml"
+    k8s_role_defaults: "{{ repo_root }}/roles/k8s_node/defaults/main.yml"
+    k8s_role_tasks: "{{ repo_root }}/roles/k8s_node/tasks/main.yml"
+    prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
+    k8s_group_vars_example: "{{ repo_root }}/inventories/production/group_vars/k8s/vars.yml.example"
+    k8s_runbook: "{{ repo_root }}/docs/kubernetes-runbook.md"
+    k8s_adr: "{{ repo_root }}/docs/adr/003-home-kubernetes.md"
+  tasks:
+    - name: Kubernetes | assert required paths exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: k8s_paths
+      loop:
+        - "{{ k8s_playbook }}"
+        - "{{ k8s_role_defaults }}"
+        - "{{ k8s_role_tasks }}"
+        - "{{ k8s_group_vars_example }}"
+        - "{{ k8s_runbook }}"
+        - "{{ k8s_adr }}"
+        - "{{ repo_root }}/roles/k8s_node/tasks/operator_ssh.yml"
+        - "{{ repo_root }}/roles/k8s_node/templates/containerd-config.toml.j2"
+
+    - name: Kubernetes | assert paths present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ k8s_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Kubernetes | assert playbook includes baseline and k8s_node roles
+      ansible.builtin.shell: |
+        grep -q 'linux_baseline' "{{ k8s_playbook }}"
+        grep -q 'k8s_node' "{{ k8s_playbook }}"
+        grep -q 'hosts: k8s' "{{ k8s_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Kubernetes | assert role defaults define packages and operator
+      ansible.builtin.shell: |
+        grep -q 'k8s_kubernetes_packages:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_containerd_packages:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_operator_enabled:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_operator_ssh_keys:' "{{ k8s_role_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Kubernetes | assert production hosts example defines k8s groups
+      ansible.builtin.shell: |
+        grep -q '^    k8s:' "{{ prod_hosts_example }}"
+        grep -q '^    k8s_control_plane:' "{{ prod_hosts_example }}"
+        grep -q '^    k8s_nodes:' "{{ prod_hosts_example }}"
+        grep -q 'k8s-cp01.example.home' "{{ prod_hosts_example }}"
+        grep -q 'k8s-node-1.example.home' "{{ prod_hosts_example }}"
+        grep -q 'vlan9' "{{ prod_hosts_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Kubernetes | assert hypervisor example documents vlan9
+      ansible.builtin.shell: |
+        grep -q 'vlan9' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example"
+        grep -q 'br9' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Kubernetes | assert ADR documents hybrid edge
+      ansible.builtin.shell: |
+        grep -q 'MetalLB' "{{ k8s_adr }}"
+        grep -q 'ingress-nginx' "{{ k8s_adr }}"
+        grep -q 'kubeadm' "{{ k8s_adr }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

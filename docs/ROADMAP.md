@@ -44,6 +44,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 |---|---|---|---|---|
 | 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | proxy01 VM + VLAN 4 docker edge; split from bastion — [reverse-proxy-runbook.md](reverse-proxy-runbook.md), [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md), [edge-access-model.md](edge-access-model.md) |
 | 2 | 23 | Restic scheduling + offsite copy | **in progress** | systemd timer, prune, `/archive/restic/` mirror on kif; quarterly restore drill — [backup-runbook.md](backup-runbook.md) |
+| 3 | 31 | Kubernetes lab platform | **planned** | kubeadm + VLAN 9 workers; hybrid edge via proxy01 → MetalLB → ingress-nginx — [kubernetes-runbook.md](kubernetes-runbook.md), [adr/003-home-kubernetes.md](adr/003-home-kubernetes.md) |
 
 ## Active — automation backlog (post-reimage)
 
@@ -67,7 +68,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | — | nut_client role | Slice 21 | Server slice done; client role for kvm01 netclient path deferred |
 | — | AD SSH public keys | Slice 18 | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | 28+ | Bastion / edge VIP HA | Slice 26, second bastion VM | keepalived floating VIP for UniFi port-forwards — [adr/001-bastion-keepalived-vip.md](adr/001-bastion-keepalived-vip.md) |
-| — | Authelia container HA | Slice 27, container platform | Migrate Authelia/Valkey off single kif host; session loss acceptable short-term |
+| — | Authelia container HA | Slice 31 boring, container platform | Migrate Authelia/Valkey off single kif host; session loss acceptable short-term — blocked until k8s platform + restore proven ([adr/003-home-kubernetes.md](adr/003-home-kubernetes.md)) |
 | — | Cert lifetime monitoring | Slice 11+ observability | Alert on Let's Encrypt remaining lifetime (LDAP VIP, mail, edge SAN certs) |
 | — | Inventory vm_hypervisor field | — | Record which hypervisor runs each VM for outage planning |
 | — | LDAP VIP cert on kif (compose sidecar) | — | If Authelia stack migrates, revisit compose-local certbot; DC VIP+SAN remains portable LDAP endpoint |

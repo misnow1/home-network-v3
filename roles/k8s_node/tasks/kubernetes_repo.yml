@@ -1,0 +1,33 @@
+---
+- name: Kubernetes node | Download Kubernetes apt signing key
+  ansible.builtin.get_url:
+    url: "{{ k8s_kubernetes_apt_key_url }}"
+    dest: /tmp/kubernetes-apt-keyring.key
+    mode: "0644"
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Install dearmored Kubernetes apt key
+  ansible.builtin.shell: |
+    set -euo pipefail
+    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg < /tmp/kubernetes-apt-keyring.key
+    chmod 0644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    executable: /bin/bash
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Deploy Kubernetes apt source
+  ansible.builtin.template:
+    src: kubernetes.sources.j2
+    dest: /etc/apt/sources.list.d/kubernetes.sources
+    owner: root
+    group: root
+    mode: "0644"
+  register: k8s_kubernetes_apt_source
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Refresh apt cache after Kubernetes repo change
+  ansible.builtin.apt:
+    update_cache: true
+  when: k8s_kubernetes_apt_source is changed
+  tags: [k8s_node, k8s_packages]

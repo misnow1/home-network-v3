@@ -1,0 +1,21 @@
+---
+- name: Kubernetes node | Install Kubernetes packages
+  ansible.builtin.apt:
+    name: "{{ k8s_kubernetes_packages }}"
+    state: present
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Hold Kubernetes package versions
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ k8s_kubernetes_packages }}"
+  when: k8s_kubernetes_package_hold | bool
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Enable kubelet service
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    daemon_reload: true
+  tags: [k8s_node, k8s_packages]

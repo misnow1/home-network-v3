@@ -1,0 +1,61 @@
+---
+k8s_node_enabled: false
+
+# Kubernetes minor version — drives pkgs.k8s.io apt channel.
+k8s_kubernetes_version: "1.31"
+
+# pkgs.k8s.io apt repository (https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+k8s_kubernetes_apt_key_url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_kubernetes_version }}/deb/Release.key"
+k8s_kubernetes_apt_repo: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_kubernetes_version }}/deb/ /"
+
+k8s_kubernetes_packages:
+  - kubelet
+  - kubeadm
+  - kubectl
+
+# Hold kubelet/kubeadm/kubectl at the installed version until deliberate upgrade.
+k8s_kubernetes_package_hold: true
+
+# containerd.io from Docker's apt repo (without docker-ce).
+k8s_containerd_packages:
+  - containerd.io
+
+k8s_containerd_apt_key_url: https://download.docker.com/linux/ubuntu/gpg
+k8s_containerd_apt_repo_channel: stable
+k8s_deb_arch: >-
+  {{ 'amd64' if ansible_facts['architecture'] | default('x86_64') == 'x86_64'
+     else ansible_facts['architecture'] | default('amd64') }}
+
+k8s_remove_conflicting_packages: true
+k8s_conflicting_packages:
+  - docker.io
+  - docker-compose-v2
+  - docker-doc
+  - podman-docker
+  - containerd
+  - runc
+
+k8s_sysctl_settings:
+  net.ipv4.ip_forward: "1"
+  net.bridge.bridge-nf-call-iptables: "1"
+  net.bridge.bridge-nf-call-ip6tables: "1"
+
+k8s_kernel_modules:
+  - overlay
+  - br_netfilter
+
+# Disable swap for kubelet (required by kubeadm).
+k8s_disable_swap: true
+
+# Operator break-glass SSH — local Unix account with pubkey auth (not AD).
+k8s_operator_enabled: false
+k8s_operator_user: ""
+k8s_operator_uid: 1001
+k8s_operator_gid: 1001
+k8s_operator_shell: /bin/bash
+k8s_operator_home: "/home/{{ k8s_operator_user }}"
+k8s_operator_ssh_keys: []
+k8s_operator_sudo: true
+
+# Pin kubelet to a specific version string for apt (optional).
+k8s_kubelet_version: "{{ k8s_kubernetes_version }}.*"

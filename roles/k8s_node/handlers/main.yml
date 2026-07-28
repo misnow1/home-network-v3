@@ -1,0 +1,14 @@
+---
+- name: Restart containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    daemon_reload: true
+
+- name: Reload kernel modules
+  ansible.builtin.command: systemd-modules-load
+  changed_when: false
+
+- name: Apply sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: false

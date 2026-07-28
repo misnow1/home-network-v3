@@ -1,0 +1,29 @@
+---
+- name: Kubernetes node | Ensure modules-load.d directory exists
+  ansible.builtin.file:
+    path: /etc/modules-load.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [k8s_node, k8s_modules]
+
+- name: Kubernetes node | Persist kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      {% for mod in k8s_kernel_modules %}
+      {{ mod }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload kernel modules
+  tags: [k8s_node, k8s_modules]
+
+- name: Kubernetes node | Load kernel modules now
+  ansible.builtin.command: "modprobe {{ item }}"
+  loop: "{{ k8s_kernel_modules }}"
+  changed_when: false
+  failed_when: false
+  tags: [k8s_node, k8s_modules]

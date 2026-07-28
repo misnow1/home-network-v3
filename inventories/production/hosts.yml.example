@@ -158,12 +158,74 @@ all:
         fileservers:
         linux_members:
         pihole:
+        k8s:
 
     linux_members:
       hosts:
         cka-sim.example.home:
           ansible_host: 203.0.113.141
           ansible_managed: true
+
+    # Kubernetes — VLAN 9 routed fabric (ADR 003). CP is a VM; workers are bare metal.
+    # Bootstrap: docs/kubernetes-runbook.md — kubeadm init/join is manual in v1.
+    k8s_control_plane:
+      hosts:
+        k8s-cp01.example.home:
+          ansible_host: 192.168.9.10
+          ansible_managed: true
+          vm_name: k8s-cp01-example
+          vm_memory_mb: 4096
+          vm_disk_gb: 32
+          vm_hypervisor: kvm01.example.home
+          ethernets:
+            - network: vlan9
+              addresses:
+                - 192.168.9.10/24
+              nameservers:
+                - 192.168.1.18
+                - 192.168.1.22
+              routes:
+                - to: default
+                  via: 192.168.9.1
+
+    k8s_nodes:
+      hosts:
+        k8s-node-1.example.home:
+          # HP Z2 Mini G3 — Core i7, 16 GB RAM, 512 GB NVMe
+          ansible_host: 192.168.9.128
+          ansible_managed: true
+          ethernets:
+            - macaddress: 52:54:00:00:09:01
+              dhcp4: false
+              dhcp6: false
+              addresses:
+                - 192.168.9.128/24
+              nameservers:
+                - 192.168.1.18
+                - 192.168.1.22
+              routes:
+                - to: default
+                  via: 192.168.9.1
+        k8s-node-2.example.home:
+          ansible_host: 192.168.9.129
+          ansible_managed: true
+          ethernets:
+            - macaddress: 52:54:00:00:09:02
+              dhcp4: false
+              dhcp6: false
+              addresses:
+                - 192.168.9.129/24
+              nameservers:
+                - 192.168.1.18
+                - 192.168.1.22
+              routes:
+                - to: default
+                  via: 192.168.9.1
+
+    k8s:
+      children:
+        k8s_control_plane:
+        k8s_nodes:
 
     # Legacy or transitional hosts — not targeted by default apt playbooks.
     # Empty post-migration (pdc retired). Keep group for structural test compatibility.

@@ -31,6 +31,8 @@ network:
       interfaces: {{ [hypervisor_netplan_uplink ~ '.3'] | to_json }}
 {% elif bridge_name == 'br4' %}
       interfaces: {{ [hypervisor_netplan_uplink ~ '.4'] | to_json }}
+{% elif bridge_name == 'br9' %}
+      interfaces: {{ [hypervisor_netplan_uplink ~ '.9'] | to_json }}
 {% else %}
       interfaces: {{ bridge.interfaces | default([]) | to_json }}
 {% endif %}
