@@ -66,6 +66,25 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Samba DC | assert converge fixes cloud-init 127.0.1.1 hostname alias
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: dns_hosts.yml' "{{ converge_tasks }}"
+        grep -q '127\\.0\\.1\\.1' "{{ repo_root }}/roles/samba_dc/tasks/dns_hosts.yml"
+        grep -q 'Map DC FQDN to LAN IP' "{{ repo_root }}/roles/samba_dc/tasks/dns_hosts.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert IPv4-only interface auto-detect for production DCs
+      ansible.builtin.shell: |
+        grep -q 'samba_dc_register_ipv6' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        grep -q 'Auto-detect primary NIC name' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+        grep -q 'samba_dc_register_ipv6: false' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
+        ! grep -q 'Auto-detect primary IPv4 address binding' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Samba DC | assert dc-bootstrap refuses production without opt-in
       ansible.builtin.shell: |
         grep -q 'allow_production' "{{ dc_bootstrap_playbook }}"

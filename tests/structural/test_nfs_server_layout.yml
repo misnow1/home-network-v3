@@ -65,3 +65,13 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: NFS server | assert krb5 scrub removes retired static KDC pins
+      ansible.builtin.shell: |
+        grep -q 'nfs_server_krb5_retired_kdcs' "{{ nfs_defaults }}"
+        grep -q 'pdc.home.2123studios.com' "{{ nfs_defaults }}"
+        grep -q 'Remove retired static KDC pins' "{{ repo_root }}/roles/nfs_server/tasks/krb5.yml"
+        grep -q 'Cannot contact any KDC' "{{ nfs_runbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

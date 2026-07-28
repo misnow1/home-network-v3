@@ -29,6 +29,12 @@ nfs_server_export_options:
 # Register nfs/<fqdn> and nfs/<HOST> SPNs and refresh keytab (needs vault join creds).
 nfs_server_manage_spn: true
 
+# Static [realms] kdc=/admin_server= lines override dns_lookup_kdc. After the legacy
+# PDC was retired, a leftover pin at pdc.* made kinit talk to a non-KDC host.
+# Strip these hostnames when present (empty list disables the scrub).
+nfs_server_krb5_retired_kdcs:
+  - pdc.home.2123studios.com
+
 # Override when ansible_fqdn / hostname differ from AD computer object naming.
 nfs_server_spn_fqdn: "nfs/{{ ansible_fqdn | default(inventory_hostname) }}"
 nfs_server_spn_short: >-

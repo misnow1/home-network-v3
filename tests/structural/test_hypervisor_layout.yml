@@ -181,3 +181,15 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Hypervisor | assert br0 pins Pi-hole DNS and rejects DHCP/RA DNS
+      ansible.builtin.shell: |
+        grep -q '192.168.1.18' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q '192.168.1.22' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'dhcp4-overrides:' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'ra-overrides:' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'use-dns: false' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'ra-overrides' "{{ hypervisor_role }}/templates/netplan.yaml.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false

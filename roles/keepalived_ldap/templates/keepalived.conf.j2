@@ -1,8 +1,12 @@
 # {{ ansible_managed }}
 # LDAP/LDAPS VIP for {{ ldap_vip_hostname }} — see docs/ldap-vip-runbook.md.
 #
-# Samba does not rebind when the VIP appears on the NIC. notify_* scripts DNAT
-# VIP:389/636 to this DC's primary IP so clients reach LDAPS without a Samba restart.
+# VRRP advertisements use {{ ldap_vip_interface }}; the VIP address is placed on
+# macvlan {{ ldap_vip_device }} so Samba can bind the parent NIC by name without
+# samba_dnsupdate registering the VIP as this DC's hostname.
+#
+# Samba does not rebind when the VIP appears. notify_* scripts DNAT VIP:389/636
+# to this DC's primary IP so clients reach LDAPS without a Samba restart.
 
 global_defs {
     script_user root
@@ -28,7 +32,7 @@ vrrp_instance VI_LDAP {
         auth_pass {{ ldap_vip_auth_pass }}
     }
     virtual_ipaddress {
-        {{ ldap_vip_address }}/24
+        {{ ldap_vip_address }}/24 dev {{ ldap_vip_device }}
     }
     track_script {
         check_ldaps

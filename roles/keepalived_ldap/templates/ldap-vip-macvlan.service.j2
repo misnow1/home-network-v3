@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Create LDAP VIP macvlan {{ ldap_vip_device }} on {{ ldap_vip_interface }}
+After=network-online.target
+Wants=network-online.target
+Before=keepalived.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/ensure-ldap-macvlan.sh
+ExecStop=/sbin/ip link delete {{ ldap_vip_device }}
+
+[Install]
+WantedBy=multi-user.target
+Also=keepalived.service

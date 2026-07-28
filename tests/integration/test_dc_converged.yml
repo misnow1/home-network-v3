@@ -82,8 +82,11 @@
         smb_conf="$(readlink -f /etc/samba/smb.conf 2>/dev/null || echo /etc/samba/smb.conf)"
         testparm -s "$smb_conf" 2>/dev/null \
           | grep -qiE '^\s*bind interfaces only\s*=\s*yes'
-        testparm -s "$smb_conf" 2>/dev/null \
-          | grep -qF "{{ ansible_facts['default_ipv4']['interface'] }}"
+        iface_line="$(testparm -s "$smb_conf" 2>/dev/null \
+          | awk -F= '/^[[:space:]]*interfaces[[:space:]]*=/ { sub(/^[[:space:]]+/, "", $2); print $2; exit }')"
+        test -n "$iface_line"
+        echo "$iface_line" | grep -qF "{{ ansible_facts['default_ipv4']['interface'] }}" \
+          || echo "$iface_line" | grep -qF "{{ ansible_facts['default_ipv4']['address'] }}"
       args:
         executable: /bin/bash
       changed_when: false

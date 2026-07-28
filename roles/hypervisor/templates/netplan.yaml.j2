@@ -65,5 +65,13 @@ network:
         search: {{ bridge.nameservers.search | to_json }}
 {% endif %}
 {% endif %}
+{% for _override in ['dhcp4-overrides', 'dhcp6-overrides', 'ra-overrides'] %}
+{% if bridge[_override] is defined %}
+      {{ _override }}:
+{% for _option, _value in bridge[_override].items() %}
+        {{ _option }}: {{ _value | to_json }}
+{% endfor %}
+{% endif %}
+{% endfor %}
 {% endfor %}
 {% endif %}
