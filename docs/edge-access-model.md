@@ -29,7 +29,7 @@ Public exposure decisions for services proxied through **proxy01** (reverse prox
 | Service | FQDN / path | Notes |
 |---|---|---|
 | Guacamole | `guacamole.2123studios.com`, `bastion.2123studios.com/guacamole`, `kif.2123studios.com/guacamole` | Remote desktop — high risk; MFA recommended |
-| Transmission | `bastion.2123studios.com/transmission`, `kif.2123studios.com/transmission` | BitTorrent UI (RPC on VLAN 4; peer port on VLAN 1) |
+| Transmission | `bastion.2123studios.com/transmission`, `kif.2123studios.com/transmission` | BitTorrent UI — Flood for Transmission via `TRANSMISSION_WEB_HOME` (RPC on VLAN 4; peer port on VLAN 1) |
 
 Access rules live in Authelia `configuration.yml` on kif — see
 [authelia-runbook.md](authelia-runbook.md#access-control-for-proxied-apps).

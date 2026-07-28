@@ -152,10 +152,19 @@ RPC (proxy-only) from peer traffic (Internet):
 # /srv/docker/transmission/docker-compose.yml (example)
 services:
   transmission:
+    environment:
+      # Drop-in UI: [Flood for Transmission](https://github.com/johman10/flood-for-transmission)
+      # Extract release under ./config/flood-for-transmission/ (index.html at that root).
+      - TRANSMISSION_WEB_HOME=/config/flood-for-transmission
     ports:
       - "192.168.7.152:9091:9091"     # RPC / web UI — Authelia via proxy01
       - "192.168.1.152:51413:51413"   # peer_port — UniFi port-forward target
 ```
+
+The web UI is still served by Transmission on `:9091` at `/transmission` — no extra
+proxy location or Authelia rule. To revert to the stock UI, remove
+`TRANSMISSION_WEB_HOME` and recreate the container. UI updates are manual (replace
+the extracted release files); they are not tied to Transmission image upgrades.
 
 Outbound tracker/DHT traffic uses Docker NAT via kif's default route (br0) — VLAN 4
 does not need a gateway. Set `port_forwarding_enabled: false` in Transmission
