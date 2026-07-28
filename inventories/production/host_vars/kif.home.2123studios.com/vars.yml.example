@@ -160,6 +160,8 @@ hypervisor_netplan_optional_nics:
   - ens5f1np1
   - eno1
   - eno2
+# Docker edge VLAN 4 — mirrored octet from 192.168.1.152 (L2-only, no gateway).
+hypervisor_netplan_br4_address: 192.168.7.152/24
 hypervisor_libvirt_pools_extra:
   - name: boot
     path: /var/lib/libvirt/boot
@@ -215,15 +217,26 @@ backup_docker_volumes:
     notes: Transmission settings — verify compose project prefix
 
 # --- Edge exposure — Docker host port firewall -----------------------------
-# Restrict published ports to the nginx reverse proxy (shell-clt01).
+# Proxy-facing ports bind on br4 (192.168.7.152) — reachable only from proxy01
+# docker NIC. Transmission peer port stays on VLAN 1 for Internet inbound.
 # Prevents LAN bypass of Authelia by hitting kif:PORT directly.
 docker_engine_manage_ufw: true
 docker_engine_ufw_edge_proxy_cidrs:
-  - 192.168.1.17/32   # shell-clt01.home.2123studios.com
-  # - 192.168.1.99/32 # edge keepalived VIP — add when Slice 28+ is deployed
+  - 192.168.7.23/32   # proxy01.home.2123studios.com (vlan4)
+  # - 192.168.7.99/32 # edge keepalived VIP on vlan4 — add when Slice 28+ is deployed
 docker_engine_ufw_published_ports:
   - 9191   # Authelia
   - 4080   # Guacamole
   - 8000   # Paperless
-  - 9091   # Transmission
+  - 9091   # Transmission RPC (Authelia-protected via proxy)
+  - 32400  # Plex
+docker_engine_ufw_allow_rules:
+  - port: 51413
+    proto: tcp
+    src: any
+    comment: transmission peer
+  - port: 51413
+    proto: udp
+    src: any
+    comment: transmission peer/DHT
 # docker_engine_ufw_default_deny stays false — kif also serves SMB/NFS/NUT on LAN.

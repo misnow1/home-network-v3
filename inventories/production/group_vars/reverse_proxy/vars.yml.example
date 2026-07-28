@@ -4,9 +4,12 @@
 #   cp inventories/production/group_vars/reverse_proxy/vars.yml.example \
 #      inventories/production/group_vars/reverse_proxy/vars.yml
 #
-# This reproduces the legacy bastion-el9 nginx layout on the Ubuntu bastion.
-# Issue the SAN certificate first with playbooks/certbot.yml (the reverse_proxy
-# host is in the certbot group; certbot_domains below must cover every FQDN).
+# Edge nginx on standalone proxy01 (dual-homed: VLAN 1 public + VLAN 4 docker).
+# Issue the SAN certificate first with playbooks/certbot.yml (proxy01 is in the
+# certbot group; certbot_domains below must cover every FQDN).
+#
+# Apply order on proxy01: baseline.yml → certbot.yml → reverse-proxy.yml
+# (no domain-join, no bastion.yml). See docs/reverse-proxy-runbook.md.
 
 # --- Certbot SAN certificate (DNS-01 via Dreamhost) --------------------------
 certbot_enabled: true
@@ -26,9 +29,16 @@ certbot_domains:
 
 # --- Reverse proxy -----------------------------------------------------------
 reverse_proxy_enabled: true
-reverse_proxy_authelia_url: http://kif.home.2123studios.com:9191
+# Docker VLAN 4 backend — kif br4 address (mirrored octet from 192.168.1.152).
+reverse_proxy_authelia_url: http://192.168.7.152:9191
 # All vhosts share the SAN cert lineage (matches certbot_domains[0]).
 reverse_proxy_cert_name: auth.2123studios.com
+
+# No proxy/load balancer sits in front of nginx; Internet and LAN clients reach
+# proxy01 directly. Keep nginx's X-Forwarded-For trust boundary empty so clients
+# cannot spoof their source address. Add CIDRs only when deploying an upstream
+# proxy whose forwarded headers nginx should trust.
+reverse_proxy_trusted_proxies: []
 
 # Brute-force throttling for auth portal and forward-auth subrequests.
 reverse_proxy_rate_limit_zones:
@@ -46,18 +56,18 @@ reverse_proxy_sites:
       - auth.2123studios.com
     locations:
       - path: /
-        proxy_pass: http://kif.home.2123studios.com:9191
+        proxy_pass: http://192.168.7.152:9191
         rate_limit:
           zone: auth_portal
           burst: 30
       - path: "= /api/verify"
-        proxy_pass: http://kif.home.2123studios.com:9191
+        proxy_pass: http://192.168.7.152:9191
         include_proxy_snippet: false
         rate_limit:
           zone: auth_portal
           burst: 20
       - path: /api/authz/
-        proxy_pass: http://kif.home.2123studios.com:9191
+        proxy_pass: http://192.168.7.152:9191
         include_proxy_snippet: false
         rate_limit:
           zone: auth_portal
@@ -71,7 +81,7 @@ reverse_proxy_sites:
       - path: "= /"
         return: "301 /guacamole/"
       - path: /guacamole
-        proxy_pass: http://kif.home.2123studios.com:4080/guacamole
+        proxy_pass: http://192.168.7.152:4080/guacamole
         auth_required: true
         websocket: true
         rate_limit:
@@ -79,13 +89,13 @@ reverse_proxy_sites:
           burst: 20
 
   # Paperless — no Authelia: Paperless-ngx iOS app cannot follow auth redirects.
-  # Relies on Paperless native login + nginx rate_limit; keep docker port bastion-only.
+  # Relies on Paperless native login + nginx rate_limit; backend on Docker VLAN only.
   - name: paperless.2123studios.com
     server_names:
       - paperless.2123studios.com
     locations:
       - path: /
-        proxy_pass: http://kif.home.2123studios.com:8000
+        proxy_pass: http://192.168.7.152:8000
         websocket: true
         rate_limit:
           zone: proxied_apps
@@ -100,7 +110,7 @@ reverse_proxy_sites:
     upstreams:
       - name: plex_backend
         servers:
-          - 192.168.1.152:32400
+          - 192.168.7.152:32400
         keepalive: 32
     extra_server_config: |
       proxy_set_header Host $host;
@@ -127,7 +137,7 @@ reverse_proxy_sites:
       - kif.2123studios.com
     locations:
       - path: /transmission
-        proxy_pass: http://kif.home.2123studios.com:9091/transmission
+        proxy_pass: http://192.168.7.152:9091/transmission
         auth_required: true
         rate_limit:
           zone: proxied_apps
@@ -135,7 +145,7 @@ reverse_proxy_sites:
         extra_config: |
           proxy_pass_header X-Transmission-Session-Id;
       - path: /guacamole
-        proxy_pass: http://kif.home.2123studios.com:4080/guacamole
+        proxy_pass: http://192.168.7.152:4080/guacamole
         auth_required: true
         websocket: true
         rate_limit:

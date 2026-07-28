@@ -201,15 +201,16 @@ email to `root` on package changes (`MailReport: on-change`). See
 
 ### Reverse proxy (`reverse_proxy`)
 
-**Playbook:** [`playbooks/reverse-proxy.yml`](../playbooks/reverse-proxy.yml) (run `baseline.yml` + `domain-join.yml` + `bastion.yml` + `certbot.yml` first)  
+**Playbook:** [`playbooks/reverse-proxy.yml`](../playbooks/reverse-proxy.yml) (run `baseline.yml` + `certbot.yml` first on proxy01)  
 **Role:** [`roles/reverse_proxy`](../roles/reverse_proxy/) — variable `reverse_proxy_packages`
 
 | Package | Purpose |
 |---|---|
 | `nginx` | Edge reverse proxy / TLS termination |
 
-Typically colocated on the bastion host. Serves data-driven, TLS-protected virtual hosts
-that proxy to Docker containers (on `kif`) and other LAN backends, with optional Authelia
+Runs on **proxy01** — a standalone dual-homed VM separate from the SSH bastion.
+Serves data-driven, TLS-protected virtual hosts that proxy to Docker containers on VLAN 4
+(`192.168.7.x` on kif) with optional Authelia
 forward-auth per location. Optional nginx rate limiting via
 `reverse_proxy_rate_limit_zones`. TLS uses a single Let's Encrypt SAN certificate issued by the
 [`certbot`](../roles/certbot/) role (DNS-01 via Dreamhost) and reloaded through the certbot
@@ -258,7 +259,7 @@ hosts. See [edge-access-model.md](edge-access-model.md).
 | DC | `linux_baseline` inline in DC playbooks; `security-updates.yml` for ongoing patching |
 | Hypervisor, fileserver, domain member | `baseline.yml` → `security-updates.yml` → role playbook |
 | Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` (includes `unattended_upgrades`) |
-| Reverse proxy | `baseline.yml` → `domain-join.yml` → `bastion.yml` → `certbot.yml` → `reverse-proxy.yml` |
+| Reverse proxy | `baseline.yml` → `certbot.yml` → `reverse-proxy.yml` (proxy01; no domain-join) |
 | CKA | `cka-converge.yml` (baseline + `cka_node`) |
 
 ## Overriding package lists

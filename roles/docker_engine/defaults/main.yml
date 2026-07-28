@@ -62,7 +62,7 @@ docker_engine_nvidia_auto_reboot: false
 # Opt-in UFW: restrict published Docker host ports to edge reverse-proxy hosts.
 # Prevents LAN clients from bypassing nginx Authelia by hitting kif:PORT directly.
 docker_engine_manage_ufw: false
-# Edge proxy host IPs/CIDRs (shell-clt01 today; add keepalived VIP when deployed).
+# Edge proxy host IPs/CIDRs (proxy01 docker NIC on vlan4).
 docker_engine_ufw_edge_proxy_cidrs: []
 # Published container ports reachable only from edge proxy CIDRs above.
 docker_engine_ufw_published_ports: []

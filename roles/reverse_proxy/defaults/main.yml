@@ -29,16 +29,19 @@ reverse_proxy_resolvers:
   - 192.168.1.22
 reverse_proxy_resolver_timeout: 10s
 
-# Networks trusted to set X-Forwarded-For (Authelia trusted proxies).
-reverse_proxy_trusted_proxies:
-  - 192.168.0.0/16
-  - fe80::/16
+# Upstream proxies/load balancers nginx trusts to supply X-Forwarded-For.
+# Leave empty when clients reach nginx directly (including through NAT).
+# This is an nginx real-ip trust boundary, not an Authelia setting.
+reverse_proxy_trusted_proxies: []
 
 # HSTS header applied to each TLS vhost (per-site override via `hsts`).
 reverse_proxy_hsts_enabled: true
 reverse_proxy_hsts_max_age: 63072000
 
-# TLS tuning (Mozilla intermediate).
+# TLS tuning (Mozilla intermediate). The distro nginx.conf sets ssl_protocols and
+# ssl_prefer_server_ciphers in the same http{} scope that includes conf.d, so the
+# role comments those out and keeps TLS policy in conf.d/ssl_params.conf.
+reverse_proxy_nginx_conf: /etc/nginx/nginx.conf
 reverse_proxy_ssl_protocols: TLSv1.2 TLSv1.3
 reverse_proxy_ssl_ciphers: >-
   ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
@@ -48,6 +51,9 @@ reverse_proxy_ssl_session_cache: shared:SSL:5m
 
 # Manage UFW rules for HTTP/HTTPS on the proxy host.
 reverse_proxy_manage_ufw: true
+
+# Standalone proxy hosts (no domain join) — deploy key-only sshd drop-in.
+reverse_proxy_manage_sshd: true
 
 # Rate limiting zones (http context). Reference from location.rate_limit.zone.
 # Example: { name: auth_portal, rate: 10r/s, size: 10m }

@@ -2,9 +2,10 @@
 # Configure the nginx + Authelia reverse proxy on edge proxy hosts.
 # Lab integration: scripts/test-integration.sh (member01.lab.test, INTEGRATION_SLICE=reverse_proxy).
 #
-# Prerequisites: baseline.yml + domain-join.yml + bastion.yml, and a TLS
-# certificate issued by playbooks/certbot.yml covering every proxied FQDN
-# (unless reverse_proxy_bootstrap_selfsigned is enabled for lab use).
+# Prerequisites: baseline.yml and a TLS certificate issued by playbooks/certbot.yml
+# covering every proxied FQDN (unless reverse_proxy_bootstrap_selfsigned is
+# enabled for lab use). Production proxy01 is standalone — no domain-join or
+# bastion.yml. Lab member01 may still use domain-join for integration tests.
 #
 # Safety: refuses production inventory unless -e allow_production=true.
 

@@ -52,8 +52,8 @@ workflow so MAC and reservation stay aligned.
 
 ## Production apply
 
-Production bastion host: **shell-clt01.home.2123studios.com** (also in `reverse_proxy`
-and `certbot` groups). Template examples use `bastion.example.home`.
+Production bastion host: **shell-clt01.home.2123studios.com** (SSH jump only — nginx
+and certbot moved to **proxy01**). Template examples use `bastion.example.home`.
 
 ```bash
 PROD='./scripts/prod-run.sh --confirm-production --'

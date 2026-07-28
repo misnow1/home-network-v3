@@ -42,7 +42,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 
 | Priority | Slice | Name | Status | Notes |
 |---|---|---|---|---|
-| 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | Data-driven `reverse_proxy` role; SAN cert via certbot DNS-01; Authelia forward-auth; rate limits — [reverse-proxy-runbook.md](reverse-proxy-runbook.md), [edge-access-model.md](edge-access-model.md) |
+| 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | proxy01 VM + VLAN 4 docker edge; split from bastion — [reverse-proxy-runbook.md](reverse-proxy-runbook.md), [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md), [edge-access-model.md](edge-access-model.md) |
 | 2 | 23 | Restic scheduling + offsite copy | **in progress** | systemd timer, prune, `/archive/restic/` mirror on kif; quarterly restore drill — [backup-runbook.md](backup-runbook.md) |
 
 ## Active — automation backlog (post-reimage)

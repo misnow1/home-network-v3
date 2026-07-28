@@ -11,6 +11,7 @@
     rp_playbook: "{{ repo_root }}/playbooks/reverse-proxy.yml"
     rp_runbook: "{{ repo_root }}/docs/reverse-proxy-runbook.md"
     rp_example: "{{ repo_root }}/inventories/production/group_vars/reverse_proxy/vars.yml.example"
+    rp_proxy_template: "{{ repo_root }}/roles/reverse_proxy/templates/proxy.conf.j2"
     certbot_defaults: "{{ repo_root }}/roles/certbot/defaults/main.yml"
     certbot_hook: "{{ repo_root }}/roles/certbot/templates/reload-services.sh.j2"
     prod_hosts_example: "{{ repo_root }}/inventories/production/hosts.yml.example"
@@ -28,6 +29,8 @@
         - "{{ repo_root }}/roles/reverse_proxy/tasks/certs.yml"
         - "{{ repo_root }}/roles/reverse_proxy/tasks/sites.yml"
         - "{{ repo_root }}/roles/reverse_proxy/tasks/ufw.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/tasks/sshd.yml"
+        - "{{ repo_root }}/roles/reverse_proxy/templates/99-reverse-proxy.conf.j2"
         - "{{ repo_root }}/roles/reverse_proxy/templates/site.conf.j2"
         - "{{ repo_root }}/roles/reverse_proxy/templates/proxy.conf.j2"
         - "{{ repo_root }}/roles/reverse_proxy/templates/ssl_params.conf.j2"
@@ -64,6 +67,18 @@
         grep -q 'reverse_proxy_sites:' "{{ rp_defaults }}"
         grep -q 'reverse_proxy_require_cert:' "{{ rp_defaults }}"
         grep -q 'reverse_proxy_bootstrap_selfsigned:' "{{ rp_defaults }}"
+        grep -q 'reverse_proxy_manage_sshd:' "{{ rp_defaults }}"
+        grep -q '^reverse_proxy_trusted_proxies: \[\]$' "{{ rp_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Reverse proxy | assert forwarded-header trust boundary is fail-closed
+      ansible.builtin.shell: |
+        grep -qF 'proxy_set_header X-Forwarded-For $remote_addr;' "{{ rp_proxy_template }}"
+        ! grep -qF 'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' "{{ rp_proxy_template }}"
+        grep -q 'set_real_ip_from' "{{ rp_proxy_template }}"
+        grep -q '^reverse_proxy_trusted_proxies: \[\]$' "{{ rp_example }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -91,7 +106,10 @@
     - name: Reverse proxy | assert production example defines the group and certbot membership
       ansible.builtin.shell: |
         grep -q '^    reverse_proxy:' "{{ prod_hosts_example }}"
+        grep -q 'proxy01.example.home' "{{ prod_hosts_example }}"
+        grep -q 'vlan4' "{{ prod_hosts_example }}"
         grep -q 'reverse_proxy_authelia_url' "{{ rp_example }}"
+        grep -q '192.168.7.152' "{{ rp_example }}"
         grep -q 'certbot_domains' "{{ rp_example }}"
       args:
         executable: /bin/bash

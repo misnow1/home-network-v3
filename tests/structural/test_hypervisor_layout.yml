@@ -171,3 +171,13 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+    - name: Hypervisor | assert VLAN 4 docker edge network in production example
+      ansible.builtin.shell: |
+        grep -q 'vlan4' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q 'br4' "{{ repo_root }}/inventories/production/group_vars/hypervisors/vars.yml.example" &&
+        grep -q "bridge_name == 'br4'" "{{ hypervisor_role }}/templates/netplan.yaml.j2" &&
+        grep -q 'hypervisor_netplan_br4_address' "{{ libvirt_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

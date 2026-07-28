@@ -1,0 +1,10 @@
+---
+- name: Reverse proxy | Deploy sshd drop-in configuration
+  ansible.builtin.template:
+    src: 99-reverse-proxy.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-reverse-proxy.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart ssh
+  tags: [reverse_proxy_sshd]

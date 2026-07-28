@@ -1,16 +1,17 @@
 # Edge access model
 
-Public exposure decisions for services proxied through **shell-clt01** (bastion +
-reverse proxy). Complements [reverse-proxy-runbook.md](reverse-proxy-runbook.md) and
+Public exposure decisions for services proxied through **proxy01** (reverse proxy) and
+**shell-clt01** (SSH bastion). Complements [reverse-proxy-runbook.md](reverse-proxy-runbook.md) and
 [authelia-runbook.md](authelia-runbook.md).
 
 ## Principles
 
-1. **Internet-facing surface stays thin** — only SSH (22) and HTTPS (443) on the edge host.
+1. **Internet-facing surface stays thin** — SSH (22) on shell-clt01; HTTP/HTTPS (80/443) on proxy01.
 2. **Authelia before apps** — admin and data apps require forward-auth unless the app
    provides equivalent auth and public access is intentional.
-3. **Backends not directly reachable** — Docker host ports on kif are UFW-restricted to
-   the reverse-proxy host(s) only (`docker_engine_manage_ufw`).
+3. **Proxy backends on VLAN 4** — Docker host ports for proxied apps bind on kif br4
+   (`192.168.7.152`) and are UFW-restricted to proxy01's docker NIC only
+   (`docker_engine_manage_ufw`).
 4. **Recoverability beats obscurity** — scheduled restic + offsite copy (see
    [backup-runbook.md](backup-runbook.md)) is the primary ransomware control.
 
@@ -19,7 +20,7 @@ reverse proxy). Complements [reverse-proxy-runbook.md](reverse-proxy-runbook.md)
 | Service | FQDN / path | Auth | Rationale |
 |---|---|---|---|
 | Authelia portal | `auth.2123studios.com` | Login portal itself | Required for SSO |
-| Paperless | `paperless.2123studios.com` | Paperless native login | iOS Paperless-ngx app cannot follow Authelia redirects; rate-limited; backend port bastion-only |
+| Paperless | `paperless.2123studios.com` | Paperless native login | iOS Paperless-ngx app cannot follow Authelia redirects; rate-limited; backend on VLAN 4 only |
 | Plex | `plex.2123studios.com` | Plex native auth | Remote streaming for household; large app surface — monitor updates |
 | SSH jump | `:22` on shell-clt01 | Kerberos/GSSAPI only | Admin access; fail2ban + no passwords |
 
@@ -28,10 +29,23 @@ reverse proxy). Complements [reverse-proxy-runbook.md](reverse-proxy-runbook.md)
 | Service | FQDN / path | Notes |
 |---|---|---|
 | Guacamole | `guacamole.2123studios.com`, `bastion.2123studios.com/guacamole`, `kif.2123studios.com/guacamole` | Remote desktop — high risk; MFA recommended |
-| Transmission | `bastion.2123studios.com/transmission`, `kif.2123studios.com/transmission` | BitTorrent UI |
+| Transmission | `bastion.2123studios.com/transmission`, `kif.2123studios.com/transmission` | BitTorrent UI (RPC on VLAN 4; peer port on VLAN 1) |
 
 Access rules live in Authelia `configuration.yml` on kif — see
 [authelia-runbook.md](authelia-runbook.md#access-control-for-proxied-apps).
+
+## Transmission exception (Internet peer port)
+
+Transmission needs outbound Internet (trackers/DHT via Docker NAT on br0) and inbound
+peer connections (UniFi port-forward to kif VLAN 1). The web UI/RPC stays proxy-only
+on VLAN 4:
+
+| Port | Bind address | Exposure |
+|---|---|---|
+| 9091 (RPC) | `192.168.7.152` | proxy01 only (Authelia) |
+| 51413 (peer) | `192.168.1.152` | Internet via UniFi forward |
+
+VLAN 4 remains L2-only (no gateway) — see [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md).
 
 ## VPN-preferred (future tightening)
 
@@ -55,7 +69,8 @@ Implementation when tightening:
 | Capability | Host | Exposure |
 |---|---|---|
 | Samba / NFS data | kif | LAN only (`192.168.1.0/24`, Kerberos) |
-| Docker backends | kif | LAN, restricted to reverse-proxy IP via UFW |
+| Docker proxy backends | kif | VLAN 4 only (`192.168.7.152`), proxy01 via UFW |
+| Transmission peer port | kif | VLAN 1 (`192.168.1.152:51413`), Internet forward |
 | AD / LDAP | dc1/dc2 + VIP | LAN only |
 | Mail relay | mail/mail2 | Submission from LAN |
 
@@ -63,11 +78,11 @@ Implementation when tightening:
 
 | Control | Where |
 |---|---|
-| nginx TLS + rate limits | `roles/reverse_proxy`, `reverse_proxy_rate_limit_zones` |
+| nginx TLS + rate limits | `roles/reverse_proxy` on proxy01, `reverse_proxy_rate_limit_zones` |
 | Authelia forward-auth | `auth_required: true` in `reverse_proxy_sites` |
 | kif Docker port firewall | `docker_engine_manage_ufw` in kif host_vars |
 | Scheduled backups + offsite | `roles/backup`, kif host_vars |
-| SSH hardening | `roles/bastion` |
+| SSH hardening | `roles/bastion` on shell-clt01 |
 
 ## Review cadence
 
