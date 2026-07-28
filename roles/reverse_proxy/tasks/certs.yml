@@ -7,41 +7,54 @@
   loop_control:
     label: "{{ item }}"
 
-- name: Reverse proxy | Generate self-signed bootstrap certificates (lab only)
+# Ansible blocks cannot take a loop, so the bootstrap steps loop individually
+# over the stat results rather than sharing one block-level loop.
+- name: Reverse proxy | Ensure live directory exists for bootstrap cert (lab only)
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ reverse_proxy_cert_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
   when:
     - reverse_proxy_bootstrap_selfsigned | bool
     - not (item.stat.exists | default(false))
     - not ansible_check_mode
+
+- name: Reverse proxy | Create self-signed bootstrap certificate (lab only)
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048
+      -keyout {{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/privkey.pem
+      -out {{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/fullchain.pem
+      -days {{ reverse_proxy_selfsigned_days }}
+      -subj "/CN={{ item.item }}"
+      -addext "subjectAltName=DNS:{{ item.item }}"
+    creates: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/fullchain.pem"
   loop: "{{ reverse_proxy_cert_stat.results }}"
   loop_control:
     label: "{{ item.item }}"
-  block:
-    - name: Reverse proxy | Ensure live directory exists for bootstrap cert
-      ansible.builtin.file:
-        path: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
+  when:
+    - reverse_proxy_bootstrap_selfsigned | bool
+    - not (item.stat.exists | default(false))
+    - not ansible_check_mode
 
-    - name: Reverse proxy | Create self-signed bootstrap certificate
-      ansible.builtin.command:
-        cmd: >-
-          openssl req -x509 -nodes -newkey rsa:2048
-          -keyout {{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/privkey.pem
-          -out {{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/fullchain.pem
-          -days {{ reverse_proxy_selfsigned_days }}
-          -subj "/CN={{ item.item }}"
-          -addext "subjectAltName=DNS:{{ item.item }}"
-      args:
-        creates: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/fullchain.pem"
-
-    - name: Reverse proxy | Restrict bootstrap private key permissions
-      ansible.builtin.file:
-        path: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/privkey.pem"
-        owner: root
-        group: root
-        mode: "0600"
+- name: Reverse proxy | Restrict bootstrap private key permissions (lab only)
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_letsencrypt_live }}/{{ item.item }}/privkey.pem"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ reverse_proxy_cert_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - reverse_proxy_bootstrap_selfsigned | bool
+    - not (item.stat.exists | default(false))
+    - not ansible_check_mode
 
 - name: Reverse proxy | Re-stat certificate lineages after bootstrap
   ansible.builtin.stat:

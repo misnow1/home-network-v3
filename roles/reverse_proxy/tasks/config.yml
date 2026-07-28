@@ -35,6 +35,13 @@
     group: root
     mode: "0644"
 
+- name: Reverse proxy | Comment out distro TLS directives in nginx.conf
+  ansible.builtin.replace:
+    path: "{{ reverse_proxy_nginx_conf }}"
+    regexp: '^(\s*)(ssl_protocols|ssl_prefer_server_ciphers)(\s+[^;]*;.*)$'
+    replace: '\1# \2\3'
+  notify: reload nginx
+
 - name: Reverse proxy | Deploy TLS parameters snippet
   ansible.builtin.template:
     src: ssl_params.conf.j2

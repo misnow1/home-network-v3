@@ -38,7 +38,10 @@ reverse_proxy_trusted_proxies:
 reverse_proxy_hsts_enabled: true
 reverse_proxy_hsts_max_age: 63072000
 
-# TLS tuning (Mozilla intermediate).
+# TLS tuning (Mozilla intermediate). The distro nginx.conf sets ssl_protocols and
+# ssl_prefer_server_ciphers in the same http{} scope that includes conf.d, so the
+# role comments those out and keeps TLS policy in conf.d/ssl_params.conf.
+reverse_proxy_nginx_conf: /etc/nginx/nginx.conf
 reverse_proxy_ssl_protocols: TLSv1.2 TLSv1.3
 reverse_proxy_ssl_ciphers: >-
   ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
