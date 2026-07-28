@@ -64,8 +64,10 @@ hypervisor_netplan_uplink: ""
 hypervisor_netplan_optional_nics: []
 hypervisor_netplan_vlans: []
 hypervisor_netplan_bridges: {}
-# Production br0/br3 use hypervisor_netplan_uplink when interfaces are omitted:
-#   br0 -> [uplink] with dhcp4: true; br3 -> [uplink.3] with no address.
+# Production br0/br3/br4 use hypervisor_netplan_uplink when interfaces are omitted:
+#   br0 -> [uplink] with dhcp4: true; br3/br4 -> [uplink.N] with no address.
+# br4 static address (Docker edge VLAN) — set per host, e.g. 192.168.7.152/24.
+hypervisor_netplan_br4_address: ""
 # Pin br0's MAC to the uplink NIC (per host) so the DHCP reservation keeps the same
 # IP after the uplink is enslaved into br0. Empty = let networkd derive br0's MAC.
 # Set in host_vars: `ip link show <uplink>` -> link/ether. Overridden by an explicit

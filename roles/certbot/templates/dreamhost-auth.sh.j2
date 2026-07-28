@@ -12,7 +12,8 @@ source "${ENV_FILE}"
 
 PROPAGATION_SECONDS="${DREAMHOST_PROPAGATION_SECONDS:-120}"
 POLL_INTERVAL="${DREAMHOST_PROPAGATION_POLL_INTERVAL:-10}"
-VALIDATION_RESOLVERS="${DREAMHOST_VALIDATION_RESOLVERS:-8.8.8.8 1.1.1.1 ns1.dreamhost.com ns2.dreamhost.com ns3.dreamhost.com}"
+SETTLE_SECONDS="${DREAMHOST_PROPAGATION_SETTLE_SECONDS:-15}"
+VALIDATION_RESOLVERS="${DREAMHOST_VALIDATION_RESOLVERS:-ns1.dreamhost.com ns2.dreamhost.com ns3.dreamhost.com}"
 RECORD="_acme-challenge.${CERTBOT_DOMAIN}"
 UNIQUE_ID="$(uuidgen)"
 tmp_body="$(mktemp)"
@@ -39,23 +40,37 @@ if [[ "${http_code}" != "200" ]] || ! grep -q '"result"[[:space:]]*:[[:space:]]*
   exit 1
 fi
 
-echo "Dreamhost TXT added for ${RECORD}; polling public resolvers (up to ${PROPAGATION_SECONDS}s)"
+echo "Dreamhost TXT added for ${RECORD}; polling ${VALIDATION_RESOLVERS} (up to ${PROPAGATION_SECONDS}s)"
 
 deadline=$(( $(date +%s) + PROPAGATION_SECONDS ))
 while true; do
+  # Every resolver must agree. Dreamhost's nameservers sync the zone
+  # independently, and Let's Encrypt may query whichever one is still stale, so
+  # returning on the first hit yields NXDOMAIN at validation time.
+  missing=""
   for resolver in ${VALIDATION_RESOLVERS}; do
+    # +noall +answer keeps dig's command echo and question section out of the
+    # parse; a name can hold several challenge TXTs, so match any of them.
     txt="$(
-      dig +search=0 +retry=0 +time=3 +tries=1 @"${resolver}" "${RECORD}" TXT 2>/dev/null \
-        | awk -F'"' '/TXT/ { print $2; exit }'
-    )"
-    if [[ "${txt}" == "${CERTBOT_VALIDATION}" ]]; then
-      echo "TXT visible via ${resolver}"
-      exit 0
+      dig +noall +answer +nosearch +retry=0 +time=3 +tries=1 \
+        @"${resolver}" "${RECORD}" TXT 2>/dev/null \
+        | awk -F'"' 'NF >= 2 { print $2 }'
+    )" || txt=""
+    if ! grep -qxF -- "${CERTBOT_VALIDATION}" <<<"${txt}"; then
+      missing="${missing} ${resolver}"
     fi
   done
 
+  if [[ -z "${missing}" ]]; then
+    echo "TXT visible via all resolvers (${VALIDATION_RESOLVERS})"
+    # Let the last resolver's answer age past any in-flight negative cache
+    # entry before handing control back to certbot.
+    sleep "${SETTLE_SECONDS}"
+    exit 0
+  fi
+
   if (( $(date +%s) >= deadline )); then
-    echo "ERROR: TXT for ${RECORD} not visible via ${VALIDATION_RESOLVERS} after ${PROPAGATION_SECONDS}s." >&2
+    echo "ERROR: TXT for ${RECORD} not visible via${missing} after ${PROPAGATION_SECONDS}s." >&2
     echo "Dreamhost panel may show the record; verify from another host:" >&2
     echo "  dig @8.8.8.8 ${RECORD} TXT +short" >&2
     echo "  dig @ns1.dreamhost.com ${RECORD} TXT +short" >&2

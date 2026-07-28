@@ -35,6 +35,11 @@
   ansible.builtin.include_tasks: packages.yml
   tags: [reverse_proxy, reverse_proxy_packages]
 
+- name: Reverse proxy | Harden sshd for standalone hosts
+  ansible.builtin.include_tasks: sshd.yml
+  when: reverse_proxy_manage_sshd | bool
+  tags: [reverse_proxy, reverse_proxy_sshd]
+
 - name: Reverse proxy | Deploy shared configuration and snippets
   ansible.builtin.include_tasks: config.yml
   tags: [reverse_proxy, reverse_proxy_config]

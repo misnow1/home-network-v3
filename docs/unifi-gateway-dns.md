@@ -383,6 +383,22 @@ FerryCrossing has multiple VLANs. BIND ACLs on every DC (`dc_trusted_networks` i
 
 MS-SNTP from DCs remains VLAN 1 only (`dc_ntp_allow_cidr`); IoT uses router or public NTP.
 
+| 3 (restricted) | `192.168.5.0/24` | Router/public only | **Isolated** — not in `dc_trusted_networks` |
+| 4 (docker edge) | `192.168.7.0/24` | **None** (L2 trunk only) | Hypervisor br4 + proxy01 docker NIC; not in AD |
+
+### VLAN 4 (Docker edge)
+
+L2-only VLAN for reverse-proxy backends — **no gateway, DHCP, or DNS** on UniFi:
+
+1. UniFi Network → **Settings** → **Networks** → create VLAN **4**.
+2. Set subnet `192.168.7.0/24` but **disable** DHCP and **do not** assign a gateway.
+3. Tag VLAN 4 on hypervisor switch ports (kif, kvm01 uplinks).
+4. Static addresses are configured in Ansible/netplan and proxy01 cloud-init — see
+   [hypervisor-runbook.md](hypervisor-runbook.md#vlan-4--docker-edge-network-br4).
+
+Do not add `192.168.7.0/24` to DC ACLs, AD site subnets, or Pi-hole zones unless a
+future design explicitly requires it.
+
 ### VLAN 3 (restricted)
 
 No changes — clients do not query AD DNS. Do not add `192.168.5.0/24` to DC ACLs or

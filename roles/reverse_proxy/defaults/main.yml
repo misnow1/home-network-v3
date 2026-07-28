@@ -49,6 +49,9 @@ reverse_proxy_ssl_session_cache: shared:SSL:5m
 # Manage UFW rules for HTTP/HTTPS on the proxy host.
 reverse_proxy_manage_ufw: true
 
+# Standalone proxy hosts (no domain join) — deploy key-only sshd drop-in.
+reverse_proxy_manage_sshd: true
+
 # Rate limiting zones (http context). Reference from location.rate_limit.zone.
 # Example: { name: auth_portal, rate: 10r/s, size: 10m }
 reverse_proxy_rate_limit_zones: []

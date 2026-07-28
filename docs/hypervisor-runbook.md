@@ -43,7 +43,8 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_enabled` | `true` | Master gate — set in `group_vars/hypervisors` for production |
 | `hypervisor_netplan_enabled` | `false` | Enable host bridge/VLAN netplan |
 | `hypervisor_netplan_bridges` | `{}` | Per-bridge config; production uses `dhcp4: true` on br0 |
-| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`) |
+| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`, `vlan4`) |
+| `hypervisor_netplan_br4_address` | `""` | Static br4 address per host (e.g. `192.168.7.152/24`) |
 | `hypervisor_libvirt_pools` | `default`, `vms` | Base dir pools |
 | `hypervisor_libvirt_pools_extra` | `[]` | Host-specific pools (e.g. kif `boot`) |
 | `hypervisor_libvirt_users` | `[ansible]` | Users in `libvirt`/`kvm` groups |
@@ -165,7 +166,29 @@ reformatted. See [`roles/docker_engine`](../roles/docker_engine/) and
 Production bridge networks and netplan (including DHCP on br0 and DNS search domain on
 br0 via `vm_dns_search`) are set in
 [`inventories/production/group_vars/hypervisors/`](../inventories/production/group_vars/hypervisors/vars.yml.example).
-Per-host `host_vars` set `hypervisor_netplan_uplink` and optional NICs only.
+Per-host `host_vars` set `hypervisor_netplan_uplink`, optional NICs, and
+`hypervisor_netplan_br4_address`.
+
+### VLAN 4 — Docker edge network (br4)
+
+VLAN 4 (`192.168.7.0/24`) is an **L2-only** segment for proxy-facing Docker backends.
+It extends across kif and kvm01 via tagged trunks — **no UniFi gateway, DHCP, or DNS**.
+
+| Host | br4 address | libvirt network |
+|---|---|---|
+| kif | `192.168.7.152/24` | `vlan4` → `br4` |
+| kvm01 | `192.168.7.21/24` | `vlan4` → `br4` |
+| proxy01 (VM) | `192.168.7.23/24` | second NIC on `vlan4` |
+
+Set the static address per hypervisor in `host_vars`:
+
+```yaml
+hypervisor_netplan_br4_address: 192.168.7.152/24   # kif — mirrored from 192.168.1.152
+```
+
+UniFi: create VLAN 4, tag hypervisor uplinks, **do not** assign a gateway or DHCP pool.
+See [unifi-gateway-dns.md](unifi-gateway-dns.md#vlan-4-docker-edge) and
+[adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md).
 
 ### Netplan apply and bridge MAC / DHCP reservation
 

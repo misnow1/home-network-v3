@@ -29,6 +29,8 @@ network:
       interfaces: {{ [hypervisor_netplan_uplink] | to_json }}
 {% elif bridge_name == 'br3' %}
       interfaces: {{ [hypervisor_netplan_uplink ~ '.3'] | to_json }}
+{% elif bridge_name == 'br4' %}
+      interfaces: {{ [hypervisor_netplan_uplink ~ '.4'] | to_json }}
 {% else %}
       interfaces: {{ bridge.interfaces | default([]) | to_json }}
 {% endif %}
@@ -36,7 +38,9 @@ network:
 {% if _bridge_mac %}
       macaddress: {{ _bridge_mac }}
 {% endif %}
-{% if bridge.addresses is defined and bridge.addresses | length > 0 %}
+{% if bridge_name == 'br4' and hypervisor_netplan_br4_address | default('') %}
+      addresses: {{ [hypervisor_netplan_br4_address] | to_json }}
+{% elif bridge.addresses is defined and bridge.addresses | length > 0 %}
       addresses: {{ bridge.addresses | to_json }}
 {% endif %}
 {% if bridge.dhcp4 is defined %}

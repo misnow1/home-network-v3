@@ -1,0 +1,18 @@
+---
+# proxy01 — standalone edge reverse proxy (no domain join).
+#
+#   mkdir -p inventories/production/host_vars/proxy01.home.2123studios.com
+#   cp inventories/production/host_vars/proxy01.home.2123studios.com/vars.yml.example \
+#      inventories/production/host_vars/proxy01.home.2123studios.com/vars.yml
+#
+# Apply order: baseline.yml → certbot.yml → reverse-proxy.yml
+# Site + certbot settings: inventories/production/group_vars/reverse_proxy/vars.yml
+#
+# VM: dual-homed on kvm01 (external-default + vlan4). Create with:
+#   ./scripts/vm/vm-create.sh -i production --prepare proxy01.home.2123studios.com
+
+# Console break-glass root password (vault_root_password). Does not enable SSH root.
+linux_baseline_root_console_enabled: true
+
+# Standalone sshd hardening (key-only) — see roles/reverse_proxy/tasks/sshd.yml.
+reverse_proxy_manage_sshd: true

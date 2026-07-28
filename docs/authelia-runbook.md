@@ -82,7 +82,7 @@ access_control:
 
 Paperless stays **out** of Authelia: the Paperless-ngx iOS app does not support auth
 redirects. Rely on Paperless native credentials, nginx rate limits, and kif Docker
-port UFW (bastion-only). See [edge-access-model.md](edge-access-model.md).
+port UFW (proxy-only on VLAN 4). See [edge-access-model.md](edge-access-model.md).
 
 Apply on kif:
 
@@ -130,6 +130,56 @@ Alternatively use plain SMTP on port 587 with TLS:
 ```
 
 Test notifier after change (Authelia admin UI or trigger a password reset flow).
+
+## Docker Compose port bindings (VLAN 4)
+
+Proxy-facing containers publish ports on kif's **Docker VLAN** address only
+(`192.168.7.152`, br4). nginx on **proxy01** reaches backends over vlan4
+(`192.168.7.23` → `192.168.7.152`). See [edge-access-model.md](edge-access-model.md).
+
+```yaml
+# /srv/docker/authelia/docker-compose.yml (example)
+services:
+  authelia:
+    ports:
+      - "192.168.7.152:9191:9091"
+```
+
+Apply the same pattern for Guacamole, Paperless, and Plex. **Transmission** splits
+RPC (proxy-only) from peer traffic (Internet):
+
+```yaml
+# /srv/docker/transmission/docker-compose.yml (example)
+services:
+  transmission:
+    ports:
+      - "192.168.7.152:9091:9091"     # RPC / web UI — Authelia via proxy01
+      - "192.168.1.152:51413:51413"   # peer_port — UniFi port-forward target
+```
+
+Outbound tracker/DHT traffic uses Docker NAT via kif's default route (br0) — VLAN 4
+does not need a gateway. Set `port_forwarding_enabled: false` in Transmission
+settings; use explicit UniFi forwards to `192.168.1.152:51413` instead of UPnP.
+See [Transmission config](https://github.com/transmission/transmission/blob/main/docs/Editing-Configuration-Files.md)
+for `rpc_bind_address` / `bind_address_ipv4` when using `network_mode: host`.
+
+## Trusted proxies
+
+Add proxy01's docker NIC to Authelia `configuration.yml` so forward-auth sees
+correct client IPs:
+
+```yaml
+identity_validation:
+  reset_password:
+    jwt_secret: '...'
+# ...
+# Under server / session trusted proxies (Authelia 4.x location varies):
+# trusted_proxies:
+#   - 192.168.7.23/32
+```
+
+Consult the Authelia version docs for the exact key path. Add the keepalived VIP
+on vlan4 when edge HA (Slice 28+) is deployed.
 
 ## Session / Redis
 

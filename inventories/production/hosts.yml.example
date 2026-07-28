@@ -60,11 +60,22 @@ all:
           vm_name: bastion-example-home
           # Omitted ethernets defaults to one dual-stack DHCP NIC on vm_network.
 
-    # Edge nginx + Authelia reverse proxy. Typically the bastion host.
+    # Edge nginx reverse proxy — standalone proxy01 (not the bastion).
     # Site definitions live in group_vars/reverse_proxy/vars.yml.
     reverse_proxy:
       hosts:
-        bastion.example.home:
+        proxy01.example.home:
+          ansible_host: 203.0.113.23
+          vm_name: proxy01-example-home
+          vm_memory_mb: 2048
+          vm_disk_gb: 16
+          ethernets:
+            - network: external-default
+              dhcp4: true
+              dhcp6: true
+            - network: vlan4
+              addresses:
+                - 192.168.7.23/24
 
     mail_relay:
       hosts:
@@ -135,12 +146,13 @@ all:
         mail_relay:
       hosts:
         # Reverse proxy needs a SAN cert for every proxied FQDN (DNS-01 Dreamhost).
-        bastion.example.home:
+        proxy01.example.home:
 
     linux:
       children:
         dc:
         bastion:
+        reverse_proxy:
         mail_relay:
         hypervisors:
         fileservers:
