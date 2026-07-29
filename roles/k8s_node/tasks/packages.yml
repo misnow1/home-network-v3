@@ -1,4 +1,10 @@
 ---
+- name: Kubernetes node | Install kubeadm preflight dependencies
+  ansible.builtin.apt:
+    name: "{{ k8s_preflight_packages }}"
+    state: present
+  tags: [k8s_node, k8s_packages]
+
 - name: Kubernetes node | Install Kubernetes packages
   ansible.builtin.apt:
     name: "{{ k8s_kubernetes_packages }}"

@@ -6,8 +6,9 @@
     daemon_reload: true
 
 - name: Reload kernel modules
-  ansible.builtin.command: systemd-modules-load
-  changed_when: false
+  ansible.builtin.systemd:
+    name: systemd-modules-load
+    state: restarted
 
 - name: Apply sysctl
   ansible.builtin.command: sysctl --system

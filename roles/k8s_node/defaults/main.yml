@@ -13,6 +13,17 @@ k8s_kubernetes_packages:
   - kubeadm
   - kubectl
 
+# kubeadm preflight FileExisting-* checks. conntrack is a fatal failure on a
+# minimal Ubuntu server install; the rest are preflight warnings or needed by
+# kube-proxy and `kubectl port-forward` at runtime.
+k8s_preflight_packages:
+  - conntrack
+  - ebtables
+  - ethtool
+  - iproute2
+  - iptables
+  - socat
+
 # Hold kubelet/kubeadm/kubectl at the installed version until deliberate upgrade.
 k8s_kubernetes_package_hold: true
 

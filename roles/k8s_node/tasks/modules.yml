@@ -21,9 +21,11 @@
   notify: Reload kernel modules
   tags: [k8s_node, k8s_modules]
 
+# br_netfilter must be loaded before sysctl.yml — net.bridge.* keys do not exist until then.
 - name: Kubernetes node | Load kernel modules now
-  ansible.builtin.command: "modprobe {{ item }}"
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
   loop: "{{ k8s_kernel_modules }}"
-  changed_when: false
-  failed_when: false
+  when: not ansible_check_mode
   tags: [k8s_node, k8s_modules]

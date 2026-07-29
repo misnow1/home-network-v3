@@ -242,6 +242,8 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 | `kubelet` | Kubernetes node agent |
 | `kubeadm` | Cluster bootstrap CLI |
 | `kubectl` | Kubernetes admin CLI |
+| `conntrack` | Required by kube-proxy; fatal `kubeadm init` preflight check |
+| `ebtables`, `ethtool`, `iproute2`, `iptables`, `socat` | Remaining kubeadm preflight dependencies (`k8s_preflight_packages`) |
 
 Nodes also receive baseline packages, swap disabled, kernel modules (`overlay`,
 `br_netfilter`), and sysctl for forwarding/bridge netfilter. Optional local operator

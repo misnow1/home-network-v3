@@ -270,6 +270,8 @@ Deploy **Uptime Kuma** (or similar) with:
 | Symptom | Check |
 |---|---|
 | `kubeadm init` fails on swap | `swapon --show`; rerun `k8s-node-prep.yml` |
+| `ERROR FileExisting-conntrack` | Rerun `k8s-node-prep.yml` — `k8s_preflight_packages` installs it |
+| Warning: sandbox image `""` inconsistent with kubeadm | Cosmetic. kubeadm 1.31 reads `sandboxImage` from the CRI runtime status, which containerd 2.x no longer reports there. Confirm with `containerd config dump \| grep -A2 pinned_images` (expect `sandbox = 'registry.k8s.io/pause:3.10'`) |
 | Nodes NotReady | Calico pods, `journalctl -u kubelet` |
 | MetalLB VIP unreachable from proxy01 | UniFi firewall VLAN 1→9, ARP on VLAN 9 |
 | Ingress 502 from proxy01 | `kubectl get svc -n ingress-nginx`, VIP matches pool |
