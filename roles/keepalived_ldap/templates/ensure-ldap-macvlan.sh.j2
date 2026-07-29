@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Ensure macvlan {{ ldap_vip_device }} exists on parent {{ ldap_vip_interface }}.
+# VIP lives here so Samba can bind the parent NIC by name without seeing the VIP.
+set -euo pipefail
+
+PARENT="{{ ldap_vip_interface }}"
+DEV="{{ ldap_vip_device }}"
+
+if [[ ! -d "/sys/class/net/${PARENT}" ]]; then
+  echo "parent interface ${PARENT} not present" >&2
+  exit 1
+fi
+
+# VIP-only interface: keepalived owns every address here. Refuse RA/SLAAC so a
+# dynamic ISP GUA never lands on the device and outlives the current prefix.
+harden_ipv6() {
+  sysctl -qw "net.ipv6.conf.${DEV}.accept_ra=0" || true
+  sysctl -qw "net.ipv6.conf.${DEV}.autoconf=0" || true
+  ip -6 addr flush dev "${DEV}" scope global dynamic 2>/dev/null || true
+}
+
+if [[ -d "/sys/class/net/${DEV}" ]]; then
+  link_info="$(ip -d link show dev "${DEV}" 2>/dev/null || true)"
+  if ! grep -q "macvlan" <<<"${link_info}"; then
+    echo "${DEV} exists but is not a macvlan — refusing to replace" >&2
+    exit 1
+  fi
+  harden_ipv6
+  ip link set "${DEV}" up
+  exit 0
+fi
+
+ip link add link "${PARENT}" name "${DEV}" type macvlan mode bridge
+harden_ipv6
+ip link set "${DEV}" up

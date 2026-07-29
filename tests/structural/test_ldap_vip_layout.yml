@@ -25,6 +25,8 @@
         - "{{ repo_root }}/roles/keepalived_ldap/templates/keepalived.conf.j2"
         - "{{ repo_root }}/roles/keepalived_ldap/templates/check_ldaps.sh.j2"
         - "{{ repo_root }}/roles/keepalived_ldap/templates/ldap-vip-notify.sh.j2"
+        - "{{ repo_root }}/roles/keepalived_ldap/templates/ensure-ldap-macvlan.sh.j2"
+        - "{{ repo_root }}/roles/keepalived_ldap/templates/ldap-vip-macvlan.service.j2"
         - "{{ runbook }}"
 
     - name: LDAP VIP | assert files present
@@ -45,12 +47,18 @@
         grep -q 'notify_master' "{{ repo_root }}/roles/keepalived_ldap/templates/keepalived.conf.j2"
         grep -q 'dnat to' "{{ repo_root }}/roles/keepalived_ldap/templates/ldap-vip-notify.sh.j2"
         grep -q 'nftables DNAT' "{{ runbook }}"
+        grep -q 'ldap_vip_device' "{{ repo_root }}/roles/keepalived_ldap/defaults/main.yml"
+        grep -q 'dev ldap0' "{{ repo_root }}/roles/keepalived_ldap/templates/keepalived.conf.j2"
+        grep -q 'ensure-ldap-macvlan' "{{ repo_root }}/roles/keepalived_ldap/tasks/main.yml"
+        grep -q 'macvlan' "{{ runbook }}"
         grep -q 'deny_ip "${LDAP_VIP_ADDRESS}"' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
         grep -q 'canonicalize_ip' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
         grep -q 'ipaddress.ip_address' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
         grep -q 'dns-records-pruned' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
+        grep -q 'REGISTER_IPV6' "{{ repo_root }}/roles/samba_dc/templates/prune-dc-dns.sh.j2"
         grep -q 'samba_dc_dns_prune_script' "{{ samba_interfaces }}"
-        grep -q 'ldap_vip_enabled' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+        grep -q 'Auto-detect primary NIC name' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+        grep -q 'samba_dc_register_ipv6' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
         grep -q 'prune-dc-dns.sh.j2' "{{ samba_interfaces }}"
       args:
         executable: /bin/bash

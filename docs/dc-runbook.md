@@ -153,13 +153,20 @@ Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc
 
 1. Ensures `samba-ad-dc` and `named` are running
 2. Refreshes `/etc/krb5.conf`
-3. Restricts Samba to the primary LAN NIC for DNS self-registration (see
+3. Fixes `/etc/hosts` so the DC FQDN maps to the LAN IP (not cloud-init's
+   `127.0.1.1`) — otherwise `samba_dnsupdate` GSS-TSIG updates target
+   `127.0.1.1:53` where BIND does not listen
+4. Binds Samba to `lo` + primary NIC **by name** (`interfaces = lo enp1s0`) —
+   no IPv4/IPv6 literals. LDAP VIP lives on macvlan `ldap0` (see
+   [ldap-vip-runbook.md](ldap-vip-runbook.md)); stale AAAA pruned when
+   `samba_dc_register_ipv6: false`
+5. Restricts Samba away from Docker bridges for DNS self-registration (see
    [dns-architecture.md](dns-architecture.md#dc-hostname-registration-aaaa))
-4. Deploys BIND options (`named.conf.options`) with estate-wide query ACLs from
+6. Deploys BIND options (`named.conf.options`) with estate-wide query ACLs from
    `dc_trusted_networks` / `samba_dc_dns_allowed_networks` — identical on **every**
    host in the `dc` group (**re-applied every converge**, not only at bootstrap)
-5. Extends chrony for MS-SNTP signing (`dc_ntp_allow_cidr` — often narrower than DNS)
-6. Optionally configures a **local operator SSH account** (see below)
+7. Extends chrony for MS-SNTP signing (`dc_ntp_allow_cidr` — often narrower than DNS)
+8. Optionally configures a **local operator SSH account** (see below)
 
 ### Group vars vs host vars (all DCs)
 

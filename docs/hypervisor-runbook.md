@@ -217,6 +217,40 @@ then loses the host at its `ansible_host`. Choose one:
 If the host goes unreachable after the first `hypervisor.yml`, find its new lease on the
 router, update `ansible_host` (or fix the reservation/MAC), then re-run.
 
+### Host resolvers (br0 DNS)
+
+Production `br0` uses DHCP for the host address but **must not** inherit DNS from the
+lease or from IPv6 Router Advertisements:
+
+| Source | What it offers | Problem |
+|---|---|---|
+| DHCPv4 (UCG) | Pi-hole `.18` + `.22` | Correct — but not the only source |
+| RDNSS / DHCPv6 (UCG) | Gateway GUA `2600:…::1` | Router is not an AD-aware resolver |
+| Static netplan | Pi-hole `.18` + `.22` | Required steady-state |
+
+When `systemd-resolved` selects the router's IPv6 address as **Current DNS Server**, AD
+SRV queries (`_kerberos._udp`, `_ldap._tcp`) fail. Kerberos cannot locate a KDC, and
+winbind `getpwnam` fails with `WBC_ERR_DOMAIN_NOT_FOUND` — even though both DCs serve
+correct RFC2307 attributes and Pi-hole answers the same queries.
+
+`hypervisor_netplan_bridges.br0` in
+[`group_vars/hypervisors/vars.yml.example`](../inventories/production/group_vars/hypervisors/vars.yml.example)
+sets:
+
+- `nameservers.addresses` → Pi-hole pair
+- `dhcp4-overrides.use-dns: false`, `dhcp6-overrides.use-dns: false`, `ra-overrides.use-dns: false`
+
+After converge, verify on each hypervisor:
+
+```bash
+resolvectl status br0 | grep -E 'Current DNS Server|DNS Servers'
+dig +short SRV _kerberos._udp.home.2123studios.com
+getent passwd <ad-user>
+```
+
+Expected: current server is `.18` or `.22` (never the gateway GUA); SRV records list
+dc1/dc2; `getent` returns a passwd line.
+
 ## Nested virtualization
 
 `hv01.lab.test` is created with `vm_nested_virt: true` (CPU host-passthrough) and

@@ -95,6 +95,22 @@ missing (RHEL→Ubuntu leftover). The role creates it when detected; or manually
 sudo mkdir -p /etc/krb5.conf.d
 ```
 
+### `Cannot contact any KDC` / kinit hits the legacy `pdc`
+
+`dns_lookup_kdc = true` is ignored when `[realms]` still pins
+`kdc = pdc.home.2123studios.com`. The retired PDC answers ICMP/SSH but is not a
+KDC, so machine `kinit` and NFS GSS fail even though `dc1`/`dc2` SRV records are
+healthy.
+
+The role strips hostnames in `nfs_server_krb5_retired_kdcs` (default: `pdc…`).
+Verify after converge:
+
+```bash
+grep -E '^\s*(kdc|admin_server)\s*=' /etc/krb5.conf   # no pdc lines
+KRB5_TRACE=/dev/stderr kinit -k -t /etc/krb5.keytab 'KIF$@HOME.2123STUDIOS.COM'
+# expect: Resolving hostname dc1… / dc2…
+```
+
 ### `access denied by server` with correct export ACL
 
 Server GSS layer failure — see nfs-client runbook SPN/keytab/`rpc-svcgssd` section.

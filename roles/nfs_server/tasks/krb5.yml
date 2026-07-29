@@ -20,6 +20,28 @@
     mode: "0755"
   when: nfs_server_krb5_includedir.rc == 0
 
+# Static [realms] kdc= entries override dns_lookup_kdc even when that flag is true.
+# A leftover pin at the retired legacy PDC breaks machine kinit / NFS GSS / winbind.
+- name: NFS server | Remove retired static KDC pins from krb5.conf
+  ansible.builtin.lineinfile:
+    path: /etc/krb5.conf
+    regexp: '^\s*(kdc|admin_server)\s*=\s*{{ item | regex_escape }}\s*$'
+    state: absent
+  loop: "{{ nfs_server_krb5_retired_kdcs }}"
+  when:
+    - nfs_server_krb5_retired_kdcs | length > 0
+    - not ansible_check_mode
+  notify: restart nfs server
+
+- name: NFS server | Drop empty realm blocks left after KDC scrub
+  ansible.builtin.replace:
+    path: /etc/krb5.conf
+    regexp: '(?m)^[A-Z0-9.-]+ = \{\s*\n\}'
+    replace: ''
+  when:
+    - nfs_server_krb5_retired_kdcs | length > 0
+    - not ansible_check_mode
+
 - name: NFS server | Load rpcsec_gss_krb5 kernel module
   community.general.modprobe:
     name: rpcsec_gss_krb5

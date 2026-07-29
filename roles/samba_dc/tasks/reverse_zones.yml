@@ -11,28 +11,25 @@
 - name: DC reverse zones | Ensure Samba DNS reverse zones exist
   ansible.builtin.shell: |
     set -euo pipefail
-    # Authenticate via the Samba PASSWD env var so the secret never appears in
-    # the process table (argv), unlike --password=... on the command line.
-    list=$(samba-tool dns zonelist 127.0.0.1 -UAdministrator)
+    # Use the local machine account (--machine-pass): no Administrator secret
+    # in argv or env, and no drift when the vault password is rotated.
+    list=$(samba-tool dns zonelist 127.0.0.1 --machine-pass)
     for z in {% for zone in samba_dc_reverse_zones %}{{ zone | quote }} {% endfor %}; do
       zre=${z//./\\.}
       if printf '%s\n' "$list" | grep -qE "(^|[^[:alnum:].-])${zre}([^[:alnum:].-]|$)"; then
         echo "exists: $z"
         continue
       fi
-      samba-tool dns zonecreate 127.0.0.1 "$z" -UAdministrator
+      samba-tool dns zonecreate 127.0.0.1 "$z" --machine-pass
       echo "created: $z"
     done
   args:
     executable: /bin/bash
-  environment:
-    PASSWD: "{{ vault_samba_admin_password }}"
   register: samba_dc_reverse_zones_result
   changed_when: "'created:' in samba_dc_reverse_zones_result.stdout"
   when:
     - samba_dc_reverse_zones | length > 0
     - samba_sam_ldb.stat.exists
-  no_log: true
   tags: [samba_dns, samba_converge]
 
 - name: DC reverse zones | Restart named after creating reverse zones
