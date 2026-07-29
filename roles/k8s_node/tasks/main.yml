@@ -46,6 +46,21 @@
   ansible.builtin.include_tasks: packages.yml
   tags: [k8s_node, k8s_packages]
 
+- name: Kubernetes node | Install Helm CLI
+  ansible.builtin.include_tasks: helm.yml
+  when: k8s_helm_enabled | bool
+  tags: [k8s_node, k8s_helm]
+
+- name: Kubernetes node | Install Cilium CLI
+  ansible.builtin.include_tasks: cilium_cli.yml
+  when: k8s_cilium_cli_enabled | bool
+  tags: [k8s_node, k8s_cilium_cli]
+
+- name: Kubernetes node | Enable kubectl shell tab completion
+  ansible.builtin.include_tasks: kubectl_completion.yml
+  when: k8s_kubectl_completion_enabled | bool
+  tags: [k8s_node, k8s_kubectl_completion]
+
 - name: Kubernetes node | Configure operator break-glass SSH
   ansible.builtin.include_tasks: operator_ssh.yml
   tags: [k8s_node, k8s_operator]

@@ -242,13 +242,16 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 | `kubelet` | Kubernetes node agent |
 | `kubeadm` | Cluster bootstrap CLI |
 | `kubectl` | Kubernetes admin CLI |
+| `helm` | Cilium / MetalLB / Envoy Gateway charts — pinned binary from `get.helm.sh` with SHA256 verification (`k8s_helm_*`), not the community apt/snap builds |
+| `cilium` | Cilium CLI for install/status/Hubble — pinned from GitHub releases (`k8s_cilium_cli_*`) |
+| `bash-completion` | Required for kubectl tab completion on bash |
 | `conntrack` | Required by kube-proxy; fatal `kubeadm init` preflight check |
 | `ebtables`, `ethtool`, `iproute2`, `iptables`, `socat` | Remaining kubeadm preflight dependencies (`k8s_preflight_packages`) |
 
 Nodes also receive baseline packages, swap disabled, kernel modules (`overlay`,
 `br_netfilter`), and sysctl for forwarding/bridge netfilter. Optional local operator
-break-glass SSH (`k8s_operator_*`). **`kubeadm init/join`, Calico, MetalLB, and
-ingress-nginx are manual** — see [kubernetes-runbook.md](kubernetes-runbook.md).
+break-glass SSH (`k8s_operator_*`). **`kubeadm init/join`, Cilium, MetalLB, and
+Envoy Gateway are manual** — see [kubernetes-runbook.md](kubernetes-runbook.md).
 
 ### Backup hosts (`hypervisors` with backup playbook)
 

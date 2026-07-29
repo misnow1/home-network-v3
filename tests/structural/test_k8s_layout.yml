@@ -26,6 +26,9 @@
         - "{{ k8s_runbook }}"
         - "{{ k8s_adr }}"
         - "{{ repo_root }}/roles/k8s_node/tasks/operator_ssh.yml"
+        - "{{ repo_root }}/roles/k8s_node/tasks/helm.yml"
+        - "{{ repo_root }}/roles/k8s_node/tasks/cilium_cli.yml"
+        - "{{ repo_root }}/roles/k8s_node/tasks/kubectl_completion.yml"
         - "{{ repo_root }}/roles/k8s_node/templates/containerd-config.toml.j2"
 
     - name: Kubernetes | assert paths present
@@ -52,6 +55,9 @@
         grep -q 'k8s_containerd_packages:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_operator_enabled:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_operator_ssh_keys:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_helm_enabled:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_cilium_cli_enabled:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_kubectl_completion_enabled:' "{{ k8s_role_defaults }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -79,7 +85,9 @@
     - name: Kubernetes | assert ADR documents hybrid edge
       ansible.builtin.shell: |
         grep -q 'MetalLB' "{{ k8s_adr }}"
-        grep -q 'ingress-nginx' "{{ k8s_adr }}"
+        grep -q 'Cilium' "{{ k8s_adr }}"
+        grep -q 'Envoy Gateway' "{{ k8s_adr }}"
+        grep -q 'Gateway API' "{{ k8s_adr }}"
         grep -q 'kubeadm' "{{ k8s_adr }}"
       args:
         executable: /bin/bash

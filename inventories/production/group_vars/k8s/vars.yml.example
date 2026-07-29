@@ -5,7 +5,7 @@
 #      inventories/production/group_vars/k8s/vars.yml
 #
 # Nodes are NOT domain-joined. Apply playbooks/k8s-node-prep.yml after baseline.yml.
-# Cluster bootstrap (kubeadm init/join, Calico, MetalLB, ingress): docs/kubernetes-runbook.md
+# Cluster bootstrap (kubeadm init/join, Cilium, MetalLB, Envoy Gateway): docs/kubernetes-runbook.md
 
 k8s_node_enabled: true
 

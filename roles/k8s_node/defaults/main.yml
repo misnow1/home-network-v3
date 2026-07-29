@@ -75,3 +75,22 @@ k8s_pause_image: registry.k8s.io/pause:3.10.2
 
 # Set by packages.yml when the installed minor differs from k8s_kubernetes_version.
 k8s_minor_change_pending: false
+
+# Helm CLI — needed for the Cilium, MetalLB, and Envoy Gateway charts. Installed from
+# the Helm project's own release archive; upstream explicitly does not vet the apt and
+# snap packages. k8s_helm_sha256 is the linux-amd64 digest and must be bumped with
+# k8s_helm_version (a mismatch fails the download rather than installing unverified).
+k8s_helm_enabled: true
+k8s_helm_version: "4.2.3"
+k8s_helm_sha256: e9b88b4ee95b18c706839c28d3a0220e5bc470e9cd9262410c90793c45ff8b7c
+k8s_helm_install_dir: /usr/local/bin
+
+# Cilium CLI — cluster install/status/Hubble helpers. Pin version + SHA256 together;
+# see https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli
+k8s_cilium_cli_enabled: true
+k8s_cilium_cli_version: "0.19.7"
+k8s_cilium_cli_sha256: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
+k8s_cilium_cli_install_dir: /usr/local/bin
+
+# System-wide kubectl tab completion (bash + zsh drop-ins under /etc).
+k8s_kubectl_completion_enabled: true

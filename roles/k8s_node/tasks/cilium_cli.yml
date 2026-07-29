@@ -1,0 +1,45 @@
+---
+- name: Kubernetes node | Check installed Cilium CLI version
+  ansible.builtin.command: "{{ k8s_cilium_cli_install_dir }}/cilium version --client"
+  register: k8s_cilium_cli_installed
+  changed_when: false
+  failed_when: false
+  tags: [k8s_node, k8s_cilium_cli]
+
+# `cilium version --client` prints e.g. "cilium-cli: v0.19.7 ..."; absent means install.
+- name: Kubernetes node | Determine whether Cilium CLI needs installing
+  ansible.builtin.set_fact:
+    k8s_cilium_cli_upgrade_required: >-
+      {{ ('v' ~ k8s_cilium_cli_version) not in (k8s_cilium_cli_installed.stdout | default('')) }}
+  tags: [k8s_node, k8s_cilium_cli]
+
+- name: Kubernetes node | Download Cilium CLI release archive
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/cilium/cilium-cli/releases/download/v{{ k8s_cilium_cli_version }}/cilium-linux-{{ k8s_deb_arch }}.tar.gz
+    dest: "/tmp/cilium-linux-{{ k8s_deb_arch }}.tar.gz"
+    checksum: "sha256:{{ k8s_cilium_cli_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: k8s_cilium_cli_upgrade_required
+  tags: [k8s_node, k8s_cilium_cli]
+
+- name: Kubernetes node | Install Cilium CLI binary
+  ansible.builtin.unarchive:
+    src: "/tmp/cilium-linux-{{ k8s_deb_arch }}.tar.gz"
+    dest: "{{ k8s_cilium_cli_install_dir }}"
+    remote_src: true
+    extra_opts:
+      - cilium
+    owner: root
+    group: root
+    mode: "0755"
+  when: k8s_cilium_cli_upgrade_required
+  tags: [k8s_node, k8s_cilium_cli]
+
+- name: Kubernetes node | Remove downloaded Cilium CLI archive
+  ansible.builtin.file:
+    path: "/tmp/cilium-linux-{{ k8s_deb_arch }}.tar.gz"
+    state: absent
+  tags: [k8s_node, k8s_cilium_cli]
