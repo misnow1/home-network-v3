@@ -5,10 +5,34 @@
     state: present
   tags: [k8s_node, k8s_packages]
 
+- name: Kubernetes node | Gather installed package versions
+  ansible.builtin.package_facts:
+    manager: apt
+  tags: [k8s_node, k8s_packages]
+
+# Without this, raising k8s_kubernetes_version is a silent no-op: the apt source
+# moves to the new channel but the hold keeps the old minor installed.
+- name: Kubernetes node | Detect pending Kubernetes minor version change
+  ansible.builtin.set_fact:
+    k8s_minor_change_pending: >-
+      {{ installed | length > 0
+         and not installed[0].version.startswith(k8s_kubernetes_version ~ '.') }}
+  vars:
+    installed: "{{ ansible_facts.packages['kubeadm'] | default([]) }}"
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Release apt hold for pending minor version change
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ k8s_kubernetes_packages }}"
+  when: k8s_minor_change_pending | bool
+  tags: [k8s_node, k8s_packages]
+
 - name: Kubernetes node | Install Kubernetes packages
   ansible.builtin.apt:
     name: "{{ k8s_kubernetes_packages }}"
-    state: present
+    state: "{{ 'latest' if k8s_minor_change_pending | bool else 'present' }}"
   tags: [k8s_node, k8s_packages]
 
 - name: Kubernetes node | Hold Kubernetes package versions

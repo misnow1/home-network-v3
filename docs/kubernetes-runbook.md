@@ -101,7 +101,7 @@ Copy `admin.conf` to your workstation (via bastion). Restrict file mode `600`.
 Install Calico matching your Kubernetes minor version — follow upstream docs, e.g.:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.0/manifests/calico.yaml
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/calico.yaml
 ```
 
 Wait for calico-node pods Ready on CP. Verify:
@@ -271,7 +271,7 @@ Deploy **Uptime Kuma** (or similar) with:
 |---|---|
 | `kubeadm init` fails on swap | `swapon --show`; rerun `k8s-node-prep.yml` |
 | `ERROR FileExisting-conntrack` | Rerun `k8s-node-prep.yml` — `k8s_preflight_packages` installs it |
-| Warning: sandbox image `""` inconsistent with kubeadm | Cosmetic. kubeadm 1.31 reads `sandboxImage` from the CRI runtime status, which containerd 2.x no longer reports there. Confirm with `containerd config dump \| grep -A2 pinned_images` (expect `sandbox = 'registry.k8s.io/pause:3.10'`) |
+| Warning: sandbox image `""` inconsistent with kubeadm | Cosmetic. kubeadm reads `sandboxImage` from the CRI runtime status, which containerd 2.x no longer reports there. Confirm with `containerd config dump \| grep -A2 pinned_images` and compare against `kubeadm config images list`; set `k8s_pause_image` if they differ |
 | Nodes NotReady | Calico pods, `journalctl -u kubelet` |
 | MetalLB VIP unreachable from proxy01 | UniFi firewall VLAN 1→9, ARP on VLAN 9 |
 | Ingress 502 from proxy01 | `kubectl get svc -n ingress-nginx`, VIP matches pool |

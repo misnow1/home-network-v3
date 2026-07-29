@@ -1,8 +1,9 @@
 ---
 k8s_node_enabled: false
 
-# Kubernetes minor version — drives pkgs.k8s.io apt channel.
-k8s_kubernetes_version: "1.31"
+# Kubernetes minor version — drives pkgs.k8s.io apt channel. Keep on a supported
+# minor (upstream maintains the three most recent); see https://kubernetes.io/releases/
+k8s_kubernetes_version: "1.36"
 
 # pkgs.k8s.io apt repository (https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
 k8s_kubernetes_apt_key_url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_kubernetes_version }}/deb/Release.key"
@@ -68,5 +69,9 @@ k8s_operator_home: "/home/{{ k8s_operator_user }}"
 k8s_operator_ssh_keys: []
 k8s_operator_sudo: true
 
-# Pin kubelet to a specific version string for apt (optional).
-k8s_kubelet_version: "{{ k8s_kubernetes_version }}.*"
+# CRI sandbox image. Must match `kubeadm config images list` for the target minor
+# or kubeadm preflight warns and the runtime pulls a second pause image.
+k8s_pause_image: registry.k8s.io/pause:3.10.2
+
+# Set by packages.yml when the installed minor differs from k8s_kubernetes_version.
+k8s_minor_change_pending: false
