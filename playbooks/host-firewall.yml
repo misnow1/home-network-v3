@@ -1,0 +1,13 @@
+---
+# Converge opt-in UFW host firewall.
+# Production: enable via host_firewall_* in host_vars, then:
+#   ./scripts/prod-run.sh --confirm-production -- playbooks/host-firewall.yml --limit HOST
+#
+# Also applied from hypervisor.yml when host_firewall_enabled is true.
+
+- name: Configure host firewall
+  hosts: linux
+  become: true
+  roles:
+    - role: host_firewall
+      when: host_firewall_enabled | default(false) | bool

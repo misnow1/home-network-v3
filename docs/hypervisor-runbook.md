@@ -57,6 +57,10 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_grub_cmdline_linux_extra` | `[]` | Kernel cmdline tokens (e.g. `intel_iommu=on`, `iommu=pt`) |
 | `docker_engine_enabled` | `true` | Include `docker_engine` role |
 
+Host firewall (UFW) is a separate opt-in role applied from this playbook when
+`host_firewall_enabled: true` — see [host-firewall-runbook.md](host-firewall-runbook.md).
+Do not reintroduce firewall tasks under `docker_engine`.
+
 ### GRUB menu timeout (kif + kvm01)
 
 Both production hypervisors enable a 5s **menu** timeout (replacing Ubuntu's hidden/0

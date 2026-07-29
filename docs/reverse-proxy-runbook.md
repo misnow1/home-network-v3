@@ -152,7 +152,8 @@ ${PROD} playbooks/reverse-proxy.yml --limit "${PROXY}" -e allow_production=true
 
 1. Publish the container port on kif br4 (`192.168.7.152:PORT`) — see
    [authelia-runbook.md](authelia-runbook.md#docker-compose-port-bindings-vlan-4).
-2. Add the port to `docker_engine_ufw_published_ports` and re-converge kif hypervisor/docker.
+2. Add the port to `host_firewall_edge_published_ports` and re-converge kif
+   (`playbooks/host-firewall.yml` or `hypervisor.yml --tags host_firewall`).
 3. Add an entry to `reverse_proxy_sites` (and the FQDN to `certbot_domains`).
 4. Re-run `certbot.yml` so the SAN cert covers the new name.
 5. Re-run `reverse-proxy.yml`.
@@ -165,7 +166,7 @@ Edge exposure decisions: [edge-access-model.md](edge-access-model.md).
 |---|---|
 | Authelia forward-auth | `auth_required: true` per location; rules in [authelia-runbook.md](authelia-runbook.md) |
 | Rate limiting | `reverse_proxy_rate_limit_zones` + `locations[].rate_limit` |
-| Backend isolation | kif `docker_engine_manage_ufw` — proxy ports on VLAN 4 only from proxy01 |
+| Backend isolation | kif `host_firewall` — proxy ports on VLAN 4 only from proxy01 |
 | TLS | SAN cert via certbot DNS-01; HSTS on all vhosts |
 | sshd | Key-only on proxy01 (`reverse_proxy_manage_sshd`) |
 

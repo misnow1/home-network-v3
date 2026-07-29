@@ -243,14 +243,17 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 When `backup_schedule_enabled: true`, deploys `ansible-backup.timer` (docker volume backup,
 retention prune, optional offsite `restic copy`). See [backup-runbook.md](backup-runbook.md).
 
-### Docker workload hosts (`docker_engine` with UFW)
+### Host firewall (`host_firewall`)
 
-When `docker_engine_manage_ufw: true`, restricts published container ports to edge proxy
-hosts. See [edge-access-model.md](edge-access-model.md).
+When `host_firewall_enabled: true`, manages UFW with default-deny incoming, explicit
+LAN/internet allows, and optional Docker edge proxy restrictions. See
+[host-firewall-runbook.md](host-firewall-runbook.md).
 
 | Package | Purpose |
 |---|---|
-| `ufw` | Host firewall for Docker port isolation |
+| `ufw` | Host firewall |
+
+### Docker workload hosts (`docker_engine`)
 
 ## Apply order
 

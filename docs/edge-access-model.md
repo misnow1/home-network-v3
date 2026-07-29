@@ -11,8 +11,11 @@ Public exposure decisions for services proxied through **proxy01** (reverse prox
    provides equivalent auth and public access is intentional.
 3. **Proxy backends on VLAN 4** — Docker host ports for proxied apps bind on kif br4
    (`192.168.7.152`) and are UFW-restricted to proxy01's docker NIC only
-   (`docker_engine_manage_ufw`).
-4. **Recoverability beats obscurity** — scheduled restic + offsite copy (see
+   (`host_firewall` edge published ports).
+4. **Kubernetes north-south** — Internet TLS and Authelia stay on **proxy01**; HTTP
+   forwards to a MetalLB VIP on VLAN 9 and in-cluster **ingress-nginx**. Do not
+   port-forward NodePorts from UniFi. See [kubernetes-runbook.md](kubernetes-runbook.md).
+5. **Recoverability beats obscurity** — scheduled restic + offsite copy (see
    [backup-runbook.md](backup-runbook.md)) is the primary ransomware control.
 
 ## Public services (by design)
@@ -70,6 +73,7 @@ Implementation when tightening:
 |---|---|---|
 | Samba / NFS data | kif | LAN only (`192.168.1.0/24`, Kerberos) |
 | Docker proxy backends | kif | VLAN 4 only (`192.168.7.152`), proxy01 via UFW |
+| Kubernetes apps | VLAN 9 workers + CP VM | Internal; public via proxy01 → MetalLB VIP → ingress-nginx ([adr/003-home-kubernetes.md](adr/003-home-kubernetes.md)) |
 | Transmission peer port | kif | VLAN 1 (`192.168.1.152:51413`), Internet forward |
 | AD / LDAP | dc1/dc2 + VIP | LAN only |
 | Mail relay | mail/mail2 | Submission from LAN |
@@ -80,7 +84,7 @@ Implementation when tightening:
 |---|---|
 | nginx TLS + rate limits | `roles/reverse_proxy` on proxy01, `reverse_proxy_rate_limit_zones` |
 | Authelia forward-auth | `auth_required: true` in `reverse_proxy_sites` |
-| kif Docker port firewall | `docker_engine_manage_ufw` in kif host_vars |
+| kif host firewall | `host_firewall_enabled` + edge vars in kif host_vars — [host-firewall-runbook.md](host-firewall-runbook.md) |
 | Scheduled backups + offsite | `roles/backup`, kif host_vars |
 | SSH hardening | `roles/bastion` on shell-clt01 |
 
@@ -89,5 +93,6 @@ Implementation when tightening:
 Revisit this document when:
 
 - Adding a new proxied container
-- Deploying edge VIP HA (Slice 28+) — update `docker_engine_ufw_edge_proxy_cidrs`
+- Adding a new Kubernetes app behind ingress-nginx + proxy01
+- Deploying edge VIP HA (Slice 28+) — update `host_firewall_edge_proxy_cidrs`
 - Changing who needs remote access (VPN vs public)

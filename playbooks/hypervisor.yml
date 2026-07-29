@@ -9,4 +9,7 @@
   become: true
   serial: 1
   roles:
+    - role: host_firewall
+      when: host_firewall_enabled | default(false) | bool
+      tags: [host_firewall]
     - role: hypervisor

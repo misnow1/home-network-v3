@@ -1,0 +1,39 @@
+---
+# Opt-in host firewall (UFW). Safe for multi-role hosts (fileserver + docker + NUT):
+# enumerate LAN/internet services in host_firewall_rules before enabling.
+
+host_firewall_enabled: false
+
+host_firewall_packages:
+  - ufw
+
+# Allow OpenSSH application profile before enabling UFW (break-glass).
+host_firewall_allow_ssh: true
+
+# Default policies applied when the role enables UFW.
+host_firewall_default_incoming: deny
+host_firewall_default_outgoing: allow
+# Leave routed alone unless explicitly set (null skips the task).
+host_firewall_default_routed: null
+
+# Explicit allow rules. Each entry:
+#   port: "2049"          # required
+#   proto: tcp            # default tcp; use udp when needed
+#   src: any              # default any; prefer direction+interface for LAN
+#   direction: in         # optional; with interface → `ufw allow in on br0 …`
+#   interface: br0        # optional ingress/egress NIC (avoids GUA CIDR churn)
+#   comment: nfs
+host_firewall_rules: []
+
+# Explicit deny rules (same shape as allow rules). Applied after allows so
+# more-specific allows (e.g. edge proxy CIDRs) win first.
+host_firewall_deny_rules: []
+
+# Convenience for Docker edge backends: allow published ports only from proxy
+# CIDRs, then deny the same ports from everywhere else.
+host_firewall_edge_proxy_cidrs: []
+host_firewall_edge_published_ports: []
+host_firewall_edge_deny_unlisted: true
+
+# Enable UFW after rules are present. Set false to stage rules without activating.
+host_firewall_enable: true

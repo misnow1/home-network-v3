@@ -1,0 +1,96 @@
+---
+- name: Host firewall | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not host_firewall_enabled | bool
+
+- name: Host firewall | Install UFW
+  ansible.builtin.apt:
+    name: "{{ host_firewall_packages }}"
+    state: present
+  tags: [host_firewall, host_firewall_packages]
+
+- name: Host firewall | Allow OpenSSH
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+    comment: home-network-v3 host firewall ssh
+  when: host_firewall_allow_ssh | bool
+  tags: [host_firewall, host_firewall_rules]
+
+- name: Host firewall | Apply allow rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    src: "{{ item.src | default('any') }}"
+    direction: "{{ item.direction | default(omit) }}"
+    interface: "{{ item.interface | default(omit) }}"
+    comment: "{{ item.comment | default('home-network-v3 host firewall') }}"
+  loop: "{{ host_firewall_rules }}"
+  when: host_firewall_rules | length > 0
+  tags: [host_firewall, host_firewall_rules]
+
+- name: Host firewall | Allow edge published ports from proxy CIDRs
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.1 | string }}"
+    proto: tcp
+    src: "{{ item.0 }}"
+    comment: home-network-v3 edge proxy
+  loop: "{{ host_firewall_edge_proxy_cidrs | product(host_firewall_edge_published_ports) | list }}"
+  when:
+    - host_firewall_edge_proxy_cidrs | length > 0
+    - host_firewall_edge_published_ports | length > 0
+  tags: [host_firewall, host_firewall_edge]
+
+- name: Host firewall | Deny edge published ports from other sources
+  community.general.ufw:
+    rule: deny
+    port: "{{ item | string }}"
+    proto: tcp
+    comment: home-network-v3 edge published port deny
+  loop: "{{ host_firewall_edge_published_ports }}"
+  when:
+    - host_firewall_edge_deny_unlisted | bool
+    - host_firewall_edge_published_ports | length > 0
+  tags: [host_firewall, host_firewall_edge]
+
+- name: Host firewall | Apply deny rules
+  community.general.ufw:
+    rule: deny
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    src: "{{ item.src | default('any') }}"
+    direction: "{{ item.direction | default(omit) }}"
+    interface: "{{ item.interface | default(omit) }}"
+    comment: "{{ item.comment | default('home-network-v3 host firewall deny') }}"
+  loop: "{{ host_firewall_deny_rules }}"
+  when: host_firewall_deny_rules | length > 0
+  tags: [host_firewall, host_firewall_rules]
+
+- name: Host firewall | Set default incoming policy
+  community.general.ufw:
+    direction: incoming
+    policy: "{{ host_firewall_default_incoming }}"
+  when: host_firewall_default_incoming | length > 0
+  tags: [host_firewall, host_firewall_policy]
+
+- name: Host firewall | Set default outgoing policy
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ host_firewall_default_outgoing }}"
+  when: host_firewall_default_outgoing | length > 0
+  tags: [host_firewall, host_firewall_policy]
+
+- name: Host firewall | Set default routed policy
+  community.general.ufw:
+    direction: routed
+    policy: "{{ host_firewall_default_routed }}"
+  when: host_firewall_default_routed | default(none) not in [none, '']
+  tags: [host_firewall, host_firewall_policy]
+
+- name: Host firewall | Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: host_firewall_enable | bool
+  tags: [host_firewall, host_firewall_enable]
