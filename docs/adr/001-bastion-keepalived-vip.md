@@ -36,7 +36,7 @@ This mirrors the LDAP VIP pattern on dc1/dc2 ([ldap-vip-runbook.md](../ldap-vip-
   nginx/cert sync or independent SAN certs on both proxy nodes, and coordinated
   keepalived health checks (nginx + sshd on respective VMs).
 - Cert renewal must reload nginx on whichever proxy node holds the HTTPS VIP (and ideally both nodes).
-- Update `docker_engine_ufw_edge_proxy_cidrs` with the vlan4 keepalived VIP when deployed.
+- Update `host_firewall_edge_proxy_cidrs` with the vlan4 keepalived VIP when deployed.
 - Authelia remains on kif today — edge HA without Authelia HA still improves SSH and
   static/offline surfaces; full app auth HA is a separate concern.
 - Documented in ROADMAP as deferred until a second bastion is provisioned.

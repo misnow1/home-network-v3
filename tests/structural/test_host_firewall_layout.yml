@@ -1,0 +1,91 @@
+---
+# Structural tests for host_firewall role layout.
+
+- name: Structural — host_firewall layout
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname }}"
+    host_firewall_role: "{{ repo_root }}/roles/host_firewall"
+    host_firewall_defaults: "{{ host_firewall_role }}/defaults/main.yml"
+    host_firewall_tasks: "{{ host_firewall_role }}/tasks/main.yml"
+    host_firewall_playbook: "{{ repo_root }}/playbooks/host-firewall.yml"
+    host_firewall_runbook: "{{ repo_root }}/docs/host-firewall-runbook.md"
+    hypervisor_playbook: "{{ repo_root }}/playbooks/hypervisor.yml"
+    kif_example: "{{ repo_root }}/inventories/production/host_vars/kif.home.2123studios.com/vars.yml.example"
+  tasks:
+    - name: Host firewall | assert role skeleton files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: host_firewall_paths
+      loop:
+        - "{{ host_firewall_defaults }}"
+        - "{{ host_firewall_tasks }}"
+        - "{{ host_firewall_playbook }}"
+        - "{{ host_firewall_runbook }}"
+
+    - name: Host firewall | assert role skeleton present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing required path: {{ item.item }}"
+      loop: "{{ host_firewall_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Host firewall | assert playbook targets linux and gates on enabled
+      ansible.builtin.shell: |
+        grep -q 'hosts: linux' "{{ host_firewall_playbook }}"
+        grep -q 'host_firewall_enabled' "{{ host_firewall_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Host firewall | assert defaults cover edge + LAN rule knobs
+      ansible.builtin.shell: |
+        grep -q 'host_firewall_enabled' "{{ host_firewall_defaults }}"
+        grep -q 'host_firewall_rules:' "{{ host_firewall_defaults }}"
+        grep -q 'host_firewall_edge_proxy_cidrs:' "{{ host_firewall_defaults }}"
+        grep -q 'host_firewall_edge_published_ports:' "{{ host_firewall_defaults }}"
+        grep -q 'host_firewall_default_incoming: deny' "{{ host_firewall_defaults }}"
+        grep -q 'host_firewall_allow_ssh: true' "{{ host_firewall_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Host firewall | assert tasks apply SSH before enable
+      ansible.builtin.shell: |
+        grep -q 'Allow OpenSSH' "{{ host_firewall_tasks }}"
+        grep -q 'state: enabled' "{{ host_firewall_tasks }}"
+        grep -q 'host_firewall_enable' "{{ host_firewall_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Host firewall | assert tasks support interface-based allows
+      ansible.builtin.shell: |
+        grep -q 'item.direction' "{{ host_firewall_tasks }}"
+        grep -q 'item.interface' "{{ host_firewall_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Host firewall | assert hypervisor playbook includes role
+      ansible.builtin.shell: |
+        grep -q 'host_firewall' "{{ hypervisor_playbook }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Host firewall | assert kif example enables firewall with NFS/SMB on br0
+      ansible.builtin.shell: |
+        grep -q 'host_firewall_enabled: true' "{{ kif_example }}"
+        grep -q 'port: "2049"' "{{ kif_example }}"
+        grep -q 'port: "445"' "{{ kif_example }}"
+        grep -q 'interface: br0' "{{ kif_example }}"
+        grep -q 'direction: in' "{{ kif_example }}"
+        grep -q 'host_firewall_edge_published_ports:' "{{ kif_example }}"
+        ! grep -q 'docker_engine_manage_ufw' "{{ kif_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false

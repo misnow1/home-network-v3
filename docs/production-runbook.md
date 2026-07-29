@@ -63,7 +63,7 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
 | 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
-| 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
+| 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only); optional `host_firewall` when enabled |
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest + optional systemd timer/offsite copy |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind; kif multi-share when `fileserver_samba_enabled: true` — [fileserver-runbook.md](fileserver-runbook.md) |
 | 7n | `fileservers` (opt-in) | `nfs-server.yml` | Kerberos NFS exports on kif when `nfs_server_enabled` — [nfs-server-runbook.md](nfs-server-runbook.md); run **before** step 8n |
@@ -275,6 +275,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Domain join | [domain-join-runbook.md](domain-join-runbook.md) |
 | AD user SSH keys | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
+| Host firewall | [host-firewall-runbook.md](host-firewall-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |
 | Security updates | [security-updates-runbook.md](security-updates-runbook.md) |

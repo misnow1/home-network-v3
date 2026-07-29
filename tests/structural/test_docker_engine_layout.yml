@@ -22,7 +22,6 @@
         - install.yml
         - nvidia.yml
         - daemon.yml
-        - ufw.yml
 
     - name: Docker engine | assert template and handlers exist
       ansible.builtin.stat:
@@ -60,11 +59,11 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Docker engine | assert edge firewall variables exist
+    - name: Docker engine | assert legacy UFW is rejected in favor of host_firewall
       ansible.builtin.shell: |
         grep -q 'docker_engine_manage_ufw' "{{ docker_engine_role }}/defaults/main.yml" &&
-        grep -q 'docker_engine_ufw_published_ports' "{{ docker_engine_role }}/defaults/main.yml" &&
-        grep -q 'docker_engine_ufw' "{{ docker_engine_main }}"
+        grep -q 'host_firewall' "{{ docker_engine_main }}" &&
+        test ! -f "{{ docker_engine_role }}/tasks/ufw.yml"
       args:
         executable: /bin/bash
       changed_when: false
