@@ -3,6 +3,10 @@
 
 hypervisor_libvirt_enabled: true
 hypervisor_netplan_enabled: true
+# Drop cloud-init leftovers (50-cloud-init.yaml) that fight 01-hypervisor.yaml —
+# dhcp4 on the bridge-slave uplink leaves enp5s0 "configuring" and
+# systemd-networkd-wait-online permanently failed.
+hypervisor_netplan_remove_unmanaged: true
 
 # Must be set here (not just the hypervisor role default): include_role loads
 # docker_engine's own default (false) which would otherwise shadow it and skip Docker.

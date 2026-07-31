@@ -221,6 +221,14 @@ then loses the host at its `ansible_host`. Choose one:
 If the host goes unreachable after the first `hypervisor.yml`, find its new lease on the
 router, update `ansible_host` (or fix the reservation/MAC), then re-run.
 
+**Unmanaged cloud-init netplan:** leave `hypervisor_netplan_remove_unmanaged: true` on
+production hypervisors. A leftover `/etc/netplan/50-cloud-init.yaml` that still puts
+`dhcp4` on the uplink (now a bridge slave) or declares a USB NIC without `optional:
+true` leaves that interface stuck in systemd-networkd's `configuring` state.
+`systemd-networkd-wait-online` then fails every boot and the host reports `degraded`.
+With the flag set, converge deletes every netplan file other than
+`{{ hypervisor_netplan_config_file }}` and re-applies.
+
 ### Host resolvers (br0 DNS)
 
 Production `br0` uses DHCP for the host address but **must not** inherit DNS from the
