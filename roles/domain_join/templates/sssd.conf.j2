@@ -21,6 +21,10 @@ default_shell = /bin/bash
 
 cache_credentials = true
 krb5_store_password_if_offline = true
+{% if sssd_krb5_renewable | bool %}
+krb5_renewable_lifetime = {{ sssd_krb5_renewable_lifetime }}
+krb5_renew_interval = {{ sssd_krb5_renew_interval }}
+{% endif %}
 
 {# NOTE: with access_provider = simple and no simple_allow_groups, SSSD's
    simple provider grants access to ALL domain users. Set
