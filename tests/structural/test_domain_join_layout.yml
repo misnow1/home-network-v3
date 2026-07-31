@@ -11,6 +11,8 @@
     sudo_template: "{{ repo_root }}/roles/domain_join/templates/domain-sudoers.j2"
     domain_join_playbook: "{{ repo_root }}/playbooks/domain-join.yml"
     sssd_template: "{{ repo_root }}/roles/domain_join/templates/sssd.conf.j2"
+    domain_join_defaults: "{{ repo_root }}/roles/domain_join/defaults/main.yml"
+    configure_tasks: "{{ repo_root }}/roles/domain_join/tasks/configure.yml"
   tasks:
     - name: Domain join | assert join task excludes DC hosts
       ansible.builtin.shell: |
@@ -103,6 +105,32 @@
       ansible.builtin.shell: |
         grep -q 'domain_join_manage_resolv_conf' "{{ repo_root }}/roles/domain_join/tasks/join.yml"
         grep -q 'domain_join_dns_servers | length' "{{ repo_root }}/roles/domain_join/tasks/join.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # Naming a responder in services= and socket-activating it both makes the
+    # sssd-<responder>.socket unit fail to bind, leaving the host degraded.
+    - name: Domain join | assert sssd.conf omits services= under socket activation
+      ansible.builtin.shell: |
+        grep -q 'sssd_socket_activation' "{{ sssd_template }}"
+        grep -q 'sssd_socket_activation: true' "{{ domain_join_defaults }}"
+        grep -q 'sssd_responder_sockets:' "{{ domain_join_defaults }}"
+        # services= must be reachable only when socket activation is off
+        grep -q 'if not (sssd_socket_activation | bool)' "{{ sssd_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert sssd restart is flushed before sockets are started
+      ansible.builtin.shell: |
+        grep -q 'meta: flush_handlers' "{{ configure_tasks }}"
+        grep -q 'reset-failed' "{{ configure_tasks }}"
+        grep -q 'sssd_responder_sockets' "{{ configure_tasks }}"
+        test "$(grep -n 'meta: flush_handlers' "{{ configure_tasks }}" | head -1 | cut -d: -f1)" \
+          -lt "$(grep -n 'sssd_responder_sockets' "{{ configure_tasks }}" | head -1 | cut -d: -f1)"
+        test "$(grep -n 'reset-failed' "{{ configure_tasks }}" | head -1 | cut -d: -f1)" \
+          -lt "$(grep -n 'Enable and start responder sockets' "{{ configure_tasks }}" | head -1 | cut -d: -f1)"
       args:
         executable: /bin/bash
       changed_when: false
