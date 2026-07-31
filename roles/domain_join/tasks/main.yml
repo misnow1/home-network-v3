@@ -1,25 +1,32 @@
 ---
 - name: Install domain join packages
   ansible.builtin.include_tasks: packages.yml
+  when: domain_join_enabled | bool
   tags: [domain_packages]
 
 - name: Join AD domain
   ansible.builtin.include_tasks: join.yml
+  when: domain_join_enabled | bool
   tags: [domain_join]
 
 - name: Configure SSSD and PAM homedir
   ansible.builtin.include_tasks: configure.yml
-  tags: [domain_configure]
+  when: domain_join_enabled | bool
+  tags: [domain_configure, domain_krb5]
 
 - name: Configure sshd for domain member login
   ansible.builtin.include_tasks: sshd.yml
-  when: domain_member_sshd_enabled | bool
+  when:
+    - domain_join_enabled | bool
+    - domain_member_sshd_enabled | bool
   tags: [domain_sshd]
 
 - name: Configure sudo for domain groups
   ansible.builtin.include_tasks: sudo.yml
+  when: domain_join_enabled | bool
   tags: [domain_sudo]
 
+# Independent of AD — runs even when domain_join_enabled is false.
 - name: Configure Postfix relay client
   ansible.builtin.include_tasks: postfix_relayclient.yml
   when:

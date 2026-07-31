@@ -45,6 +45,12 @@ The reverse-proxy host must be in both the `reverse_proxy` and `certbot` invento
 `certbot_domains` must list **every** proxied FQDN; the first entry becomes the
 `/etc/letsencrypt/live/<name>` lineage referenced by `reverse_proxy_cert_name`.
 
+proxy01 also stays in the `linux` group (for `baseline.yml`, `security-updates.yml`,
+and `host-firewall.yml`) with **`domain_join_enabled: false`** in
+`group_vars/reverse_proxy/vars.yml`, so fleet-wide `domain-join.yml` runs skip it
+instead of failing on `realm join`. See
+[domain-join-runbook.md](domain-join-runbook.md) § Opting a linux member out of AD.
+
 ## VM provisioning (proxy01)
 
 Dual-homed on kvm01: **external-default** (DHCP → `192.168.1.23`) + **vlan4**

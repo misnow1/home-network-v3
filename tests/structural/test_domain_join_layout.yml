@@ -33,6 +33,36 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Domain join | assert sssd.conf enables krb5 renewal
+      ansible.builtin.shell: |
+        grep -q 'sssd_krb5_renewable' "{{ sssd_template }}"
+        grep -q 'krb5_renewable_lifetime' "{{ sssd_template }}"
+        grep -q 'krb5_renew_interval' "{{ sssd_template }}"
+        grep -q 'sssd_krb5_renewable_lifetime' "{{ repo_root }}/roles/domain_join/defaults/main.yml"
+        grep -q 'sssd_kcm_enabled' "{{ repo_root }}/roles/domain_join/defaults/main.yml"
+        grep -q 'sssd-kcm' "{{ repo_root }}/roles/domain_join/tasks/packages.yml"
+        grep -q 'includedir /etc/krb5.conf.d/' "{{ repo_root }}/roles/domain_join/tasks/krb5.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # krb5_renewable is not a valid SSSD option; sssctl config-check rejects it.
+    - name: Domain join | assert sssd.conf avoids invalid krb5_renewable option
+      ansible.builtin.shell: |
+        ! grep -qE '^krb5_renewable\s*=' "{{ sssd_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert krb5 lifetime drop-in is deployed
+      ansible.builtin.shell: |
+        grep -q 'ansible_ticket_lifetimes' "{{ repo_root }}/roles/domain_join/tasks/krb5.yml"
+        grep -q 'renew_lifetime' "{{ repo_root }}/roles/domain_join/templates/krb5-lifetimes.j2"
+        grep -q 'domain_join_krb5_renew_lifetime' "{{ repo_root }}/roles/domain_join/defaults/main.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Domain join | assert sudo tasks deploy domain group sudoers
       ansible.builtin.shell: |
         grep -q 'domain-sudoers.j2' "{{ sudo_tasks }}"
@@ -54,6 +84,17 @@
         grep -q 'domain_member_sshd_enabled' "{{ repo_root }}/roles/domain_join/tasks/main.yml"
         grep -q '10-domain-member-ssh.conf.j2' "{{ repo_root }}/roles/domain_join/tasks/sshd.yml"
         grep -q 'sss_ssh_authorizedkeys' "{{ repo_root }}/roles/domain_join/templates/10-domain-member-ssh.conf.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # Edge hosts stay in the `linux` group for baseline/updates but must not join AD.
+    - name: Domain join | assert domain_join_enabled gates AD tasks only
+      ansible.builtin.shell: |
+        grep -q 'domain_join_enabled' "{{ repo_root }}/roles/domain_join/defaults/main.yml"
+        test "$(grep -c 'domain_join_enabled | bool' "{{ repo_root }}/roles/domain_join/tasks/main.yml")" -eq 5
+        ! awk '/Postfix relay client/,/tags:/' "{{ repo_root }}/roles/domain_join/tasks/main.yml" \
+          | grep -q 'domain_join_enabled'
       args:
         executable: /bin/bash
       changed_when: false

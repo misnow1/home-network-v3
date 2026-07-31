@@ -39,3 +39,7 @@
     enabled: true
   when: not ansible_check_mode
   tags: [domain_configure]
+
+- name: Kerberos | Fix Ubuntu includedir and enable sssd-kcm
+  ansible.builtin.include_tasks: krb5.yml
+  tags: [domain_configure, domain_krb5]

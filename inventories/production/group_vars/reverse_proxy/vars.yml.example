@@ -11,6 +11,13 @@
 # Apply order on proxy01: baseline.yml → certbot.yml → reverse-proxy.yml
 # (no domain-join, no bastion.yml). See docs/reverse-proxy-runbook.md.
 
+# --- AD domain join ----------------------------------------------------------
+# proxy01 is an edge host with no AD identity and no Kerberos NFS mounts. It stays
+# in the `linux` group for baseline/security-updates/host-firewall, so opt out here
+# instead — otherwise domain-join.yml fails on `realm join` for this host.
+# The Postfix relay client still applies (independent of AD).
+domain_join_enabled: false
+
 # --- Certbot SAN certificate (DNS-01 via Dreamhost) --------------------------
 certbot_enabled: true
 certbot_provider: dreamhost_dns

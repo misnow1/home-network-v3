@@ -165,6 +165,68 @@ client `kinit`): see [domain-join-runbook.md](domain-join-runbook.md) — enable
 `domain_member_sshd_enabled` on hypervisors. AD user pubkey provisioning:
 [ad-ssh-public-keys.md](ad-ssh-public-keys.md).
 
+## Long-running sessions and ticket renewal
+
+AD defaults (Samba): TGT lifetime ~**10 hours**, renewable for ~**7 days**.
+Kerberos NFS (`sec=krb5i`) needs a **live user TGT** for every data RPC — expired
+tickets surface as `Key has expired` / ESTALE (often after a soft-mount delay).
+
+### What `domain-join.yml` configures
+
+On SSSD members, the role enables:
+
+- `krb5_renewable_lifetime = 7d` and `krb5_renew_interval = 3600` (hourly TGT renew).
+  **Not** `krb5_renewable` — that option does not exist and `sssctl config-check`
+  rejects it.
+- `sssd-kcm` + `sssd-kcm.socket` (shared KCM cache instead of `FILE:/tmp/krb5cc_*`)
+- `includedir /etc/krb5.conf.d/` in `/etc/krb5.conf` (Ubuntu stock omits this;
+  without it SSSD's `krb5.include.d` fragments and the `sssd-kcm` default-ccache
+  snippet never load)
+- `/etc/krb5.conf.d/ansible_ticket_lifetimes` with `ticket_lifetime = 24h` and
+  `renew_lifetime = 7d`. Without it, Ubuntu clients request only a **24h** renew
+  window (RHEL ships 7d in its stock `krb5.conf`), so tickets stopped being
+  renewable a day after login even with renewal enabled.
+
+Variables: `sssd_krb5_renewable`, `sssd_krb5_renewable_lifetime`,
+`sssd_krb5_renew_interval`, `sssd_kcm_enabled`, `domain_join_krb5_renew_lifetime`
+— see [sssd-config.md](sssd-config.md).
+
+### Limits and caveats
+
+- **Hard limit:** after `renew until` (typically ~7 days), renewal cannot help —
+  run `kinit` or password-SSH (`pam_sss`) to re-seed credentials.
+- **`pam_sss` vs `ssh -K`:** SSSD renews TGTs **it issued** via password /
+  kbd-interactive login. Pure GSSAPI-delegated tickets (`ssh -K`) may **not** be
+  renewed. Prefer password login to the NFS member (or `kinit` on the member)
+  for long-lived tmux + NFS.
+- **KCM cutover:** after converging `domain-join.yml`, re-login or `kinit` so
+  sessions use the KCM-backed cache (old `FILE:/tmp/krb5cc_*` is stale).
+- **`GSSAPICleanupCredentials yes`** (domain member sshd): disconnecting SSH can
+  wipe session creds even before ticket expiry. Detached tmux is not a substitute
+  for a live credential cache — re-`kinit` or re-login after reconnect. Cleanup
+  stays enabled (security); do not disable it to “fix” tmux.
+
+### Recovery
+
+```bash
+kinit your_ad_user@HOME.2123STUDIOS.COM
+klist
+ls ~your_ad_user    # autofs remount with fresh creds
+```
+
+### Validation
+
+```bash
+sudo sssctl config-check          # must report no issues
+grep -E 'krb5_renew' /etc/sssd/sssd.conf
+grep includedir /etc/krb5.conf
+cat /etc/krb5.conf.d/ansible_ticket_lifetimes
+systemctl is-active sssd-kcm.socket
+# After pam_sss login + ~1h:
+journalctl -u sssd | grep -i renew
+klist   # KCM cache; "renew until" ~7d out; Expires advances without manual kinit
+```
+
 ## Validation checklist
 
 - [ ] `systemctl is-active autofs rpc-gssd`
@@ -173,8 +235,11 @@ client `kinit`): see [domain-join-runbook.md](domain-join-runbook.md) — enable
 - [ ] kif up: **AD user** (not local `ansible`) with `klist`: `cd ~` mounts homedir;
       `ls /archive` and `ls /media` list exports
 - [ ] kif down: reboot kvm01, `ansible` SSH works; `timeout 10 ls /archive` fails quickly
+- [ ] `krb5_renewable` / `krb5_renew_interval` present in `/etc/sssd/sssd.conf`
+- [ ] `includedir /etc/krb5.conf.d/` in `/etc/krb5.conf`; `sssd-kcm.socket` active
 
 ## Related
 
 - [hypervisor-runbook.md](hypervisor-runbook.md) — production hypervisor converge
+- [sssd-config.md](sssd-config.md) — SSSD renewal and KCM variables
 - [scripts/reimage/ubuntu-autoinstall/README.md](../scripts/reimage/ubuntu-autoinstall/README.md) — autoinstall USB
