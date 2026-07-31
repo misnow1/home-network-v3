@@ -167,6 +167,61 @@ Set `samba_dc_migration_host: true` in production `group_vars/dc/vars.yml` on dc
    host in the `dc` group (**re-applied every converge**, not only at bootstrap)
 7. Extends chrony for MS-SNTP signing (`dc_ntp_allow_cidr` — often narrower than DNS)
 8. Optionally configures a **local operator SSH account** (see below)
+9. Installs the **`samba-ad-dc` restart policy** drop-in (see below)
+
+### samba-ad-dc restart policy
+
+Samba binds *every* address on its configured interfaces at startup. On boot, a
+DHCPv6 or SLAAC address can be assigned but still in **Duplicate Address
+Detection**, so `bind()` fails and Samba tears the whole daemon down:
+
+```text
+Failed to bind to ipv6:2600:...:242:389 - NT_STATUS_ADDRESS_NOT_ASSOCIATED
+task_server_terminate: [cldapd failed to setup interfaces]
+samba_terminate: samba_terminate of samba 970: cldapd failed to setup interfaces
+```
+
+The window is sub-second — the DHCPv6 lease and the failed bind are typically
+one second apart in the journal. `After=network-online.target` does not help,
+because `systemd-networkd-wait-online` returns once IPv4 is routable and does
+not wait for IPv6 DAD to finish. `named` usually survives the same boot, which
+makes the DC look half-healthy.
+
+The packaged unit ships `Restart=no`, so a single lost race leaves the DC out of
+the directory indefinitely. Converge deploys
+`/etc/systemd/system/samba-ad-dc.service.d/10-ansible-restart.conf`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `samba_dc_restart_policy_manage` | `true` | Deploy the drop-in (`false` removes it) |
+| `samba_dc_restart_sec` | `15` | Seconds between retries |
+| `samba_dc_restart_start_limit_interval_sec` | `600` | Start-limit window |
+| `samba_dc_restart_start_limit_burst` | `10` | Attempts per window before the unit fails |
+
+Retrying works because `smb.conf` binds the NIC **by name**, so the next attempt
+picks up whatever addresses are ready. The start limit is deliberate: a genuinely
+broken config fails the unit instead of looping forever, so `systemctl --failed`
+stays meaningful.
+
+**With an LDAP VIP, keepalived handles this correctly on its own** — the
+`check_ldaps` script fails, the DC's effective priority drops below its peer, and
+the VIP stays with the healthy DC. That is a redundancy loss, not an outage, and
+it is easy to miss. Check both DCs after any reboot:
+
+```bash
+ansible dc -i inventories/production -m shell -a 'systemctl is-active samba-ad-dc'
+```
+
+If a DC is down, restarting is safe (nothing is running to disturb) and the VIP
+fails back once `check_ldaps` passes:
+
+```bash
+sudo systemctl restart samba-ad-dc
+sudo journalctl -u samba-ad-dc --since '-1m' | grep -i NT_STATUS   # expect nothing
+sudo /usr/local/sbin/check-ldaps-vip.sh; echo "rc=$?"              # expect rc=0
+```
+
+See [ldap-vip-runbook.md](ldap-vip-runbook.md) for the failback sequence.
 
 ### Group vars vs host vars (all DCs)
 
@@ -315,5 +370,6 @@ ldapsearch -H ldaps://dc1.home.2123studios.com -x -b "" -s base namingContexts
 | `samba_dns` | dc-bootstrap, dc-replica-join, dc-restore | BIND9 DLZ + AppArmor |
 | `samba_kerberos` | dc-bootstrap, dc-replica-join, dc-restore | krb5.conf copy |
 | `samba_converge` | dc-converge | Ongoing idempotent config |
+| `samba_restart_policy` | dc-converge | samba-ad-dc restart drop-in only |
 
 See [docs/dns-architecture.md](dns-architecture.md) for DNS design and DDNS integration.
