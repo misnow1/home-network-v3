@@ -3,7 +3,9 @@
 Package lists for Ubuntu 24.04 managed hosts. All `linux` inventory hosts receive
 [`linux_baseline`](../roles/linux_baseline/); role playbooks add functional packages on top.
 
-Hosts with `ansible_managed: false` in inventory are out of scope for apt playbooks.
+Hosts with `host_managed: false` in inventory are out of scope for apt playbooks.
+(Do not name the inventory flag `ansible_managed` — that shadows Ansible's built-in
+`ansible_managed` string and makes every templated file header render as `# True`.)
 Production hypervisors **kif** and **kvm01** are Ubuntu-managed post-reimage (Slice 19).
 Non-Ubuntu VMs (e.g. Pi-hole) use config-only roles until repaved as Ubuntu.
 
@@ -149,7 +151,7 @@ When `mdadm_monitor_enabled: true` (e.g. kif):
 
 Postfix relay client is a prerequisite — applied via `domain-join.yml --tags domain_mail_relay`, not by `fileserver.yml`.
 
-### Domain-joined members (`linux:!dc`)
+### Domain-joined members (`linux:!dc:!reverse_proxy`)
 
 **Playbook:** [`playbooks/domain-join.yml`](../playbooks/domain-join.yml) (run `baseline.yml` first)  
 **Role:** [`roles/domain_join`](../roles/domain_join/) — variable `domain_join_packages`

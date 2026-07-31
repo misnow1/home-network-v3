@@ -1,10 +1,16 @@
 ---
 # Join Linux members to the AD domain via realmd + sssd.
-# Excludes DC hosts. Run baseline.yml first (chrony before Kerberos).
+# Excludes:
+#   - dc — Samba AD DCs (roles/samba_dc)
+#   - reverse_proxy — proxy01 is not domain-joined (docs/software.md)
+# Run baseline.yml first (chrony before Kerberos).
 # Lab integration: scripts/test-integration.sh (member01.lab.test + dc01.lab.test).
+#
+# shell-clt01 (bastion) is EL9/CentOS — this role is Ubuntu-oriented
+# (pam-auth-update, etc.). Limit away from it until the role grows EL support.
 
 - name: Join Linux hosts to AD domain
-  hosts: "linux:!dc"
+  hosts: "linux:!dc:!reverse_proxy"
   become: true
   roles:
     - role: domain_join

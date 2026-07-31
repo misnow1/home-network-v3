@@ -74,9 +74,9 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Domain join | assert playbook targets linux excluding dc
+    - name: Domain join | assert playbook targets linux excluding dc and reverse_proxy
       ansible.builtin.shell: |
-        grep -q 'linux:!dc' "{{ domain_join_playbook }}"
+        grep -q 'linux:!dc:!reverse_proxy' "{{ domain_join_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false
