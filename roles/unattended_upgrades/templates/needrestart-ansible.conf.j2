@@ -1,0 +1,14 @@
+# Ansible managed — roles/unattended_upgrades. Local edits will be overwritten.
+# needrestart overrides.
+
+# Drop the systemd-manager special restart so needrestart never runs
+# `systemctl daemon-reexec` (/etc/needrestart/restart.d/systemd-manager).
+#
+# needrestart keys that restart when PID 1 maps an upgraded library. If the
+# generator sandbox times out during the re-exec, systemd treats it as a startup
+# failure and calls freeze(): PID 1 stops serving org.freedesktop.systemd1 and
+# every D-Bus client then stalls on the 25s activation timeout. Recovery needs a
+# forced reboot. systemd picks up upgraded libraries at the next boot anyway.
+#
+# See docs/security-updates-runbook.md § needrestart and systemd re-exec.
+push(@{$nrconf{blacklist_rc}}, qr(^systemd-manager$));

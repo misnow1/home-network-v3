@@ -56,7 +56,7 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | Step | Host group | Playbook | Notes |
 |---|---|---|---|
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
-| 1s | All Linux | `security-updates.yml` | Fleet unattended security patching — [security-updates-runbook.md](security-updates-runbook.md) |
+| 1s | All Linux | `security-updates.yml` | Fleet unattended security patching; also the needrestart/systemd re-exec guard on hypervisors — [security-updates-runbook.md](security-updates-runbook.md) |
 | 2 | `dc` | `dc-bootstrap.yml` | **Greenfield only** — once; break-glass |
 | 2m | `dc` | `dc-replica-join.yml` | Join existing domain — replica DC |
 | 2r | `dc` | `dc-restore.yml` | Join existing domain — offline backup restore |

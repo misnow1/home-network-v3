@@ -313,5 +313,10 @@ Partial hypervisor runs on kif:
 - The role never removes existing libvirt networks or pools — migrate VMs manually if renaming networks.
 - Per-host backup scope is declared in `host_vars/{hostname}/vars.yml` and rendered by
   `playbooks/backup.yml` (Slice 7). See [`docs/backup-runbook.md`](backup-runbook.md).
+- Hypervisors suppress needrestart's `systemctl daemon-reexec` hook
+  (`unattended_upgrades_needrestart_skip_systemd_manager`). Without it, a library upgrade
+  can freeze PID 1 and kill the whole D-Bus surface — slow logins, `systemctl` hangs — with
+  a forced reboot the only recovery. Failure mode, recovery, and generator-stall diagnosis:
+  [security-updates-runbook.md](security-updates-runbook.md) § needrestart and systemd re-exec.
 
 Domain join is optional for hypervisors and is not part of Slice 4 integration.

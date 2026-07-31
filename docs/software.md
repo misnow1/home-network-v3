@@ -196,7 +196,9 @@ the shared `unattended_upgrades` role (also available fleet-wide via
 | `unattended-upgrades` | Automatic security patching |
 
 Deploys APT periodic upgrade configuration, inventory-driven reboot windows, and
-email to `root` on package changes (`MailReport: on-change`). See
+email to `root` on package changes (`MailReport: on-change`). Optionally owns
+`/etc/needrestart/conf.d/90-ansible.conf` to suppress needrestart's
+`systemctl daemon-reexec` hook (enabled on hypervisors). See
 [security-updates-runbook.md](security-updates-runbook.md).
 
 ### Reverse proxy (`reverse_proxy`)

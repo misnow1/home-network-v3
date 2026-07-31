@@ -78,6 +78,13 @@ backup_prune_keep_monthly: 6
 # See docs/security-updates-runbook.md.
 unattended_upgrades_auto_reboot: false
 
+# Stop needrestart running `systemctl daemon-reexec` after a library upgrade. A re-exec
+# whose generator sandbox times out leaves PID 1 frozen and the whole D-Bus surface dead
+# (slow logins, systemctl hangs) until a forced reboot — this bit kvm01 repeatedly.
+# See docs/security-updates-runbook.md § needrestart and systemd re-exec.
+unattended_upgrades_needrestart_manage: true
+unattended_upgrades_needrestart_skip_systemd_manager: true
+
 # Host performance tuning (tuned, sysctl, THP) — off by default on production.
 # Enable after lab validation; see docs/hypervisor-performance.md.
 # hypervisor_perf_tuning_enabled: true

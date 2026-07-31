@@ -9,6 +9,7 @@
     role_defaults: "{{ repo_root }}/roles/unattended_upgrades/defaults/main.yml"
     role_tasks: "{{ repo_root }}/roles/unattended_upgrades/tasks/main.yml"
     role_template: "{{ repo_root }}/roles/unattended_upgrades/templates/50unattended-upgrades.j2"
+    needrestart_template: "{{ repo_root }}/roles/unattended_upgrades/templates/needrestart-ansible.conf.j2"
     security_playbook: "{{ repo_root }}/playbooks/security-updates.yml"
     bastion_playbook: "{{ repo_root }}/playbooks/bastion.yml"
     runbook: "{{ repo_root }}/docs/security-updates-runbook.md"
@@ -25,6 +26,7 @@
         - "{{ role_defaults }}"
         - "{{ role_tasks }}"
         - "{{ role_template }}"
+        - "{{ needrestart_template }}"
         - "{{ security_playbook }}"
         - "{{ runbook }}"
         - "{{ linux_vars_example }}"
@@ -68,12 +70,35 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Unattended upgrades | assert needrestart override defaults to opt-in only
+      ansible.builtin.shell: |
+        grep -q 'unattended_upgrades_needrestart_manage: false' "{{ role_defaults }}"
+        grep -q 'unattended_upgrades_needrestart_skip_systemd_manager: false' "{{ role_defaults }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Unattended upgrades | assert needrestart override is wired and reversible
+      ansible.builtin.shell: |
+        grep -q 'unattended_upgrades_needrestart_manage | bool' "{{ role_tasks }}"
+        grep -q 'needrestart-ansible.conf.j2' "{{ role_tasks }}"
+        grep -q '/etc/needrestart/conf.d/90-ansible.conf' "{{ role_tasks }}"
+        grep -q 'Restore needrestart systemd daemon-reexec hook' "{{ role_tasks }}"
+        grep -qF 'push(@' "{{ needrestart_template }}"
+        grep -qF 'nrconf{blacklist_rc}' "{{ needrestart_template }}"
+        grep -qF 'qr(^systemd-manager$)' "{{ needrestart_template }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Unattended upgrades | assert fleet and hypervisor inventory examples
       ansible.builtin.shell: |
         grep -q 'unattended_upgrades_auto_reboot: false' "{{ linux_vars_example }}"
         grep -q 'unattended_upgrades_auto_reboot: false' "{{ hypervisor_vars_example }}"
         grep -q 'unattended_upgrades_auto_reboot: false' "{{ kif_host_vars_example }}"
         grep -q 'unattended_upgrades_auto_reboot: true' "{{ bastion_vars_example }}"
+        grep -q 'unattended_upgrades_needrestart_manage: true' "{{ hypervisor_vars_example }}"
+        grep -q 'unattended_upgrades_needrestart_skip_systemd_manager: true' "{{ hypervisor_vars_example }}"
       args:
         executable: /bin/bash
       changed_when: false
