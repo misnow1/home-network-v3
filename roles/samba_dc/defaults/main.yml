@@ -101,6 +101,17 @@ samba_dc_register_ipv6: false
 samba_dc_interfaces: []
 samba_dc_dns_prune_script: /usr/local/sbin/samba-dc-prune-dns
 
+# samba-ad-dc restart policy — the packaged unit ships Restart=no, so a Samba
+# bind failure at boot (DHCPv6/SLAAC address still in Duplicate Address
+# Detection) leaves the DC down until an operator notices. Retrying rides out
+# DAD. See templates/samba-ad-dc-restart.conf.j2 and docs/dc-runbook.md.
+samba_dc_restart_policy_manage: true
+samba_dc_restart_sec: 15
+# Burst/interval bound the retries so a genuinely broken config still fails the
+# unit rather than looping forever. 10 tries over 10min far exceeds DAD (~1-3s).
+samba_dc_restart_start_limit_interval_sec: 600
+samba_dc_restart_start_limit_burst: 10
+
 # LDAPS / START-TLS — apply with playbooks/certbot.yml (requires cert material first).
 samba_dc_tls_enabled: false
 samba_dc_tls_cert_dir: "{{ certbot_live_dir | default('/etc/letsencrypt/live/' ~ inventory_hostname) }}"

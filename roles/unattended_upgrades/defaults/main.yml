@@ -8,6 +8,14 @@ unattended_upgrades_packages:
 unattended_upgrades_auto_reboot: false
 unattended_upgrades_reboot_time: "03:30"
 
+# needrestart tuning — opt in per group/host; leaves /etc/needrestart untouched when false.
+unattended_upgrades_needrestart_manage: false
+
+# Suppress needrestart's restart.d/systemd-manager hook (`systemctl daemon-reexec`).
+# A re-exec can leave PID 1 frozen when the generator sandbox times out, dropping
+# org.freedesktop.systemd1 off the system bus. See docs/security-updates-runbook.md.
+unattended_upgrades_needrestart_skip_systemd_manager: false
+
 # Email via local MTA (postfix relay client → mail.home). Empty disables mail.
 # Relies on mail-relay virtual_alias_maps rewriting root@<host> to the admin.
 # MailReport: always | only-on-error | on-change (packages installed / reboot needed).

@@ -43,6 +43,35 @@
       changed_when: false
       when: unattended_upgrades_auto_reboot | bool
 
+    - name: Check needrestart override file
+      ansible.builtin.stat:
+        path: /etc/needrestart/conf.d/90-ansible.conf
+      register: needrestart_override
+      when: unattended_upgrades_needrestart_manage | default(false) | bool
+
+    - name: Assert needrestart override presence matches inventory
+      ansible.builtin.assert:
+        that:
+          - needrestart_override.stat.exists == (unattended_upgrades_needrestart_skip_systemd_manager | default(false) | bool)
+        fail_msg: >-
+          /etc/needrestart/conf.d/90-ansible.conf presence
+          ({{ needrestart_override.stat.exists }}) does not match
+          unattended_upgrades_needrestart_skip_systemd_manager
+      when: unattended_upgrades_needrestart_manage | default(false) | bool
+
+    - name: Assert needrestart drops the systemd-manager restart and parses cleanly
+      ansible.builtin.shell: |
+        set -euo pipefail
+        grep -q 'blacklist_rc' /etc/needrestart/conf.d/90-ansible.conf
+        grep -q 'systemd-manager' /etc/needrestart/conf.d/90-ansible.conf
+        perl -c /etc/needrestart/conf.d/90-ansible.conf
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when:
+        - unattended_upgrades_needrestart_manage | default(false) | bool
+        - unattended_upgrades_needrestart_skip_systemd_manager | default(false) | bool
+
     - name: Assert mail notifications are configured
       ansible.builtin.shell: |
         set -euo pipefail

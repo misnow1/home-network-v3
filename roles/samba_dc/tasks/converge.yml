@@ -13,11 +13,18 @@
     mode: "0644"
   tags: [samba_converge]
 
+- name: DC converge | Manage samba-ad-dc restart policy
+  ansible.builtin.import_tasks: samba_restart_policy.yml
+  tags: [samba_converge, samba_restart_policy]
+
+# daemon_reload picks up the restart drop-in above. It only re-reads unit files —
+# unlike daemon-reexec, it does not restart PID 1.
 - name: DC converge | Ensure samba-ad-dc is started and enabled
-  ansible.builtin.service:
+  ansible.builtin.systemd:
     name: samba-ad-dc
     state: started
     enabled: true
+    daemon_reload: true
   when: not ansible_check_mode
   tags: [samba_converge]
 

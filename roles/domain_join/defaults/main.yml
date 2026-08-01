@@ -8,6 +8,10 @@ domain_name: lab.test
 # it is independent of AD.
 domain_join_enabled: true
 
+# AD join path is Ubuntu/Debian-oriented (apt, pam-auth-update). EL hosts stay in
+# the play (lab member01 is also in bastion/reverse_proxy) but skip AD tasks.
+domain_join_ad_supported: "{{ ansible_os_family | default('') == 'Debian' }}"
+
 domain_join_dns_servers: []
 # When true and domain_join_dns_servers is non-empty, replace /etc/resolv.conf with a
 # static file (breaks systemd-resolved stub). Default false — use DHCP/resolved on members.
@@ -38,6 +42,21 @@ domain_join_krb5_renew_lifetime: 7d
 
 # Shared credential cache (KCM) — preferred over FILE:/tmp/krb5cc_* for multi-session NFS.
 sssd_kcm_enabled: true
+
+# Ubuntu socket-activates the SSSD responders. Naming them in sssd.conf's
+# services= line as well makes each sssd-<responder>.socket fail to bind
+# (status=17), so the host sits permanently `degraded` and real unit failures
+# get lost in the noise. Omitting services= lets nss/pam/ssh/pac behave like
+# autofs/kcm/sudo already do. Set false only on a distro without socket units.
+sssd_socket_activation: true
+# Responder units that the old services= line conflicted with. Started here so
+# a host converging off the old config clears its failed units without a reboot.
+sssd_responder_sockets:
+  - sssd-nss.socket
+  - sssd-pam.socket
+  - sssd-pam-priv.socket
+  - sssd-ssh.socket
+  - sssd-pac.socket
 
 # Opt-in sshd for members with Kerberized NFS homedirs (hypervisors, etc.).
 # Bastion uses roles/bastion (GSSAPI-only, no password). Do not enable both patterns blindly.
