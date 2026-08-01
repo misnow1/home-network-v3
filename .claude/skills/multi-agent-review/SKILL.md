@@ -46,13 +46,12 @@ Copy and tick as you go:
 ```
 Multi-agent review:
 - [ ] 1. Plan drafted (Plan mode / expensive model)
-- [ ] 2. User approved the plan
-- [ ] 3. Ambiguity resolved via /grill-me (or N/A)
-- [ ] 4. Plan review complete; findings triaged
-- [ ] 5. Implementation complete (coding subagent)
-- [ ] 6. Code review complete; findings triaged
-- [ ] 7. Accepted findings fixed
-- [ ] 8. Optional CodeRabbit pass (at most once)
+- [ ] 2. Ambiguity resolved via /grill-me (or N/A)
+- [ ] 3. Plan review complete; findings triaged
+- [ ] 4. Implementation complete (coding subagent)
+- [ ] 5. Code review complete; findings triaged
+- [ ] 6. Accepted findings fixed
+- [ ] 7. Optional CodeRabbit pass (at most once)
 ```
 
 ## Workflow
@@ -60,23 +59,16 @@ Multi-agent review:
 ### 1. Draft plan
 
 Draft in Plan mode with the expensive/planning model. Cover scope, approach,
-files touched, risks, and open decisions.
+files touched, risks, and open decisions. Use the **`/grill-me`** skill to resolve
+ambiguity in the plan and resolve open questions. If grill-me is unavailable, stop
+with install/update instructions from Dependencies.
 
-**Stop for manual user approval.** Do not continue until the user explicitly
-approves the plan.
-
-### 2. Ambiguity gate
-
-If open decisions remain, invoke **`/grill-me`**. Loop until shared
-understanding. If grill-me is unavailable, stop with install/update
-instructions from Dependencies.
-
-### 3. Plan review
+### 2. Plan review
 
 Spawn a fresh review subagent (expensive model) with the approved plan and
 relevant codebase context. Defect-first. Use the plan-review prompt below.
 
-### 4. Triage plan review
+### 3. Triage plan review
 
 For each finding, either:
 
@@ -85,26 +77,27 @@ For each finding, either:
 
 Do not silently ignore findings. Show a triage table before implementing.
 
-### 5. Implement
+### 4. Implement
 
 Spawn a coding subagent (cheaper model) against the triaged plan. Prefer the
 subagent for large implementation; orchestrator stays on coordination and gates.
 
-### 6. Code review
+### 5. Code review
 
 Spawn a review subagent (expensive model) over the branch or uncommitted diff.
 Optionally run a second GPT-family pass. Use `bugbot` / `security-review` only
 when the user asks for those specifically; default is general defect-first
 review. Use the code-review prompt below.
 
-### 7. Triage code review
+### 6. Triage code review
 
 Same accept-or-dismiss-with-reasons discipline as step 4. Fix accepted findings
 with the coding model before claiming ready to merge.
 
-### 8. Optional CodeRabbit
+### 7. Optional CodeRabbit
 
-If local changes exist and the user has not disabled it, run once:
+If local changes exist and CodeRabbit is installed and the user has not disabled
+it, run once:
 
 ```bash
 coderabbit --agent -t uncommitted
