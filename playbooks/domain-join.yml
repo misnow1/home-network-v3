@@ -1,16 +1,16 @@
 ---
 # Join Linux members to the AD domain via realmd + sssd.
-# Excludes:
-#   - dc — Samba AD DCs (roles/samba_dc)
-#   - reverse_proxy — proxy01 is not domain-joined (docs/software.md)
-# Run baseline.yml first (chrony before Kerberos).
+# Excludes DC hosts (roles/samba_dc). Run baseline.yml first (chrony before Kerberos).
 # Lab integration: scripts/test-integration.sh (member01.lab.test + dc01.lab.test).
 #
-# shell-clt01 (bastion) is EL9/CentOS — this role is Ubuntu-oriented
-# (pam-auth-update, etc.). Limit away from it until the role grows EL support.
+# Do NOT exclude reverse_proxy or bastion from the host pattern: lab member01 sits in
+# both those groups and is the domain-join integration fixture. Instead:
+#   - reverse_proxy (production proxy01): domain_join_enabled: false
+#   - bastion on EL9 (shell-clt01): role AD tasks gate on ansible_os_family == 'Debian'
+#     until the role grows EL package/PAM support
 
 - name: Join Linux hosts to AD domain
-  hosts: "linux:!dc:!reverse_proxy"
+  hosts: "linux:!dc"
   become: true
   roles:
     - role: domain_join

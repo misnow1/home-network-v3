@@ -8,6 +8,10 @@ domain_name: lab.test
 # it is independent of AD.
 domain_join_enabled: true
 
+# AD join path is Ubuntu/Debian-oriented (apt, pam-auth-update). EL hosts stay in
+# the play (lab member01 is also in bastion/reverse_proxy) but skip AD tasks.
+domain_join_ad_supported: "{{ ansible_os_family | default('') == 'Debian' }}"
+
 domain_join_dns_servers: []
 # When true and domain_join_dns_servers is non-empty, replace /etc/resolv.conf with a
 # static file (breaks systemd-resolved stub). Default false — use DHCP/resolved on members.

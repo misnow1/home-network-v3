@@ -151,7 +151,7 @@ When `mdadm_monitor_enabled: true` (e.g. kif):
 
 Postfix relay client is a prerequisite — applied via `domain-join.yml --tags domain_mail_relay`, not by `fileserver.yml`.
 
-### Domain-joined members (`linux:!dc:!reverse_proxy`)
+### Domain-joined members (`linux:!dc`)
 
 **Playbook:** [`playbooks/domain-join.yml`](../playbooks/domain-join.yml) (run `baseline.yml` first)  
 **Role:** [`roles/domain_join`](../roles/domain_join/) — variable `domain_join_packages`

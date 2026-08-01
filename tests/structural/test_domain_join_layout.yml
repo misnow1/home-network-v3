@@ -74,9 +74,13 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Domain join | assert playbook targets linux excluding dc and reverse_proxy
+    - name: Domain join | assert playbook targets linux excluding dc only
       ansible.builtin.shell: |
-        grep -q 'linux:!dc:!reverse_proxy' "{{ domain_join_playbook }}"
+        # reverse_proxy/bastion stay in the pattern — lab member01 is in both groups.
+        # Production proxy01 uses domain_join_enabled: false; EL bastion is gated by
+        # domain_join_ad_supported (Debian family).
+        grep -qE '^  hosts: "linux:!dc"$' "{{ domain_join_playbook }}"
+        ! grep -qE '^  hosts:.*reverse_proxy' "{{ domain_join_playbook }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -97,6 +101,16 @@
         test "$(grep -c 'domain_join_enabled | bool' "{{ repo_root }}/roles/domain_join/tasks/main.yml")" -eq 5
         ! awk '/Postfix relay client/,/tags:/' "{{ repo_root }}/roles/domain_join/tasks/main.yml" \
           | grep -q 'domain_join_enabled'
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Domain join | assert AD tasks also require Debian family
+      ansible.builtin.shell: |
+        grep -q 'domain_join_ad_supported' "{{ domain_join_defaults }}"
+        test "$(grep -c 'domain_join_ad_supported | bool' "{{ repo_root }}/roles/domain_join/tasks/main.yml")" -eq 5
+        ! awk '/Postfix relay client/,/tags:/' "{{ repo_root }}/roles/domain_join/tasks/main.yml" \
+          | grep -q 'domain_join_ad_supported'
       args:
         executable: /bin/bash
       changed_when: false
