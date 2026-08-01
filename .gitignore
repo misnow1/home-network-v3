@@ -35,8 +35,11 @@ inventories/cka/hosts.yml
 # Python virtual environment
 .venv/
 
-# Ansible retry files
+# Ansible retry files and local runtime/cache (keep .ansible-lint config tracked)
 *.retry
+.ansible/
+.ansible-tmp/
+.ansible-local-tmp/
 
 # Production run logs
 logs/
