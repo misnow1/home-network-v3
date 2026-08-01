@@ -1,0 +1,8 @@
+{
+  "networkPolicy": {
+    "default": "allow"
+  },
+  "additionalReadonlyPaths": [
+    "/home/misnow1/.pyenv"
+  ]
+}
