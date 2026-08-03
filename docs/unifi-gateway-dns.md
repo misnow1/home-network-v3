@@ -15,6 +15,7 @@ See also:
 - [pihole-runbook.md](pihole-runbook.md) — Pi-hole forwarding, DHCP cutover, static DNS migration
 - [ddns-runbook.md](ddns-runbook.md) — DDNS API, bearer token, hook behaviour, cutover timing
 - [dns-architecture.md](dns-architecture.md) — BIND DLZ and DDNS pipeline
+- [wan-failover-5g.md](wan-failover-5g.md) — UniFi 5G Backup failover and cellular Traffic Rules
 
 ## Architecture change
 
@@ -403,6 +404,12 @@ future design explicitly requires it.
 
 No changes — clients do not query AD DNS. Do not add `192.168.5.0/24` to DC ACLs or
 AD site subnets.
+
+### Cellular failover (5G Backup)
+
+Per-network cellular allow/deny and Traffic Rules live in
+[wan-failover-5g.md](wan-failover-5g.md). Summary: VLAN 1 may fail over to the
+U5G; VLANs 2, 3, and 9 must not.
 
 ## Token rotation
 

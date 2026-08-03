@@ -44,6 +44,7 @@
       - docs/ldap-vip-runbook.md
       - docs/authelia-runbook.md
       - docs/edge-access-model.md
+      - docs/wan-failover-5g.md
       - docs/host-firewall-runbook.md
       - docs/nut-runbook.md
       - docs/nfs-server-runbook.md

@@ -87,6 +87,16 @@ Implementation when tightening:
 | kif host firewall | `host_firewall_enabled` + edge vars in kif host_vars — [host-firewall-runbook.md](host-firewall-runbook.md) |
 | Scheduled backups + offsite | `roles/backup`, kif host_vars |
 | SSH hardening | `roles/bastion` on shell-clt01 |
+| Cellular WAN failover | UniFi 5G Backup (manual) — [wan-failover-5g.md](wan-failover-5g.md) |
+
+## Cellular failover (primary WAN down)
+
+Metered **UniFi 5G Backup** (RedCap) is Failover-only on the UCG Fiber. VLAN 1
+may use cellular with Traffic Rules that preserve messaging and light browsing
+while blocking BitTorrent, streaming, OS updates, and cloud backup. IoT and
+Kubernetes VLANs must not fail over. Carrier **CGNAT** usually breaks inbound
+port-forwards (SSH/HTTPS) during failover — see
+[wan-failover-5g.md](wan-failover-5g.md).
 
 ## Review cadence
 
@@ -96,3 +106,4 @@ Revisit this document when:
 - Adding a new Kubernetes app behind ingress-nginx + proxy01
 - Deploying edge VIP HA (Slice 28+) — update `host_firewall_edge_proxy_cidrs`
 - Changing who needs remote access (VPN vs public)
+- Changing 5G backup data plan or failover Traffic Rules
