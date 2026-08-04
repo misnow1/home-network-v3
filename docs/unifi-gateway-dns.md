@@ -375,6 +375,8 @@ FerryCrossing has multiple VLANs. BIND ACLs on every DC (`dc_trusted_networks` i
 | 1 (default) | `192.168.1.0/24` | Pi-hole `.18` + `.22` | Primary LAN; DDNS hook on UCG |
 | 2 (IoT) | `192.168.3.0/24` | Pi-hole `.18` + `.22` | Inter-VLAN routing; Pi-hole → dc1/dc2 for AD |
 | 3 (restricted) | `192.168.5.0/24` | Router/public only | **Isolated** — not in `dc_trusted_networks` |
+| 4 (docker edge) | `192.168.7.0/24` | **None** (L2 trunk only) | Hypervisor br4 + proxy01 docker NIC; not in AD |
+| 9 (kubernetes) | `192.168.9.0/24` | Pi-hole `.18` + `.22` or DC `.10`/`.11` | Routed k8s fabric — CP VM + workers; see [adr/003-home-kubernetes.md](adr/003-home-kubernetes.md) |
 
 ### VLAN 2 (IoT)
 
@@ -383,9 +385,6 @@ FerryCrossing has multiple VLANs. BIND ACLs on every DC (`dc_trusted_networks` i
 3. Confirm firewall rules allow IoT → Pi-hole **UDP/TCP 53** and Pi-hole → DC **UDP/TCP 53**.
 
 MS-SNTP from DCs remains VLAN 1 only (`dc_ntp_allow_cidr`); IoT uses router or public NTP.
-
-| 3 (restricted) | `192.168.5.0/24` | Router/public only | **Isolated** — not in `dc_trusted_networks` |
-| 4 (docker edge) | `192.168.7.0/24` | **None** (L2 trunk only) | Hypervisor br4 + proxy01 docker NIC; not in AD |
 
 ### VLAN 4 (Docker edge)
 
@@ -399,6 +398,28 @@ L2-only VLAN for reverse-proxy backends — **no gateway, DHCP, or DNS** on UniF
 
 Do not add `192.168.7.0/24` to DC ACLs, AD site subnets, or Pi-hole zones unless a
 future design explicitly requires it.
+
+### VLAN 9 (Kubernetes)
+
+Routed VLAN for the home kubeadm cluster — **gateway enabled**, static addressing,
+DNS via Pi-hole or DCs ([adr/003-home-kubernetes.md](adr/003-home-kubernetes.md)):
+
+1. UniFi Network → **Settings** → **Networks** → create VLAN **9**.
+2. Subnet `192.168.9.0/24`, gateway `192.168.9.1` (UCG).
+3. **DHCP:** optional small pool for lab; **reserve** CP (`.10`), workers (`.128`/`.129`),
+   and MetalLB pool (`.200`–`.210`) as static — do not hand those to DHCP clients.
+4. **DHCP DNS Server:** Pi-hole (`192.168.1.18`, `192.168.1.22`) or dc1/dc2 (`.10`/`.11`).
+5. Tag VLAN 9 on hypervisor uplinks (kif, kvm01) for br9/libvirt **vlan9**.
+6. Firewall (minimum):
+   - VLAN 9 → VLAN 1: DNS (53), NFS (2049), HTTPS (443 apt mirrors), ICMP as needed.
+   - VLAN 1 → VLAN 9: SSH (22), Kubernetes API (6443 from admin/bastion), proxy01 → MetalLB VIP (80/443).
+   - Do not expose NodePort ranges to the Internet — north-south stays on proxy01.
+
+Add `192.168.9.0/24` to `dc_trusted_networks` if nodes query dc1/dc2 directly.
+Static BIND A records (via DDNS API or manual): `k8s-cp01`, `k8s-node-1`, `k8s-node-2`,
+and the ingress MetalLB VIP hostname.
+
+K8s nodes do **not** join AD. Break-glass local SSH only — see [kubernetes-runbook.md](kubernetes-runbook.md).
 
 ### VLAN 3 (restricted)
 

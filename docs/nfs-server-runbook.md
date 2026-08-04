@@ -31,6 +31,36 @@ nfs_server_client_networks:
 Optional overrides: `nfs_server_exports`, `nfs_server_export_sec`,
 `nfs_server_manage_spn: false` (SPN/keytab already correct).
 
+### Extra export for Kubernetes CSI (`sec=sys`)
+
+Domain-joined Kerberos exports stay on `nfs_server_exports`. Append a VLAN-9-only
+sys export via `nfs_server_extra_exports` (per-export `sec` / `clients`; `ensure: true`
+creates the directory):
+
+```yaml
+nfs_server_extra_exports:
+  - path: /export/k8s
+    fsid: 4
+    sec: sys
+    clients:
+      - 192.168.9.0/24
+    ensure: true
+    # root_squash maps client root → nobody (65534). Own the share accordingly:
+    owner: nobody
+    group: nogroup
+    mode: "0775"
+```
+
+One-shot on kif if the directory already exists:
+
+```bash
+sudo chown nobody:nogroup /export/k8s
+sudo chmod 775 /export/k8s
+```
+
+Also allow 2049 from `192.168.9.0/24` on kif (`host_firewall_rules`) and UniFi
+VLAN 9 → VLAN 1 NFS. See [kubernetes-runbook.md](kubernetes-runbook.md) Phase 6.
+
 ## Production apply (kif)
 
 Run **before** client validation on kvm01 (`nfs-client.yml`).

@@ -43,7 +43,7 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_enabled` | `true` | Master gate — set in `group_vars/hypervisors` for production |
 | `hypervisor_netplan_enabled` | `false` | Enable host bridge/VLAN netplan |
 | `hypervisor_netplan_bridges` | `{}` | Per-bridge config; production uses `dhcp4: true` on br0 |
-| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`, `vlan4`) |
+| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`, `vlan4`, `vlan9`) |
 | `hypervisor_netplan_br4_address` | `""` | Static br4 address per host (e.g. `192.168.7.152/24`) |
 | `hypervisor_libvirt_pools` | `default`, `vms` | Base dir pools |
 | `hypervisor_libvirt_pools_extra` | `[]` | Host-specific pools (e.g. kif `boot`) |
@@ -193,6 +193,36 @@ hypervisor_netplan_br4_address: 192.168.7.152/24   # kif — mirrored from 192.1
 UniFi: create VLAN 4, tag hypervisor uplinks, **do not** assign a gateway or DHCP pool.
 See [unifi-gateway-dns.md](unifi-gateway-dns.md#vlan-4-docker-edge) and
 [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md).
+
+### VLAN 9 — Kubernetes fabric (br9)
+
+VLAN 9 (`192.168.9.0/24`) is a **routed** segment for the kubeadm cluster (CP VM and
+workers). Unlike VLAN 4, nodes receive DNS and default route via the UCG gateway
+(`192.168.9.1`).
+
+| Host | Role on VLAN 9 | libvirt network |
+|---|---|---|
+| kvm01 | CP VM host (`k8s-cp01`) | `vlan9` → `br9` |
+| k8s-cp01 (VM) | `192.168.9.10/24` | NIC on `vlan9` |
+| k8s-node-1/2 (metal) | `.128`/`.129` | N/A — bare metal |
+
+`hypervisor_netplan_bridges.br9` is bridge-only (`dhcp4: false`); the hypervisor does
+not need an address on br9 unless you want host-level routing diagnostics.
+
+UniFi: create VLAN 9 with gateway and DNS; tag hypervisor uplinks. Reserve static
+addresses for CP, workers, and the MetalLB pool — see
+[unifi-gateway-dns.md](unifi-gateway-dns.md#vlan-9-kubernetes) and
+[adr/003-home-kubernetes.md](adr/003-home-kubernetes.md).
+
+Create the CP VM after converging br9:
+
+```bash
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/hypervisor.yml --limit kvm01.home.2123studios.com \
+  --tags hypervisor_netplan,hypervisor_networks
+
+./scripts/vm/vm-create.sh -i production k8s-cp01.home.2123studios.com
+```
 
 ### Netplan apply and bridge MAC / DHCP reservation
 

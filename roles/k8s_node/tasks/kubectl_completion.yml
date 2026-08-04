@@ -1,0 +1,57 @@
+---
+- name: Kubernetes node | Install bash-completion for kubectl tab completion
+  ansible.builtin.apt:
+    name: bash-completion
+    state: present
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Generate kubectl bash completion script
+  ansible.builtin.command: kubectl completion bash
+  register: k8s_kubectl_completion_bash
+  changed_when: false
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Install system kubectl bash completion script
+  ansible.builtin.copy:
+    dest: /etc/bash_completion.d/kubectl
+    content: "{{ k8s_kubectl_completion_bash.stdout }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Ensure bash drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/bash.bashrc.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Install bash kubectl completion drop-in
+  ansible.builtin.copy:
+    src: etc/bash.bashrc.d/99-kubectl.sh
+    dest: /etc/bash.bashrc.d/99-kubectl.sh
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Ensure zsh drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/zsh/zshrc.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Install zsh kubectl completion drop-in
+  ansible.builtin.copy:
+    src: etc/zsh/zshrc.d/99-kubectl.zsh
+    dest: /etc/zsh/zshrc.d/99-kubectl.zsh
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [k8s_node, k8s_kubectl_completion]

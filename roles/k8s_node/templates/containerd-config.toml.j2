@@ -1,0 +1,9 @@
+# Managed by Ansible (k8s_node role). Minimal kubeadm-compatible containerd config.
+version = 2
+
+[plugins."io.containerd.grpc.v1.cri"]
+  sandbox_image = "{{ k8s_pause_image }}"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+      SystemdCgroup = true

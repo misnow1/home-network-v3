@@ -105,6 +105,18 @@ fileserver_shares:
 nfs_server_enabled: true
 nfs_server_client_networks:
   - 192.168.1.0/24
+# Kubernetes CSI (sec=sys) — VLAN 9 only; keep Kerberos exports on nfs_server_exports.
+# nfs_server_extra_exports:
+#   - path: /export/k8s
+#     fsid: 4
+#     sec: sys
+#     clients:
+#       - 192.168.9.0/24
+#     ensure: true
+#     # root_squash → nobody (65534); CSI provisioner must be able to mkdir as nobody.
+#     owner: nobody
+#     group: nogroup
+#     mode: "0775"
 
 mdadm_monitor_enabled: true
 
@@ -250,6 +262,13 @@ host_firewall_rules:
     direction: in
     interface: br0
     comment: nfs
+  # NFS CSI from Kubernetes VLAN 9 (routed to kif br0)
+  - port: "2049"
+    proto: tcp
+    direction: in
+    interface: br0
+    src: 192.168.9.0/24
+    comment: "nfs from k8s"
   # NUT upsd (listens on 192.168.1.152:3493)
   - port: "3493"
     proto: tcp

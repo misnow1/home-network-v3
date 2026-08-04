@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: {{ ansible_facts['distribution_release'] | default('noble') }}
+Components: {{ k8s_containerd_apt_repo_channel }}
+Architectures: {{ k8s_deb_arch }}
+Signed-By: /etc/apt/keyrings/docker.asc
