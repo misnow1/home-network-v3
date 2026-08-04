@@ -6,5 +6,5 @@
 
 - name: Install domain join packages
   ansible.builtin.apt:
-    name: "{{ domain_join_packages }}"
+    name: "{{ domain_join_packages + (['sssd-kcm'] if sssd_kcm_enabled | bool else []) }}"
     state: present

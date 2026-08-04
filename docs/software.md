@@ -3,7 +3,9 @@
 Package lists for Ubuntu 24.04 managed hosts. All `linux` inventory hosts receive
 [`linux_baseline`](../roles/linux_baseline/); role playbooks add functional packages on top.
 
-Hosts with `ansible_managed: false` in inventory are out of scope for apt playbooks.
+Hosts with `host_managed: false` in inventory are out of scope for apt playbooks.
+(Do not name the inventory flag `ansible_managed` — that shadows Ansible's built-in
+`ansible_managed` string and makes every templated file header render as `# True`.)
 Production hypervisors **kif** and **kvm01** are Ubuntu-managed post-reimage (Slice 19).
 Non-Ubuntu VMs (e.g. Pi-hole) use config-only roles until repaved as Ubuntu.
 
@@ -196,7 +198,9 @@ the shared `unattended_upgrades` role (also available fleet-wide via
 | `unattended-upgrades` | Automatic security patching |
 
 Deploys APT periodic upgrade configuration, inventory-driven reboot windows, and
-email to `root` on package changes (`MailReport: on-change`). See
+email to `root` on package changes (`MailReport: on-change`). Optionally owns
+`/etc/needrestart/conf.d/90-ansible.conf` to suppress needrestart's
+`systemctl daemon-reexec` hook (enabled on hypervisors). See
 [security-updates-runbook.md](security-updates-runbook.md).
 
 ### Reverse proxy (`reverse_proxy`)

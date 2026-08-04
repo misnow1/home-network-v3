@@ -251,6 +251,14 @@ then loses the host at its `ansible_host`. Choose one:
 If the host goes unreachable after the first `hypervisor.yml`, find its new lease on the
 router, update `ansible_host` (or fix the reservation/MAC), then re-run.
 
+**Unmanaged cloud-init netplan:** leave `hypervisor_netplan_remove_unmanaged: true` on
+production hypervisors. A leftover `/etc/netplan/50-cloud-init.yaml` that still puts
+`dhcp4` on the uplink (now a bridge slave) or declares a USB NIC without `optional:
+true` leaves that interface stuck in systemd-networkd's `configuring` state.
+`systemd-networkd-wait-online` then fails every boot and the host reports `degraded`.
+With the flag set, converge deletes every netplan file other than
+`{{ hypervisor_netplan_config_file }}` and re-applies.
+
 ### Host resolvers (br0 DNS)
 
 Production `br0` uses DHCP for the host address but **must not** inherit DNS from the
@@ -343,5 +351,10 @@ Partial hypervisor runs on kif:
 - The role never removes existing libvirt networks or pools — migrate VMs manually if renaming networks.
 - Per-host backup scope is declared in `host_vars/{hostname}/vars.yml` and rendered by
   `playbooks/backup.yml` (Slice 7). See [`docs/backup-runbook.md`](backup-runbook.md).
+- Hypervisors suppress needrestart's `systemctl daemon-reexec` hook
+  (`unattended_upgrades_needrestart_skip_systemd_manager`). Without it, a library upgrade
+  can freeze PID 1 and kill the whole D-Bus surface — slow logins, `systemctl` hangs — with
+  a forced reboot the only recovery. Failure mode, recovery, and generator-stall diagnosis:
+  [security-updates-runbook.md](security-updates-runbook.md) § needrestart and systemd re-exec.
 
 Domain join is optional for hypervisors and is not part of Slice 4 integration.

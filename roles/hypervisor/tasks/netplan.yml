@@ -25,6 +25,20 @@
   when:
     - hypervisor_netplan_existing.files | length > 0
     - hypervisor_netplan_config_file not in item.path
+    - not (hypervisor_netplan_remove_unmanaged | bool)
+  tags: [hypervisor_netplan]
+
+- name: Netplan | Remove unmanaged netplan files
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ hypervisor_netplan_existing.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - hypervisor_netplan_remove_unmanaged | bool
+    - hypervisor_netplan_config_file not in item.path
+  register: hypervisor_netplan_removed
   tags: [hypervisor_netplan]
 
 - name: Netplan | Deploy hypervisor netplan configuration
@@ -53,6 +67,8 @@
   ansible.builtin.set_fact:
     hypervisor_netplan_apply_needed: >-
       {{ hypervisor_netplan_deploy is changed
+         or (hypervisor_netplan_removed is defined
+             and hypervisor_netplan_removed is changed)
          or (hypervisor_netplan_bridge_probe.results
              | selectattr('rc', 'ne', 0) | list | length > 0) }}
   tags: [hypervisor_netplan]

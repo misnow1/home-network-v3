@@ -59,6 +59,21 @@ See [sssd-config.md](sssd-config.md):
 
 DC hosts (`dc` group) are excluded — they never run `domain_join`.
 
+## Opting a linux member out of AD
+
+Some hosts belong in the `linux` group for `baseline.yml`, `security-updates.yml`, and
+`host-firewall.yml` but must not join the domain — the edge reverse proxy is the
+current example. Do **not** remove them from `linux`; set the opt-out instead:
+
+```yaml
+# inventories/production/group_vars/reverse_proxy/vars.yml
+domain_join_enabled: false
+```
+
+This skips packages, `realm join`, SSSD/PAM, member sshd, and sudo. The Postfix
+relay client still applies, since it is independent of AD. Without the opt-out,
+`domain-join.yml` fails on `realm join` for that host on every fleet-wide run.
+
 ## DNS / resolv.conf (opt-in)
 
 Default **`domain_join_manage_resolv_conf: false`** — the role does not replace

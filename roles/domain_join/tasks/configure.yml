@@ -17,6 +17,35 @@
   when: not ansible_check_mode
   tags: [domain_configure]
 
+# sssd must be running the new services=-free config before the sockets are
+# started, otherwise it still owns the responder socket paths and they fail to
+# bind all over again.
+- name: SSSD | Apply pending sssd restart before adopting sockets
+  ansible.builtin.meta: flush_handlers
+  tags: [domain_configure]
+
+- name: SSSD | Adopt socket-activated responders
+  when:
+    - sssd_socket_activation | bool
+    - not ansible_check_mode
+  tags: [domain_configure]
+  block:
+    # A unit left `failed` by the old services= conflict stays failed until
+    # something clears it, so reset before starting. sssd-pac.service fails as a
+    # service (status=17) and is not reachable via its socket, hence both here.
+    - name: SSSD | Clear stale responder failures # noqa: command-instead-of-module
+      ansible.builtin.command:
+        argv: "{{ ['systemctl', 'reset-failed'] + sssd_responder_sockets + ['sssd-pac.service'] }}"
+      changed_when: false
+      failed_when: false
+
+    - name: SSSD | Enable and start responder sockets
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: "{{ sssd_responder_sockets }}"
+
 - name: SSSD | Check whether pam_mkhomedir is enabled
   ansible.builtin.shell: |
     grep -q 'pam_mkhomedir.so' /etc/pam.d/common-session
@@ -39,3 +68,7 @@
     enabled: true
   when: not ansible_check_mode
   tags: [domain_configure]
+
+- name: Kerberos | Fix Ubuntu includedir and enable sssd-kcm
+  ansible.builtin.include_tasks: krb5.yml
+  tags: [domain_configure, domain_krb5]

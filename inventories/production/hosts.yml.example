@@ -38,10 +38,10 @@ all:
       hosts:
         kvm01.example.home:
           ansible_host: 203.0.113.20
-          ansible_managed: true   # Ubuntu 24.04 post-reimage
+          host_managed: true   # Ubuntu 24.04 post-reimage
         kif.example.home:
           ansible_host: 203.0.113.30
-          ansible_managed: true   # Ubuntu 24.04 post-reimage
+          host_managed: true   # Ubuntu 24.04 post-reimage
 
     fileservers:
       hosts:
@@ -103,7 +103,7 @@ all:
       hosts:
         pihole1.example.home:
           ansible_host: 203.0.113.18
-          ansible_managed: true
+          host_managed: true
           vm_name: pihole-1-example
           vm_memory_mb: 1536
           vm_disk_gb: 8
@@ -112,7 +112,7 @@ all:
               dhcp6: true
         pihole2.example.home:
           ansible_host: 203.0.113.22
-          ansible_managed: true
+          host_managed: true
           vm_name: pihole-2-example
           vm_memory_mb: 1536
           vm_disk_gb: 8
@@ -126,7 +126,7 @@ all:
       hosts:
         win11.example.home:
           ansible_host: 203.0.113.19
-          ansible_managed: false
+          host_managed: false
           vm_name: win11-example
           vm_cpu_count: 6
           vm_cpu_topology: "6,1"
@@ -164,7 +164,7 @@ all:
       hosts:
         cka-sim.example.home:
           ansible_host: 203.0.113.141
-          ansible_managed: true
+          host_managed: true
 
     # Kubernetes — VLAN 9 routed fabric (ADR 003). CP is a VM; workers are bare metal.
     # Bootstrap: docs/kubernetes-runbook.md — kubeadm init/join is manual in v1.

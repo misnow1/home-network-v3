@@ -1,0 +1,41 @@
+---
+# Tags are repeated per task: dynamic include_tasks does not propagate the parent
+# include's tags to children, so a --tags domain_configure run would skip these.
+# Ubuntu stock krb5-config omits includedir /etc/krb5.conf.d/; without it,
+# /etc/krb5.conf.d/enable_sssd_conf_dir never loads SSSD's pubconf fragments.
+- name: Kerberos | Ensure krb5.conf.d directory exists
+  ansible.builtin.file:
+    path: /etc/krb5.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [domain_configure, domain_krb5]
+
+- name: Kerberos | Ensure krb5.conf includes krb5.conf.d
+  ansible.builtin.lineinfile:
+    path: /etc/krb5.conf
+    line: "includedir /etc/krb5.conf.d/"
+    insertafter: EOF
+    create: false
+  tags: [domain_configure, domain_krb5]
+
+# krb5 includedir only reads filenames of alphanumerics, dashes, and underscores.
+- name: Kerberos | Deploy ticket lifetime drop-in
+  ansible.builtin.template:
+    src: krb5-lifetimes.j2
+    dest: /etc/krb5.conf.d/ansible_ticket_lifetimes
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [domain_configure, domain_krb5]
+
+- name: Kerberos | Enable and start sssd-kcm.socket
+  ansible.builtin.service:
+    name: sssd-kcm.socket
+    state: started
+    enabled: true
+  when:
+    - sssd_kcm_enabled | bool
+    - not ansible_check_mode
+  tags: [domain_configure, domain_krb5]

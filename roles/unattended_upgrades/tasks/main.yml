@@ -26,3 +26,22 @@
           APT::Periodic::Update-Package-Lists "1";
           APT::Periodic::Unattended-Upgrade "1";
           APT::Periodic::AutocleanInterval "7";
+
+    - name: Unattended upgrades | Configure needrestart overrides
+      when: unattended_upgrades_needrestart_manage | bool
+      block:
+        - name: Unattended upgrades | Skip needrestart systemd daemon-reexec hook
+          ansible.builtin.template:
+            src: needrestart-ansible.conf.j2
+            dest: /etc/needrestart/conf.d/90-ansible.conf
+            owner: root
+            group: root
+            mode: "0644"
+            validate: perl -c %s
+          when: unattended_upgrades_needrestart_skip_systemd_manager | bool
+
+        - name: Unattended upgrades | Restore needrestart systemd daemon-reexec hook
+          ansible.builtin.file:
+            path: /etc/needrestart/conf.d/90-ansible.conf
+            state: absent
+          when: not (unattended_upgrades_needrestart_skip_systemd_manager | bool)

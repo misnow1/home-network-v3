@@ -1,0 +1,46 @@
+---
+# Make samba-ad-dc survive a transient bind failure at startup instead of
+# staying down until an operator notices. See defaults/main.yml for the knobs
+# and docs/dc-runbook.md for the failure mode.
+
+- name: Samba DC restart policy | Manage samba-ad-dc restart drop-in
+  when: samba_dc_restart_policy_manage | bool
+  tags: [samba_converge, samba_restart_policy]
+  block:
+    - name: Samba DC restart policy | Ensure drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/samba-ad-dc.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Samba DC restart policy | Deploy samba-ad-dc restart drop-in
+      ansible.builtin.template:
+        src: samba-ad-dc-restart.conf.j2
+        dest: /etc/systemd/system/samba-ad-dc.service.d/10-ansible-restart.conf
+        owner: root
+        group: root
+        mode: "0644"
+      register: samba_dc_restart_dropin
+
+- name: Samba DC restart policy | Remove samba-ad-dc restart drop-in
+  ansible.builtin.file:
+    path: /etc/systemd/system/samba-ad-dc.service.d/10-ansible-restart.conf
+    state: absent
+  when: not (samba_dc_restart_policy_manage | bool)
+  register: samba_dc_restart_dropin_removed
+  tags: [samba_converge, samba_restart_policy]
+
+# systemd honours the packaged Restart=no until unit files are re-read, so the
+# reload belongs here rather than only in converge.yml — a tag-limited run must
+# not leave the drop-in on disk but inert. daemon_reload only re-reads unit
+# files; unlike daemon-reexec it does not restart PID 1.
+- name: Samba DC restart policy | Reload systemd unit files
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - (samba_dc_restart_dropin | default({}) is changed)
+      or (samba_dc_restart_dropin_removed | default({}) is changed)
+  tags: [samba_converge, samba_restart_policy]
