@@ -61,3 +61,6 @@ __pycache__/
 *.swo
 
 .tmp*
+
+# kubeconfig that I have stashed here for testing purposes
+.kube/
