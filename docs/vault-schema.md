@@ -21,7 +21,12 @@ Non-secret production variables use committed `*.example` templates under
 | `.vault_pass_lab` | Local lab vault password |
 | `.vault_pass` | Local production vault password |
 
-GitHub Actions secret: `VAULT_PASS_LAB`
+GitHub secrets (same value as `.vault_pass_lab`):
+
+| Secret name | Scope | Why |
+|---|---|---|
+| `VAULT_PASS_LAB` | Actions | Push / normal PR workflows |
+| `VAULT_PASS_LAB` | Dependabot | Dependabot PRs cannot read Actions secrets; without a Dependabot secret, `test-quick` writes an empty `.vault_pass_lab` and syntax-check fails |
 
 Default lab development password (change after clone): `change-me-lab-vault`
 
@@ -82,7 +87,8 @@ ansible-vault encrypt_string --vault-password-file .vault_pass_lab \
   'change-me-join' --name vault_ad_join_password
 ```
 
-After recreating, update the `VAULT_PASS_LAB` GitHub secret and re-run `./scripts/test-quick.sh`.
+After recreating, update `VAULT_PASS_LAB` for both Actions and Dependabot, then re-run
+`./scripts/test-quick.sh`.
 
 ## Production vault
 
