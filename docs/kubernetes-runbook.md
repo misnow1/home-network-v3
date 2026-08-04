@@ -220,18 +220,34 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.9.200/
 
 ## Phase 5 — Envoy Gateway (Gateway API)
 
-Install Gateway API + Envoy Gateway CRDs explicitly, then the controller with CRD install
-disabled (avoids Helm silently downgrading CRDs). Pin versions — verify against
+Pin the chart version against
 [Envoy Gateway Helm install](https://gateway.envoyproxy.io/v1.8/install/install-helm/)
-before running:
+before running.
+
+**Preferred (matches upstream default):** one `helm install` applies Gateway API CRDs,
+Envoy Gateway CRDs, and the controller. Fine for a first install.
 
 ```bash
-# CRDs (standard Gateway API channel + Envoy Gateway CRDs)
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.8.3 \
+  -n envoy-gateway-system \
+  --create-namespace
+
+kubectl wait --timeout=5m -n envoy-gateway-system \
+  deployment/envoy-gateway --for=condition=Available
+```
+
+**Optional — CRDs first:** upstream documents `helm template … | kubectl apply --server-side`.
+That pipe is broken on **Helm 4**: OCI `Pulled:` / `Digest:` lines go to **stdout** and kubectl
+rejects them (`apiVersion not set, kind not set`). If you still want CRDs applied separately:
+
+```bash
 helm template eg-crds oci://docker.io/envoyproxy/gateway-crds-helm \
   --version v1.8.3 \
   --set crds.gatewayAPI.enabled=true \
   --set crds.gatewayAPI.channel=standard \
   --set crds.envoyGateway.enabled=true \
+  | grep -vE '^(Pulled|Digest):' \
   | kubectl apply --server-side -f -
 
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
@@ -243,6 +259,9 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
 kubectl wait --timeout=5m -n envoy-gateway-system \
   deployment/envoy-gateway --for=condition=Available
 ```
+
+On upgrades, update CRDs before the controller chart (Helm does not upgrade CRDs that live
+under the chart's `crds/` directory).
 
 Create a shared `GatewayClass`, pin MetalLB VIP on the Envoy proxy Service, and a cluster
 HTTP `Gateway` listening on port 80 (proxy01 terminates TLS):
@@ -297,8 +316,93 @@ kubectl get svc -n envoy-gateway-system
 kubectl get gateway -n envoy-gateway-system
 ```
 
-Smoke test: deploy a tiny app + `HTTPRoute` attaching to `gatewayRef` `eg` /
-`envoy-gateway-system`. Confirm HTTP via the MetalLB VIP and `Host` header.
+### Smoke test — whoami + HTTPRoute
+
+This deploys a tiny HTTP app and tells the Gateway: “for Host `whoami.home.2123studios.com`,
+send traffic to that Service.”
+
+```bash
+kubectl create namespace whoami
+
+kubectl apply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: whoami
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami:v1.10
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whoami
+  namespace: whoami
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - whoami.home.2123studios.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: whoami
+          port: 80
+EOF
+```
+
+Wait until the route is accepted and the pod is Ready:
+
+```bash
+kubectl -n whoami get pods,svc,httproute
+kubectl -n whoami describe httproute whoami
+# Look for Accepted=True / ResolvedRefs=True under Status
+```
+
+Curl the MetalLB VIP and **set the Host header** (Envoy routes on hostname, not just IP):
+
+```bash
+curl -sS -H 'Host: whoami.home.2123studios.com' http://192.168.9.200/
+```
+
+You should see whoami’s text response (Hostname, IP, headers). Without the `Host` header you
+still get 404 — that is expected.
+
+Cleanup when done learning:
+
+```bash
+kubectl delete namespace whoami
+```
 
 ## Phase 6 — Platform add-ons
 
@@ -309,6 +413,142 @@ Install before any “useful” app:
 | metrics-server | `kubectl top` |
 | local-path-provisioner | Default StorageClass for scratch |
 | NFS CSI (optional) | RWX PVCs from kif — after NFS server proof |
+
+### metrics-server
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+On kubeadm bare metal, kubelet serves a self-signed cert, so metrics-server stays
+`0/1 Ready` and `kubectl top` fails with `Metrics API not available` until you allow
+insecure kubelet TLS (lab-acceptable; production clouds usually terminate TLS properly):
+
+```bash
+kubectl -n kube-system patch deployment metrics-server --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
+kubectl -n kube-system rollout status deploy/metrics-server --timeout=2m
+kubectl top nodes
+```
+
+### local-path-provisioner
+
+Install from upstream (creates namespace `local-path-storage`, provisioner Deployment,
+ConfigMap, and StorageClass `local-path`):
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.36/deploy/local-path-storage.yaml
+```
+
+`kubectl get all -n local-path-storage` will not show the StorageClass (cluster-scoped).
+Confirm and make it the default:
+
+```bash
+kubectl get sc
+kubectl patch storageclass local-path -p \
+  '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+kubectl get sc   # local-path should show (default)
+```
+
+Volumes land under `/opt/local-path-provisioner` on the **node that schedules the pod**
+(`WaitForFirstConsumer`). Data is node-local — not shared across workers; drain/reschedule
+to another node needs a new volume (or NFS CSI later).
+
+### NFS CSI (optional — RWX from kif)
+
+Do **not** point CSI at kif’s Kerberos `/home`/`/media`/`/archive` exports. Use a dedicated
+`sec=sys` share for VLAN 9 (`nfs_server_extra_exports` on kif — see
+[nfs-server-runbook.md](nfs-server-runbook.md)). With `root_squash`, own the share as
+`nobody:nogroup` mode `0775` so the provisioner can create PVC subdirs (client root is
+mapped to uid 65534).
+
+Driver (pin version; verify against upstream charts README):
+
+```bash
+helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
+  --namespace kube-system --version 4.12.0
+```
+
+StorageClass (keep `local-path` as default):
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: kif.home.2123studios.com
+  share: /export/k8s
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=4.1
+  - sec=sys
+```
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: kif.home.2123studios.com
+  share: /export/k8s
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=4.1
+  - sec=sys
+EOF
+
+kubectl get sc
+```
+
+Smoke test (PVC + pod; leave `local-path` as default by setting `storageClassName` explicitly):
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-csi-smoke
+  namespace: default
+spec:
+  storageClassName: nfs-csi
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 64Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-csi-smoke
+  namespace: default
+spec:
+  containers:
+    - name: pause
+      image: registry.k8s.io/pause:3.10.2
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: nfs-csi-smoke
+EOF
+
+kubectl get pvc,pod nfs-csi-smoke -o wide
+# PVC Bound, pod Running — on kif you should see a new subdir under /export/k8s
+
+kubectl delete pod/nfs-csi-smoke pvc/nfs-csi-smoke
+```
 
 Defer **cert-manager** until the Gateway HTTP path from proxy01 is boring (public TLS stays
 on proxy01).
@@ -401,8 +641,9 @@ Deploy **Uptime Kuma** (or similar) with:
 | `cilium status` never converges; operator/hubble `Pending` | Expected before workers join — see Phase 2. `didn't have free ports` = operator replica 2 needs a second node; `untolerated taint` = hubble needs an untainted worker |
 | MetalLB VIP unreachable from proxy01 | UniFi firewall VLAN 1→9, ARP on VLAN 9 |
 | Gateway 502 from proxy01 | `kubectl get gateway,httproute -A`; Envoy proxy Service EXTERNAL-IP matches pool |
+| `helm template \| kubectl apply` → `apiVersion not set` | Helm 4 prints OCI `Pulled:`/`Digest:` on stdout. Use the one-shot `helm install eg …` or `grep -vE '^(Pulled\|Digest):'` before apply (Phase 5) |
 | HTTPRoute Accepted=False | Gateway `allowedRoutes`, ReferenceGrant, Service/port names |
-| DNS failures in pods | Node `/etc/resolv.conf`; Pi-hole or DC reachability from VLAN 9 |
+| `kubectl top` → Metrics API not available | metrics-server needs `--kubelet-insecure-tls` on kubeadm — see Phase 6 |
 | NFS PVC mount fails | kif exports, firewall 2049, CSI driver logs |
 
 ## References

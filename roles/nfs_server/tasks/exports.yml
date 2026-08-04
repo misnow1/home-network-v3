@@ -1,11 +1,30 @@
 ---
+- name: NFS server | Build effective export list
+  ansible.builtin.set_fact:
+    nfs_server_exports_effective: "{{ nfs_server_exports + nfs_server_extra_exports }}"
+  tags: [nfs_server, nfs_server_exports]
+
+- name: NFS server | Ensure export directories when requested
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ nfs_server_exports_effective }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: item.ensure | default(false) | bool
+  tags: [nfs_server, nfs_server_exports]
+
 - name: NFS server | Assert export paths exist
   ansible.builtin.stat:
     path: "{{ item.path }}"
   register: nfs_server_export_paths
-  loop: "{{ nfs_server_exports }}"
+  loop: "{{ nfs_server_exports_effective }}"
   loop_control:
     label: "{{ item.path }}"
+  tags: [nfs_server, nfs_server_exports]
 
 - name: NFS server | Require export directories on disk
   ansible.builtin.assert:
@@ -16,6 +35,7 @@
   loop: "{{ nfs_server_export_paths.results }}"
   loop_control:
     label: "{{ item.item.path }}"
+  tags: [nfs_server, nfs_server_exports]
 
 - name: NFS server | Enable rpc.svcgssd in nfs-kernel-server defaults
   ansible.builtin.lineinfile:
@@ -27,6 +47,7 @@
     group: root
     mode: "0644"
   notify: restart nfs server
+  tags: [nfs_server, nfs_server_exports]
 
 - name: NFS server | Deploy /etc/exports
   ansible.builtin.template:
@@ -38,3 +59,4 @@
   notify:
     - reload nfs exports
     - restart nfs server
+  tags: [nfs_server, nfs_server_exports]
