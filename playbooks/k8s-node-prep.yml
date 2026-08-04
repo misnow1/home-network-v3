@@ -1,0 +1,13 @@
+---
+# Prepare Kubernetes nodes: baseline + containerd + kubeadm packages.
+# Does NOT run kubeadm init/join — see docs/kubernetes-runbook.md.
+#
+# Example:
+#   ./scripts/prod-run.sh --confirm-production -- playbooks/k8s-node-prep.yml
+
+- name: Kubernetes node prep
+  hosts: k8s
+  become: true
+  roles:
+    - role: linux_baseline
+    - role: k8s_node

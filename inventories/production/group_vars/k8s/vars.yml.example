@@ -1,0 +1,36 @@
+---
+# Kubernetes cluster nodes — copy to vars.yml and customize.
+#
+#   cp inventories/production/group_vars/k8s/vars.yml.example \
+#      inventories/production/group_vars/k8s/vars.yml
+#
+# Nodes are NOT domain-joined. Apply playbooks/k8s-node-prep.yml after baseline.yml.
+# Cluster bootstrap (kubeadm init/join, Cilium, MetalLB, Envoy Gateway): docs/kubernetes-runbook.md
+
+k8s_node_enabled: true
+
+# Kubernetes apt channel — pin minor version; see https://pkgs.k8s.io/
+k8s_kubernetes_version: "1.36"
+
+# Pod and service CIDRs — must not overlap home LAN VLANs (ADR 003).
+k8s_pod_network_cidr: 10.244.0.0/16
+k8s_service_cidr: 10.96.0.0/12
+
+# MetalLB L2 pool on VLAN 9 — reserve in UniFi; do not assign via DHCP.
+k8s_metallb_address_pool: 192.168.9.200-192.168.9.210
+
+# Operator break-glass SSH — local Unix account (not AD). Set keys in gitignored vars.yml.
+k8s_operator_enabled: true
+k8s_operator_user: misnow1
+k8s_operator_uid: 1001
+k8s_operator_gid: 1001
+k8s_operator_shell: /bin/bash
+k8s_operator_sudo: true
+# k8s_operator_ssh_keys:
+#   - "ssh-ed25519 AAAA... you@laptop"
+
+# Console break-glass root password (vault_root_password). Does not enable SSH root.
+linux_baseline_root_console_enabled: true
+
+# Kubelet upgrades can require reboots — prefer manual reboot windows on cluster nodes.
+unattended_upgrades_auto_reboot: false

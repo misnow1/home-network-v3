@@ -22,6 +22,7 @@ samba_dc_chrony_group: _chrony
 dc_trusted_networks:
   - 192.168.1.0/24    # FerryCrossing VLAN 1
   - 192.168.3.0/24    # FerryCrossing VLAN 2 (IoT)
+  - 192.168.9.0/24    # FerryCrossing VLAN 9 (Kubernetes) — DNS queries only; nodes not domain-joined
   - 192.168.33.0/24   # Woodbine (VPN-forwarded queries)
   - 192.168.65.0/24   # Swanhollow (VPN-forwarded queries)
   # NOT 192.168.5.0/24 — VLAN 3 (restricted) stays isolated from AD DNS

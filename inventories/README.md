@@ -42,6 +42,9 @@ Never commit `hosts.yml`, `vars.yml`, `vault.yml`, or `ansible.yml` under
 | `pihole` | Pi-hole DNS forwarders (config-only) | `pihole-converge.yml` |
 | `certbot` | Hosts needing DNS-01 certificates | `certbot.yml` |
 | `linux_members` | Domain-joined members (sssd) | `domain-join.yml`, `nfs-client.yml` |
+| `k8s` | Kubernetes CP + workers (VLAN 9, not AD-joined) | `baseline.yml`, `k8s-node-prep.yml` |
+| `k8s_control_plane` | kubeadm control-plane VM | `k8s-node-prep.yml` |
+| `k8s_nodes` | kubeadm worker nodes (bare metal) | `k8s-node-prep.yml` |
 | `windows` | Windows guests (not Ansible-managed) | `vm-create.sh` (`vm_perf_profile: windows11`) |
 | `linux` | Parent of Ubuntu apt-managed groups | `baseline.yml`, `security-updates.yml` |
 | `deferred` | Legacy/transitional — empty post-migration | None by default |
@@ -68,6 +71,7 @@ alongside `pihole-converge.yml` for Pi-hole-specific configuration.
 | `host_vars/kif.../vars.yml.example` | [nut-runbook.md](../docs/nut-runbook.md), [hypervisor-runbook.md](../docs/hypervisor-runbook.md), [nfs-server-runbook.md](../docs/nfs-server-runbook.md) |
 | `host_vars/kvm01.../vars.yml.example` | [hypervisor-runbook.md](../docs/hypervisor-runbook.md) |
 | `host_vars/cka-sim.../vars.yml.example` | [software.md](../docs/software.md), [cka-runbook.md](../docs/cka-runbook.md) |
+| `group_vars/k8s/vars.yml.example` (workers share group_vars; optional `host_vars/k8s-cp01...` for CP-only notes) | [kubernetes-runbook.md](../docs/kubernetes-runbook.md), [adr/003-home-kubernetes.md](../docs/adr/003-home-kubernetes.md) |
 ## Platform policy
 
 - **Ubuntu 24.04 LTS** for all apt-managed `linux` hosts

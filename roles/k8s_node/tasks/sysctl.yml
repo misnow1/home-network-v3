@@ -1,0 +1,24 @@
+---
+- name: Kubernetes node | Ensure sysctl.d directory exists
+  ansible.builtin.file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [k8s_node, k8s_sysctl]
+
+- name: Kubernetes node | Deploy Kubernetes sysctl settings
+  ansible.builtin.template:
+    src: 99-kubernetes.conf.j2
+    dest: /etc/sysctl.d/99-kubernetes.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+  tags: [k8s_node, k8s_sysctl]
+
+- name: Kubernetes node | Apply sysctl settings
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+  tags: [k8s_node, k8s_sysctl]
