@@ -283,6 +283,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Mail relay | [mail-relay-runbook.md](mail-relay-runbook.md) |
 | Reverse proxy | [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
 | Edge access model | [edge-access-model.md](edge-access-model.md) |
+| 5G WAN failover | [wan-failover-5g.md](wan-failover-5g.md) |
 | DDNS | [ddns-runbook.md](ddns-runbook.md) |
 | Certbot / LDAP TLS | [certbot-runbook.md](certbot-runbook.md) |
 | Backups | [backup-runbook.md](backup-runbook.md) |
