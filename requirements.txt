@@ -3,4 +3,4 @@
 ansible-core>=2.16,<2.21
 ansible-lint>=24,<27
 yamllint>=1.35,<2
-jmespath>=1.0,<2
+jmespath>=1.1.0,<2
