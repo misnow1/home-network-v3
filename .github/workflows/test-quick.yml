@@ -38,7 +38,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-utils genisoimage
 
       - name: Write lab vault password
-        run: printf '%s' "${{ secrets.VAULT_PASS_LAB }}" > .vault_pass_lab
+        env:
+          VAULT_PASS_LAB: ${{ secrets.VAULT_PASS_LAB }}
+        run: |
+          if [ -z "${VAULT_PASS_LAB}" ]; then
+            echo "::error::VAULT_PASS_LAB is empty. Set it under Actions secrets and Dependabot secrets (same value as .vault_pass_lab)."
+            exit 1
+          fi
+          printf '%s' "${VAULT_PASS_LAB}" > .vault_pass_lab
 
       - name: Run quick tests
         run: ./scripts/test-quick.sh
