@@ -12,7 +12,9 @@ This domain spans three locations:
 | **Woodbine** | Second house | `192.168.33.0/24` | Future replica DC |
 | **Swanhollow** | Parents' house | `192.168.65.0/24` | Future replica DC |
 
-**Not in AD:** `192.168.5.0/24` (VLAN 3, restricted) — isolated from AD DNS by design.
+**Not in AD:** `192.168.5.0/24` (VLAN 3, restricted) and `192.168.9.0/24` (VLAN 9,
+Kubernetes) — isolated from domain join by design. K8s nodes may query AD DNS if
+`192.168.9.0/24` is in `dc_trusted_networks` ([adr/003-home-kubernetes.md](adr/003-home-kubernetes.md)).
 
 `dc1` and `dc2` join and live in **FerryCrossing**. Remote sites can exist in AD before a
 local DC is installed — create the site and subnet now; join a DC later with

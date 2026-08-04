@@ -53,10 +53,10 @@
 - name: DC dnsupdater | Add DNS updater user to DnsAdmins
   ansible.builtin.shell: |
     set -euo pipefail
-    # Authenticate via the Samba PASSWD env var to keep the secret out of argv.
+    # Runs locally against sam.ldb as root — no Administrator credential, so
+    # this does not break when the vault admin password is rotated.
     for g in {% for g in samba_dc_dnsupdater_groups %}{{ g | quote }} {% endfor %}; do
-      if out=$(samba-tool group addmembers "$g" "{{ samba_dc_dnsupdater_name }}" \
-          -UAdministrator 2>&1); then
+      if out=$(samba-tool group addmembers "$g" "{{ samba_dc_dnsupdater_name }}" 2>&1); then
         echo "added:$g"
       elif echo "$out" | grep -qiE 'already|member'; then
         echo "present:$g"
@@ -67,28 +67,21 @@
     done
   args:
     executable: /bin/bash
-  environment:
-    PASSWD: "{{ vault_samba_admin_password }}"
   register: samba_dc_dnsup_groups
   changed_when: "'added:' in samba_dc_dnsup_groups.stdout"
   when:
     - samba_dc_dnsupdater_enabled | bool
     - samba_sam_ldb.stat.exists
     - samba_dc_dnsupdater_groups | length > 0
-  no_log: true
   tags: [samba_dns, samba_converge]
 
 - name: DC dnsupdater | Disable password expiry for DNS updater user
   ansible.builtin.command: >-
     samba-tool user setexpiry {{ samba_dc_dnsupdater_name }} --noexpiry
-    -UAdministrator
-  environment:
-    PASSWD: "{{ vault_samba_admin_password }}"
   changed_when: false
   when:
     - samba_dc_dnsupdater_enabled | bool
     - samba_sam_ldb.stat.exists
-  no_log: true
   tags: [samba_dns, samba_converge]
 
 - name: DC dnsupdater | Stat DNS updater keytab before export
@@ -104,9 +97,6 @@
   ansible.builtin.command: >-
     samba-tool domain exportkeytab {{ samba_dc_dnsupdater_keytab_path }}
     --principal={{ samba_dc_dnsupdater_name }}@{{ dc_realm | upper }}
-    -UAdministrator
-  environment:
-    PASSWD: "{{ vault_samba_admin_password }}"
   when:
     - samba_dc_dnsupdater_enabled | bool
     - samba_sam_ldb.stat.exists

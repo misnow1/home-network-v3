@@ -72,7 +72,11 @@ hypervisor_netplan_br4_address: ""
 # IP after the uplink is enslaved into br0. Empty = let networkd derive br0's MAC.
 # Set in host_vars: `ip link show <uplink>` -> link/ether. Overridden by an explicit
 # `macaddress` in hypervisor_netplan_bridges.br0.
-hypervisor_netplan_br0_macaddress: ""
+# Remove unmanaged netplan drop-ins that conflict with 01-hypervisor.yaml.
+# cloud-init's 50-cloud-init.yaml is the usual offender: dhcp4 on the uplink
+# (which is a bridge slave) and unmanaged USB NICs without optional: true leave
+# systemd-networkd-wait-online permanently failed (enp5s0 stuck "configuring").
+hypervisor_netplan_remove_unmanaged: false
 
 # Libvirt bridge networks — set per environment (empty for lab nested hv01).
 hypervisor_libvirt_networks: []

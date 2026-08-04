@@ -22,6 +22,7 @@ samba_dc_chrony_group: _chrony
 dc_trusted_networks:
   - 192.168.1.0/24    # FerryCrossing VLAN 1
   - 192.168.3.0/24    # FerryCrossing VLAN 2 (IoT)
+  - 192.168.9.0/24    # FerryCrossing VLAN 9 (Kubernetes) — DNS queries only; nodes not domain-joined
   - 192.168.33.0/24   # Woodbine (VPN-forwarded queries)
   - 192.168.65.0/24   # Swanhollow (VPN-forwarded queries)
   # NOT 192.168.5.0/24 — VLAN 3 (restricted) stays isolated from AD DNS
@@ -41,11 +42,15 @@ ddns_nsupdate_enabled: true
 #   # add 192.168.3.0/24 only if IoT DHCP will POST to the DDNS API on dc1
 # ddns_nsupdate_nginx_tls: false  # enable after certbot.yml; reuses DC FQDN cert on :443
 
-# Samba interface binding — auto-detects lo + primary NIC; override if wrong:
+# Samba interface binding — auto-detects lo + primary NIC *name*; override if wrong:
 # samba_dc_interfaces: [lo, enp1s0]
 
-# With ldap_vip_enabled, auto-detect binds to addresses (not NIC names) so the
-# keepalived VIP is never registered under the DC hostname.
+# Publish DC hostname AAAA via DNS prune allowlist. Production keeps this false
+# (ISP GUAs change); smb.conf still binds the NIC by name. See dns-architecture.md.
+samba_dc_register_ipv6: false
+
+# LDAP VIP lives on macvlan ldap0 (not enp1s0) so Samba never sees .12.
+# See docs/ldap-vip-runbook.md.
 
 # Optional per-DC SMB shares (e.g. images) — set in host_vars, not here.
 # samba_dc_shares: []
@@ -65,6 +70,8 @@ unattended_upgrades_auto_reboot: true
 ldap_vip_enabled: true
 ldap_vip_address: 192.168.1.12
 ldap_vip_hostname: ldap.home.2123studios.com
+# ldap_vip_device: ldap0       # macvlan for VIP (default)
+# ldap_vip_interface: enp1s0   # VRRP ads + macvlan parent (default: primary NIC)
 # Reserve 192.168.1.12 in UniFi DHCP — not assigned to any VM.
 
 # Internal mail relay (Slice 16+) — docs/mail-relay-runbook.md

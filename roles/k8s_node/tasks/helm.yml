@@ -1,0 +1,45 @@
+---
+- name: Kubernetes node | Check installed Helm version
+  ansible.builtin.command: "{{ k8s_helm_install_dir }}/helm version --short"
+  register: k8s_helm_installed
+  changed_when: false
+  failed_when: false
+  tags: [k8s_node, k8s_helm]
+
+# `helm version --short` prints e.g. "v4.2.3+g1234abc"; absent or older means reinstall.
+- name: Kubernetes node | Determine whether Helm needs installing
+  ansible.builtin.set_fact:
+    k8s_helm_upgrade_required: >-
+      {{ ('v' ~ k8s_helm_version) not in (k8s_helm_installed.stdout | default('')) }}
+  tags: [k8s_node, k8s_helm]
+
+- name: Kubernetes node | Download Helm release archive
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-v{{ k8s_helm_version }}-linux-{{ k8s_deb_arch }}.tar.gz"
+    dest: "/tmp/helm-v{{ k8s_helm_version }}-linux-{{ k8s_deb_arch }}.tar.gz"
+    checksum: "sha256:{{ k8s_helm_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: k8s_helm_upgrade_required
+  tags: [k8s_node, k8s_helm]
+
+- name: Kubernetes node | Install Helm binary
+  ansible.builtin.unarchive:
+    src: "/tmp/helm-v{{ k8s_helm_version }}-linux-{{ k8s_deb_arch }}.tar.gz"
+    dest: "{{ k8s_helm_install_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+      - "linux-{{ k8s_deb_arch }}/helm"
+    owner: root
+    group: root
+    mode: "0755"
+  when: k8s_helm_upgrade_required
+  tags: [k8s_node, k8s_helm]
+
+- name: Kubernetes node | Remove downloaded Helm archive
+  ansible.builtin.file:
+    path: "/tmp/helm-v{{ k8s_helm_version }}-linux-{{ k8s_deb_arch }}.tar.gz"
+    state: absent
+  tags: [k8s_node, k8s_helm]

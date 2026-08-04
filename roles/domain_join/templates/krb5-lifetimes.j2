@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Ubuntu's stock krb5.conf sets no lifetimes, so kinit requests a 24h renew window
+# while RHEL hosts request 7d. AD caps both (MaxTicketAge / MaxRenewAge).
+[libdefaults]
+    ticket_lifetime = {{ domain_join_krb5_ticket_lifetime }}
+    renew_lifetime = {{ domain_join_krb5_renew_lifetime }}

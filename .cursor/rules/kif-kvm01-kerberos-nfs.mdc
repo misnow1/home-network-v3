@@ -8,11 +8,11 @@ alwaysApply: false
 
 ## kif (NFS server, winbind — not domain_join)
 
-1. **`/etc/krb5.conf` from archive** — if it has `includedir /etc/krb5.conf.d/`, create that directory on Ubuntu or all krb5 (including `klist`, `rpc-svcgssd`) fails.
+1. **`/etc/krb5.conf` from archive** — if it has `includedir /etc/krb5.conf.d/`, create that directory on Ubuntu or all krb5 (including `klist`, `rpc-svcgssd`) fails. Do **not** leave static `kdc = pdc.*` in `[realms]` when `dns_lookup_kdc = true` — that overrides SRV discovery and talks to the retired non-KDC host. `nfs_server` strips `nfs_server_krb5_retired_kdcs`.
 2. **NFS SPN in AD** — `net ads keytab add nfs` alone is insufficient; register `nfs/kif.home.2123studios.com` and `nfs/KIF` on `KIF$` via `net ads setspn add`, then keytab add and restart `rpc-svcgssd` + `nfs-server`. Clients verify with `kvno nfs/kif.home.2123studios.com`.
 3. **Server GSS** — `modprobe rpcsec_gss_krb5`; `rpc-svcgssd` must be active for `sec=krb5*`.
 4. **Exports** — Ansible-managed `/etc/exports` via `nfs_server` role when `nfs_server_enabled: true`; do not restore `/var/lib/nfs/etab` from old OS; use `exportfs -rav`. Stable `fsid=1/2/3` per export.
-5. **`krb5.conf` is not fully Ansible-managed** on kif — role ensures `/etc/krb5.conf.d/` exists when `includedir` is present.
+5. **`krb5.conf` is not fully Ansible-managed** on kif — role ensures `/etc/krb5.conf.d/` exists when `includedir` is present, and scrubs retired static KDC pins.
 
 ## kvm01 (NFS client, sssd + nfs_client role)
 
@@ -21,6 +21,8 @@ alwaysApply: false
 3. **`sec=krb5i` data path** — requires the **calling user's** Kerberos ticket; local `ansible` (uid 1000, not in AD) gets misleading “Stale file handle”. Test as AD user with `klist` or as root for machine creds.
 4. **SSH + NFS home** — enable `domain_member_sshd_enabled` in hypervisors group_vars; cloud-init password-off breaks VPN login without client `kinit`. User keys: `docs/ad-ssh-public-keys.md`.
 5. **chgrp on mounted export** — the static-mount dir task must skip already-mounted paths (`root_squash` denies chgrp); gated via `ansible_mounts`.
+6. **Ticket renewal** — `domain_join` sets `krb5_renewable_lifetime` (**not** `krb5_renewable`, which is not a real SSSD option — `sssctl config-check` rejects it) + hourly `krb5_renew_interval`, installs `sssd-kcm`, adds `includedir /etc/krb5.conf.d/`, and drops `ansible_ticket_lifetimes` with `renew_lifetime = 7d`. Ubuntu's stock `krb5.conf` sets **no** lifetimes, so clients request only a 24h renew window while RHEL requests 7d. SSSD renews `pam_sss`-issued TGTs only. After converge: re-login/`kinit` for KCM cutover. `GSSAPICleanupCredentials yes` still wipes creds on SSH disconnect — re-auth after reconnect. Verify with `sudo sssctl config-check`. See `docs/nfs-client-runbook.md` § Long-running sessions.
+7. **Kerberos ticket forwarding is off by default** — `GSSAPIDelegateCredentials` is unset on bastion and members, so a bastion→member hop does not carry the TGT unless you use `ssh -K`. `ForwardAgent` is SSH-agent forwarding, unrelated to Kerberos. Delegated tickets are also not necessarily renewed by SSSD on the member.
 
 ## kvm01 (hypervisor netplan bridges)
 

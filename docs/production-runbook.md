@@ -56,18 +56,18 @@ For **joining an existing Samba AD domain** (replica DC or offline restore), use
 | Step | Host group | Playbook | Notes |
 |---|---|---|---|
 | 1 | All Linux | `baseline.yml` | Chrony before Kerberos-sensitive work |
-| 1s | All Linux | `security-updates.yml` | Fleet unattended security patching — [security-updates-runbook.md](security-updates-runbook.md) |
+| 1s | All Linux | `security-updates.yml` | Fleet unattended security patching; also the needrestart/systemd re-exec guard on hypervisors — [security-updates-runbook.md](security-updates-runbook.md) |
 | 2 | `dc` | `dc-bootstrap.yml` | **Greenfield only** — once; break-glass |
 | 2m | `dc` | `dc-replica-join.yml` | Join existing domain — replica DC |
 | 2r | `dc` | `dc-restore.yml` | Join existing domain — offline backup restore |
 | 3 | `dc` | `dc-converge.yml` | Ongoing DC + BIND + dnsupdater |
 | 4 | `dc` | `ddns-api.yml` | Optional Docker DDNS API for dnsmasq hooks |
 | 4p | `pihole` | `pihole-converge.yml` | Config-only Pi-hole → dc1/dc2 forwarding — [pihole-runbook.md](pihole-runbook.md) |
-| 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only) |
+| 5 | `hypervisors` | `hypervisor.yml` | libvirt + Docker (Ubuntu only); optional `host_firewall` when enabled |
 | 6 | `hypervisors` | `backup.yml` | restic client + scope manifest + optional systemd timer/offsite copy |
 | 7 | `fileservers` | `fileserver.yml` | Samba member + winbind; kif multi-share when `fileserver_samba_enabled: true` — [fileserver-runbook.md](fileserver-runbook.md) |
 | 7n | `fileservers` (opt-in) | `nfs-server.yml` | Kerberos NFS exports on kif when `nfs_server_enabled` — [nfs-server-runbook.md](nfs-server-runbook.md); run **before** step 8n |
-| 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members |
+| 8 | `linux:!dc` | `domain-join.yml` | realmd + sssd members (`domain_join_enabled: false` on proxy01; EL bastion skips AD tasks) |
 | 8n | `linux:!dc` (opt-in) | `nfs-client.yml` | After domain-join when `nfs_client_enabled` — [nfs-client-runbook.md](nfs-client-runbook.md) |
 | 9 | `bastion` | `bastion.yml` | Edge hardening (after domain-join) — [bastion-runbook.md](bastion-runbook.md) |
 | 10 | `ddns_clients` | `ddns-client.yml` | Optional GSS-TSIG update clients |
@@ -275,6 +275,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Domain join | [domain-join-runbook.md](domain-join-runbook.md) |
 | AD user SSH keys | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |
 | Hypervisor | [hypervisor-runbook.md](hypervisor-runbook.md) |
+| Host firewall | [host-firewall-runbook.md](host-firewall-runbook.md) |
 | File server | [fileserver-runbook.md](fileserver-runbook.md) |
 | Bastion | [bastion-runbook.md](bastion-runbook.md) |
 | Security updates | [security-updates-runbook.md](security-updates-runbook.md) |
@@ -282,6 +283,7 @@ See `inventories/production/hosts.yml.example` and `group_vars/*/vars.yml.exampl
 | Mail relay | [mail-relay-runbook.md](mail-relay-runbook.md) |
 | Reverse proxy | [reverse-proxy-runbook.md](reverse-proxy-runbook.md) |
 | Edge access model | [edge-access-model.md](edge-access-model.md) |
+| 5G WAN failover | [wan-failover-5g.md](wan-failover-5g.md) |
 | DDNS | [ddns-runbook.md](ddns-runbook.md) |
 | Certbot / LDAP TLS | [certbot-runbook.md](certbot-runbook.md) |
 | Backups | [backup-runbook.md](backup-runbook.md) |

@@ -7,9 +7,13 @@
       - ldap_vip_address | length > 0
       - ldap_vip_hostname | length > 0
       - ldap_vip_backend_ip | length > 0
+      - ldap_vip_interface | length > 0
+      - ldap_vip_device | length > 0
+      - ldap_vip_device != ldap_vip_interface
     fail_msg: >-
-      Configure ldap_vip_state, ldap_vip_priority, ldap_vip_address, and
-      ldap_vip_backend_ip when ldap_vip_enabled is true.
+      Configure ldap_vip_state, ldap_vip_priority, ldap_vip_address,
+      ldap_vip_backend_ip, ldap_vip_interface, and a distinct ldap_vip_device
+      (macvlan) when ldap_vip_enabled is true.
   when: ldap_vip_enabled | bool
   tags: [ldap_vip]
 
@@ -21,6 +25,38 @@
     state: present
     update_cache: true
   when: ldap_vip_enabled | bool
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Deploy macvlan ensure script
+  ansible.builtin.template:
+    src: ensure-ldap-macvlan.sh.j2
+    dest: /usr/local/sbin/ensure-ldap-macvlan.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: ldap_vip_enabled | bool
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Deploy macvlan systemd unit
+  ansible.builtin.template:
+    src: ldap-vip-macvlan.service.j2
+    dest: /etc/systemd/system/ldap-vip-macvlan.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: ldap_vip_enabled | bool
+  notify: Restart keepalived
+  tags: [ldap_vip]
+
+- name: LDAP VIP | Enable and start macvlan unit
+  ansible.builtin.systemd:
+    name: ldap-vip-macvlan.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - ldap_vip_enabled | bool
+    - not ansible_check_mode
   tags: [ldap_vip]
 
 - name: LDAP VIP | Deploy LDAPS health check script

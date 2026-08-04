@@ -50,6 +50,27 @@
           - autoinstall_builder.stat.exists
           - autoinstall_builder.stat.executable
 
+    - name: Reimage | assert inventory cloud-init generator exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/reimage/cloud-init-from-inventory.sh"
+      register: inventory_cidata
+
+    - name: Reimage | assert inventory cloud-init generator executable
+      ansible.builtin.assert:
+        that:
+          - inventory_cidata.stat.exists
+          - inventory_cidata.stat.executable
+
+    - name: Reimage | assert bare_metal_simple template exists
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/reimage/ubuntu-autoinstall/bare-metal-simple-user-data.tmpl"
+      register: bare_metal_tmpl
+
+    - name: Reimage | assert bare_metal_simple template present
+      ansible.builtin.assert:
+        that:
+          - bare_metal_tmpl.stat.exists
+
     - name: Reimage | assert ROADMAP documents slice 19 complete
       ansible.builtin.command: grep -F 'kif/kvm01 Ubuntu reimage' "{{ repo_root }}/docs/ROADMAP.md"
       changed_when: false

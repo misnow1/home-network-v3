@@ -8,7 +8,8 @@ CACHE="/var/lib/samba/private/dns_update_cache"
 EXPECTED_IP="{{ ansible_host }}"
 LDAP_VIP_ENABLED="{{ ldap_vip_enabled | default(false) | bool | lower }}"
 LDAP_VIP_ADDRESS="{{ ldap_vip_address | default('') }}"
-# Space-separated interface names and/or bind addresses from Ansible.
+REGISTER_IPV6="{{ samba_dc_register_ipv6 | default(false) | bool | lower }}"
+# Space-separated interface names (preferred) and/or bind addresses from Ansible.
 INTERFACE_ENTRIES=( {{ samba_dc_effective_interfaces | map('quote') | join(' ') }} )
 
 declare -A ALLOWED=()
@@ -98,10 +99,12 @@ for entry in "${INTERFACE_ENTRIES[@]}"; do
     allow_ip "$ip"
   done < <(ip -4 -o addr show dev "$entry" scope global 2>/dev/null \
     | awk '{print $4}' | cut -d/ -f1 || true)
-  while read -r ip; do
-    allow_ip "$ip"
-  done < <(ip -6 -o addr show dev "$entry" scope global 2>/dev/null \
-    | awk '{print $4}' | cut -d/ -f1 || true)
+  if [[ "${REGISTER_IPV6}" == "true" ]]; then
+    while read -r ip; do
+      allow_ip "$ip"
+    done < <(ip -6 -o addr show dev "$entry" scope global 2>/dev/null \
+      | awk '{print $4}' | cut -d/ -f1 || true)
+  fi
 done
 
 # The keepalived VIP must never be registered under this DC's hostname.

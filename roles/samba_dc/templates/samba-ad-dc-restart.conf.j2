@@ -1,0 +1,23 @@
+# Ansible managed — roles/samba_dc. Local edits will be overwritten.
+# samba-ad-dc restart policy.
+#
+# Samba binds every address on its configured interfaces at startup. A DHCPv6 or
+# SLAAC address still in Duplicate Address Detection is assigned but not yet
+# usable, so bind() fails with NT_STATUS_ADDRESS_NOT_ASSOCIATED; cldapd/kdc then
+# call task_server_terminate and samba_terminate takes the whole daemon down.
+# The packaged unit ships Restart=no, so a sub-second boot race leaves the DC
+# out of the directory until an operator notices.
+#
+# Retrying rides out DAD: smb.conf binds the NIC by name (samba_dc_interfaces),
+# so the next attempt picks up whatever addresses are ready. The start limit
+# still applies, so a genuinely broken config fails the unit instead of looping.
+#
+# See docs/dc-runbook.md § samba-ad-dc restart policy.
+
+[Unit]
+StartLimitIntervalSec={{ samba_dc_restart_start_limit_interval_sec }}
+StartLimitBurst={{ samba_dc_restart_start_limit_burst }}
+
+[Service]
+Restart=on-failure
+RestartSec={{ samba_dc_restart_sec }}

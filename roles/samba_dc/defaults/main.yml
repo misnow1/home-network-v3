@@ -89,13 +89,28 @@ samba_dc_smb_conf_backup_dir: /var/backups/samba
 samba_dc_shares: []
 
 # Restrict Samba (and samba_dnsupdate) to primary LAN NIC + loopback so Docker
-# bridge IPs are not registered as DC A/AAAA records. See samba_interfaces.yml.
+# bridge IPs and the LDAP VIP macvlan are not registered as DC A/AAAA records.
+# See samba_interfaces.yml and docs/ldap-vip-runbook.md.
 samba_dc_bind_interfaces_only: true
-# Empty list = auto-detect lo + ansible_facts['default_ipv4']['interface'] at runtime.
-# When ldap_vip_enabled, auto-detect uses addresses (not NIC names) so the VIP is
-# never registered under this DC hostname.
+# When true, prune allows AAAA currently on the Samba NIC. When false (production
+# default), prune deletes DC hostname AAAA — ISP GUAs are unstable; smb.conf still
+# binds the NIC by *name* so Samba listens on whatever IPv6 is present at runtime.
+samba_dc_register_ipv6: false
+# Empty list = auto-detect lo + ansible_facts['default_ipv4']['interface'] (names).
+# LDAP VIP lives on macvlan ldap0 — never list it here.
 samba_dc_interfaces: []
 samba_dc_dns_prune_script: /usr/local/sbin/samba-dc-prune-dns
+
+# samba-ad-dc restart policy — the packaged unit ships Restart=no, so a Samba
+# bind failure at boot (DHCPv6/SLAAC address still in Duplicate Address
+# Detection) leaves the DC down until an operator notices. Retrying rides out
+# DAD. See templates/samba-ad-dc-restart.conf.j2 and docs/dc-runbook.md.
+samba_dc_restart_policy_manage: true
+samba_dc_restart_sec: 15
+# Burst/interval bound the retries so a genuinely broken config still fails the
+# unit rather than looping forever. 10 tries over 10min far exceeds DAD (~1-3s).
+samba_dc_restart_start_limit_interval_sec: 600
+samba_dc_restart_start_limit_burst: 10
 
 # LDAPS / START-TLS — apply with playbooks/certbot.yml (requires cert material first).
 samba_dc_tls_enabled: false

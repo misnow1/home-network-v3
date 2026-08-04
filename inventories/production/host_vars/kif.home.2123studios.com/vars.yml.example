@@ -105,6 +105,18 @@ fileserver_shares:
 nfs_server_enabled: true
 nfs_server_client_networks:
   - 192.168.1.0/24
+# Kubernetes CSI (sec=sys) — VLAN 9 only; keep Kerberos exports on nfs_server_exports.
+# nfs_server_extra_exports:
+#   - path: /export/k8s
+#     fsid: 4
+#     sec: sys
+#     clients:
+#       - 192.168.9.0/24
+#     ensure: true
+#     # root_squash → nobody (65534); CSI provisioner must be able to mkdir as nobody.
+#     owner: nobody
+#     group: nogroup
+#     mode: "0775"
 
 mdadm_monitor_enabled: true
 
@@ -216,27 +228,79 @@ backup_docker_volumes:
     backup_class: crash_consistent
     notes: Transmission settings — verify compose project prefix
 
-# --- Edge exposure — Docker host port firewall -----------------------------
-# Proxy-facing ports bind on br4 (192.168.7.152) — reachable only from proxy01
-# docker NIC. Transmission peer port stays on VLAN 1 for Internet inbound.
-# Prevents LAN bypass of Authelia by hitting kif:PORT directly.
-docker_engine_manage_ufw: true
-docker_engine_ufw_edge_proxy_cidrs:
+# --- Host firewall (UFW) — see docs/host-firewall-runbook.md ----------------
+# Default deny incoming. Enumerate every LAN/internet listener before enabling.
+# Proxy-facing Docker ports bind on br4 (192.168.7.152); Transmission peer on VLAN 1.
+host_firewall_enabled: true
+host_firewall_default_incoming: deny
+host_firewall_rules:
+  # LAN services: match ingress on br0 (IPv4 + whatever GUA is current; no CIDR churn).
+  # Samba (smbd / nmbd)
+  - port: "445"
+    proto: tcp
+    direction: in
+    interface: br0
+    comment: smb
+  - port: "139"
+    proto: tcp
+    direction: in
+    interface: br0
+    comment: smb netbios-ssn
+  - port: "137"
+    proto: udp
+    direction: in
+    interface: br0
+    comment: nmbd name service
+  - port: "138"
+    proto: udp
+    direction: in
+    interface: br0
+    comment: nmbd datagram
+  # Kerberos NFSv4 (nfs_client uses nfsvers=4.1 — no rpcbind/mountd needed)
+  - port: "2049"
+    proto: tcp
+    direction: in
+    interface: br0
+    comment: nfs
+  # NFS CSI from Kubernetes VLAN 9 (routed to kif br0)
+  - port: "2049"
+    proto: tcp
+    direction: in
+    interface: br0
+    src: 192.168.9.0/24
+    comment: "nfs from k8s"
+  # NUT upsd (listens on 192.168.1.152:3493)
+  - port: "3493"
+    proto: tcp
+    direction: in
+    interface: br0
+    comment: nut upsd
+  # Windows discovery (wsdd)
+  - port: "5357"
+    proto: tcp
+    direction: in
+    interface: br0
+    comment: wsdd
+  - port: "3702"
+    proto: udp
+    direction: in
+    interface: br0
+    comment: wsdd ssdp
+  # Transmission peer (Internet via UniFi forward to VLAN 1)
+  - port: "51413"
+    proto: tcp
+    src: any
+    comment: transmission peer
+  - port: "51413"
+    proto: udp
+    src: any
+    comment: transmission peer/DHT
+host_firewall_edge_proxy_cidrs:
   - 192.168.7.23/32   # proxy01.home.2123studios.com (vlan4)
   # - 192.168.7.99/32 # edge keepalived VIP on vlan4 — add when Slice 28+ is deployed
-docker_engine_ufw_published_ports:
+host_firewall_edge_published_ports:
   - 9191   # Authelia
   - 4080   # Guacamole
   - 8000   # Paperless
   - 9091   # Transmission RPC (Authelia-protected via proxy)
   - 32400  # Plex
-docker_engine_ufw_allow_rules:
-  - port: 51413
-    proto: tcp
-    src: any
-    comment: transmission peer
-  - port: 51413
-    proto: udp
-    src: any
-    comment: transmission peer/DHT
-# docker_engine_ufw_default_deny stays false — kif also serves SMB/NFS/NUT on LAN.

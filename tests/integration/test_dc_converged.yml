@@ -82,8 +82,45 @@
         smb_conf="$(readlink -f /etc/samba/smb.conf 2>/dev/null || echo /etc/samba/smb.conf)"
         testparm -s "$smb_conf" 2>/dev/null \
           | grep -qiE '^\s*bind interfaces only\s*=\s*yes'
-        testparm -s "$smb_conf" 2>/dev/null \
-          | grep -qF "{{ ansible_facts['default_ipv4']['interface'] }}"
+        iface_line="$(testparm -s "$smb_conf" 2>/dev/null \
+          | awk -F= '/^[[:space:]]*interfaces[[:space:]]*=/ { sub(/^[[:space:]]+/, "", $2); print $2; exit }')"
+        test -n "$iface_line"
+        echo "$iface_line" | grep -qF "{{ ansible_facts['default_ipv4']['interface'] }}" \
+          || echo "$iface_line" | grep -qF "{{ ansible_facts['default_ipv4']['address'] }}"
       args:
         executable: /bin/bash
       changed_when: false
+
+    # Assert what systemd actually resolved, not just that the file is on disk —
+    # a missing daemon-reload would leave the packaged Restart=no in effect.
+    - name: Query effective samba-ad-dc restart policy
+      ansible.builtin.systemd:
+        name: samba-ad-dc
+      register: dc_restart_policy
+      changed_when: false
+
+    - name: Assert samba-ad-dc restarts itself after a transient bind failure
+      ansible.builtin.assert:
+        that:
+          - dc_restart_policy.status['Restart'] == 'on-failure'
+          - dc_restart_policy.status['StartLimitBurst'] | int == samba_dc_restart_start_limit_burst | int
+          - dc_restart_policy.status['RestartUSec'] | length > 0
+        fail_msg: >-
+          samba-ad-dc must restart on failure so a boot-time IPv6 DAD bind race
+          does not leave the DC out of the directory; systemd reports
+          Restart={{ dc_restart_policy.status['Restart'] }}
+          StartLimitBurst={{ dc_restart_policy.status['StartLimitBurst'] }}
+      when: samba_dc_restart_policy_manage | bool
+
+    - name: Assert samba-ad-dc restart drop-in is present
+      ansible.builtin.stat:
+        path: /etc/systemd/system/samba-ad-dc.service.d/10-ansible-restart.conf
+      register: dc_restart_dropin
+
+    - name: Assert restart drop-in matches samba_dc_restart_policy_manage
+      ansible.builtin.assert:
+        that:
+          - dc_restart_dropin.stat.exists == (samba_dc_restart_policy_manage | bool)
+        fail_msg: >-
+          Restart drop-in presence ({{ dc_restart_dropin.stat.exists }}) does not
+          match samba_dc_restart_policy_manage ({{ samba_dc_restart_policy_manage }})

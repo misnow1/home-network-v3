@@ -1,0 +1,13 @@
+---
+- name: Kubernetes node | Disable active swap
+  ansible.builtin.command: swapoff -a
+  changed_when: true
+  when: ansible_swaptotal_mb | default(0) | int > 0
+  tags: [k8s_node, k8s_swap]
+
+- name: Kubernetes node | Remove swap entries from fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '\sswap\s'
+    state: absent
+  tags: [k8s_node, k8s_swap]

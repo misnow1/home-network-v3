@@ -43,7 +43,7 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_libvirt_enabled` | `true` | Master gate — set in `group_vars/hypervisors` for production |
 | `hypervisor_netplan_enabled` | `false` | Enable host bridge/VLAN netplan |
 | `hypervisor_netplan_bridges` | `{}` | Per-bridge config; production uses `dhcp4: true` on br0 |
-| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`, `vlan4`) |
+| `hypervisor_libvirt_networks` | `[]` | Bridge networks (`external-default`, `vlan3`, `vlan4`, `vlan9`) |
 | `hypervisor_netplan_br4_address` | `""` | Static br4 address per host (e.g. `192.168.7.152/24`) |
 | `hypervisor_libvirt_pools` | `default`, `vms` | Base dir pools |
 | `hypervisor_libvirt_pools_extra` | `[]` | Host-specific pools (e.g. kif `boot`) |
@@ -56,6 +56,10 @@ Re-run `hypervisor.yml` twice — second run must report `changed=0`.
 | `hypervisor_grub_timeout_style` | `menu` | `menu` / `countdown` / `hidden` |
 | `hypervisor_grub_cmdline_linux_extra` | `[]` | Kernel cmdline tokens (e.g. `intel_iommu=on`, `iommu=pt`) |
 | `docker_engine_enabled` | `true` | Include `docker_engine` role |
+
+Host firewall (UFW) is a separate opt-in role applied from this playbook when
+`host_firewall_enabled: true` — see [host-firewall-runbook.md](host-firewall-runbook.md).
+Do not reintroduce firewall tasks under `docker_engine`.
 
 ### GRUB menu timeout (kif + kvm01)
 
@@ -190,6 +194,36 @@ UniFi: create VLAN 4, tag hypervisor uplinks, **do not** assign a gateway or DHC
 See [unifi-gateway-dns.md](unifi-gateway-dns.md#vlan-4-docker-edge) and
 [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md).
 
+### VLAN 9 — Kubernetes fabric (br9)
+
+VLAN 9 (`192.168.9.0/24`) is a **routed** segment for the kubeadm cluster (CP VM and
+workers). Unlike VLAN 4, nodes receive DNS and default route via the UCG gateway
+(`192.168.9.1`).
+
+| Host | Role on VLAN 9 | libvirt network |
+|---|---|---|
+| kvm01 | CP VM host (`k8s-cp01`) | `vlan9` → `br9` |
+| k8s-cp01 (VM) | `192.168.9.10/24` | NIC on `vlan9` |
+| k8s-node-1/2 (metal) | `.128`/`.129` | N/A — bare metal |
+
+`hypervisor_netplan_bridges.br9` is bridge-only (`dhcp4: false`); the hypervisor does
+not need an address on br9 unless you want host-level routing diagnostics.
+
+UniFi: create VLAN 9 with gateway and DNS; tag hypervisor uplinks. Reserve static
+addresses for CP, workers, and the MetalLB pool — see
+[unifi-gateway-dns.md](unifi-gateway-dns.md#vlan-9-kubernetes) and
+[adr/003-home-kubernetes.md](adr/003-home-kubernetes.md).
+
+Create the CP VM after converging br9:
+
+```bash
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/hypervisor.yml --limit kvm01.home.2123studios.com \
+  --tags hypervisor_netplan,hypervisor_networks
+
+./scripts/vm/vm-create.sh -i production k8s-cp01.home.2123studios.com
+```
+
 ### Netplan apply and bridge MAC / DHCP reservation
 
 `netplan.yml` deploys `/etc/netplan/{{ hypervisor_netplan_config_file }}` (mode `0600`),
@@ -216,6 +250,48 @@ then loses the host at its `ansible_host`. Choose one:
 
 If the host goes unreachable after the first `hypervisor.yml`, find its new lease on the
 router, update `ansible_host` (or fix the reservation/MAC), then re-run.
+
+**Unmanaged cloud-init netplan:** leave `hypervisor_netplan_remove_unmanaged: true` on
+production hypervisors. A leftover `/etc/netplan/50-cloud-init.yaml` that still puts
+`dhcp4` on the uplink (now a bridge slave) or declares a USB NIC without `optional:
+true` leaves that interface stuck in systemd-networkd's `configuring` state.
+`systemd-networkd-wait-online` then fails every boot and the host reports `degraded`.
+With the flag set, converge deletes every netplan file other than
+`{{ hypervisor_netplan_config_file }}` and re-applies.
+
+### Host resolvers (br0 DNS)
+
+Production `br0` uses DHCP for the host address but **must not** inherit DNS from the
+lease or from IPv6 Router Advertisements:
+
+| Source | What it offers | Problem |
+|---|---|---|
+| DHCPv4 (UCG) | Pi-hole `.18` + `.22` | Correct — but not the only source |
+| RDNSS / DHCPv6 (UCG) | Gateway GUA `2600:…::1` | Router is not an AD-aware resolver |
+| Static netplan | Pi-hole `.18` + `.22` | Required steady-state |
+
+When `systemd-resolved` selects the router's IPv6 address as **Current DNS Server**, AD
+SRV queries (`_kerberos._udp`, `_ldap._tcp`) fail. Kerberos cannot locate a KDC, and
+winbind `getpwnam` fails with `WBC_ERR_DOMAIN_NOT_FOUND` — even though both DCs serve
+correct RFC2307 attributes and Pi-hole answers the same queries.
+
+`hypervisor_netplan_bridges.br0` in
+[`group_vars/hypervisors/vars.yml.example`](../inventories/production/group_vars/hypervisors/vars.yml.example)
+sets:
+
+- `nameservers.addresses` → Pi-hole pair
+- `dhcp4-overrides.use-dns: false`, `dhcp6-overrides.use-dns: false`, `ra-overrides.use-dns: false`
+
+After converge, verify on each hypervisor:
+
+```bash
+resolvectl status br0 | grep -E 'Current DNS Server|DNS Servers'
+dig +short SRV _kerberos._udp.home.2123studios.com
+getent passwd <ad-user>
+```
+
+Expected: current server is `.18` or `.22` (never the gateway GUA); SRV records list
+dc1/dc2; `getent` returns a passwd line.
 
 ## Nested virtualization
 
@@ -275,5 +351,10 @@ Partial hypervisor runs on kif:
 - The role never removes existing libvirt networks or pools — migrate VMs manually if renaming networks.
 - Per-host backup scope is declared in `host_vars/{hostname}/vars.yml` and rendered by
   `playbooks/backup.yml` (Slice 7). See [`docs/backup-runbook.md`](backup-runbook.md).
+- Hypervisors suppress needrestart's `systemctl daemon-reexec` hook
+  (`unattended_upgrades_needrestart_skip_systemd_manager`). Without it, a library upgrade
+  can freeze PID 1 and kill the whole D-Bus surface — slow logins, `systemctl` hangs — with
+  a forced reboot the only recovery. Failure mode, recovery, and generator-stall diagnosis:
+  [security-updates-runbook.md](security-updates-runbook.md) § needrestart and systemd re-exec.
 
 Domain join is optional for hypervisors and is not part of Slice 4 integration.

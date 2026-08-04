@@ -27,10 +27,10 @@ network:
       interfaces: {{ bridge.interfaces | to_json }}
 {% elif bridge_name == 'br0' %}
       interfaces: {{ [hypervisor_netplan_uplink] | to_json }}
-{% elif bridge_name == 'br3' %}
-      interfaces: {{ [hypervisor_netplan_uplink ~ '.3'] | to_json }}
-{% elif bridge_name == 'br4' %}
-      interfaces: {{ [hypervisor_netplan_uplink ~ '.4'] | to_json }}
+{% elif bridge_name is match('^br[0-9]+$') %}
+{# br3/br4/br9/... → uplink.N when the matching VLAN is declared in
+   hypervisor_netplan_vlans. Explicit bridge.interfaces always wins. #}
+      interfaces: {{ [hypervisor_netplan_uplink ~ '.' ~ (bridge_name[2:])] | to_json }}
 {% else %}
       interfaces: {{ bridge.interfaces | default([]) | to_json }}
 {% endif %}
@@ -65,5 +65,13 @@ network:
         search: {{ bridge.nameservers.search | to_json }}
 {% endif %}
 {% endif %}
+{% for _override in ['dhcp4-overrides', 'dhcp6-overrides', 'ra-overrides'] %}
+{% if bridge[_override] is defined %}
+      {{ _override }}:
+{% for _option, _value in bridge[_override].items() %}
+        {{ _option }}: {{ _value | to_json }}
+{% endfor %}
+{% endif %}
+{% endfor %}
 {% endfor %}
 {% endif %}

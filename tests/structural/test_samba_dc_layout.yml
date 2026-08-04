@@ -13,6 +13,9 @@
     dc_converge_playbook: "{{ repo_root }}/playbooks/dc-converge.yml"
     converge_tasks: "{{ repo_root }}/roles/samba_dc/tasks/converge.yml"
     restore_tasks: "{{ repo_root }}/roles/samba_dc/tasks/restore.yml"
+    defaults_main: "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+    restart_policy_tasks: "{{ repo_root }}/roles/samba_dc/tasks/samba_restart_policy.yml"
+    restart_policy_template: "{{ repo_root }}/roles/samba_dc/templates/samba-ad-dc-restart.conf.j2"
   tasks:
     - name: Samba DC | bootstrap tasks exist
       ansible.builtin.stat:
@@ -62,6 +65,25 @@
     - name: Samba DC | assert converge.yml imports operator_ssh tasks
       ansible.builtin.shell: |
         grep -q 'import_tasks: operator_ssh.yml' "{{ converge_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert converge fixes cloud-init 127.0.1.1 hostname alias
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: dns_hosts.yml' "{{ converge_tasks }}"
+        grep -q '127\\.0\\.1\\.1' "{{ repo_root }}/roles/samba_dc/tasks/dns_hosts.yml"
+        grep -q 'Map DC FQDN to LAN IP' "{{ repo_root }}/roles/samba_dc/tasks/dns_hosts.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert IPv4-only interface auto-detect for production DCs
+      ansible.builtin.shell: |
+        grep -q 'samba_dc_register_ipv6' "{{ repo_root }}/roles/samba_dc/defaults/main.yml"
+        grep -q 'Auto-detect primary NIC name' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
+        grep -q 'samba_dc_register_ipv6: false' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
+        ! grep -q 'Auto-detect primary IPv4 address binding' "{{ repo_root }}/roles/samba_dc/tasks/samba_interfaces_resolve.yml"
       args:
         executable: /bin/bash
       changed_when: false
@@ -181,6 +203,59 @@
       ansible.builtin.shell: |
         grep -q 'dc_trusted_networks' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
         grep -q '192.168.3.0/24' "{{ repo_root }}/inventories/production/group_vars/dc/vars.yml.example"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # A Samba bind failure at boot (DHCPv6/SLAAC address still in Duplicate
+    # Address Detection) must not leave the DC down — the packaged unit ships
+    # Restart=no. See docs/dc-runbook.md.
+    - name: Samba DC | assert restart policy drop-in is templated with bounded retries
+      ansible.builtin.shell: |
+        test -f "{{ restart_policy_tasks }}"
+        test -f "{{ restart_policy_template }}"
+        grep -q 'Restart=on-failure' "{{ restart_policy_template }}"
+        grep -q 'RestartSec={{ '{{' }} samba_dc_restart_sec {{ '}}' }}' "{{ restart_policy_template }}"
+        grep -q 'StartLimitBurst=' "{{ restart_policy_template }}"
+        grep -q 'StartLimitIntervalSec=' "{{ restart_policy_template }}"
+        grep -q 'samba-ad-dc.service.d/10-ansible-restart.conf' "{{ restart_policy_tasks }}"
+        grep -q 'samba_dc_restart_policy_manage: true' "{{ defaults_main }}"
+        grep -q 'samba_dc_restart_sec:' "{{ defaults_main }}"
+        grep -q 'samba_dc_restart_start_limit_interval_sec:' "{{ defaults_main }}"
+        grep -q 'samba_dc_restart_start_limit_burst:' "{{ defaults_main }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Samba DC | assert restart drop-in is removed when management is disabled
+      ansible.builtin.shell: |
+        grep -q 'state: absent' "{{ restart_policy_tasks }}"
+        grep -q 'not (samba_dc_restart_policy_manage | bool)' "{{ restart_policy_tasks }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # The drop-in is inert until systemd re-reads unit files, so the reload must
+    # live alongside the template — a --tags samba_restart_policy run has to be
+    # self-sufficient, not rely on converge.yml.
+    - name: Samba DC | assert restart policy reloads systemd itself
+      ansible.builtin.shell: |
+        grep -q 'daemon_reload: true' "{{ restart_policy_tasks }}"
+        grep -q 'samba_restart_policy' "{{ restart_policy_tasks }}"
+        test "$(grep -n '10-ansible-restart.conf' "{{ restart_policy_tasks }}" | head -1 | cut -d: -f1)" \
+          -lt "$(grep -n 'daemon_reload: true' "{{ restart_policy_tasks }}" | head -1 | cut -d: -f1)"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # daemon_reload must land before the service is ensured started, otherwise
+    # systemd keeps the packaged Restart=no for the rest of the run.
+    - name: Samba DC | assert converge applies restart policy then reloads systemd
+      ansible.builtin.shell: |
+        grep -q 'import_tasks: samba_restart_policy.yml' "{{ converge_tasks }}"
+        grep -q 'daemon_reload: true' "{{ converge_tasks }}"
+        test "$(grep -n 'samba_restart_policy.yml' "{{ converge_tasks }}" | head -1 | cut -d: -f1)" \
+          -lt "$(grep -n 'daemon_reload: true' "{{ converge_tasks }}" | head -1 | cut -d: -f1)"
       args:
         executable: /bin/bash
       changed_when: false

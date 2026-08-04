@@ -3,6 +3,10 @@
 
 hypervisor_libvirt_enabled: true
 hypervisor_netplan_enabled: true
+# Drop cloud-init leftovers (50-cloud-init.yaml) that fight 01-hypervisor.yaml —
+# dhcp4 on the bridge-slave uplink leaves enp5s0 "configuring" and
+# systemd-networkd-wait-online permanently failed.
+hypervisor_netplan_remove_unmanaged: true
 
 # Must be set here (not just the hypervisor role default): include_role loads
 # docker_engine's own default (false) which would otherwise shadow it and skip Docker.
@@ -25,26 +29,46 @@ hypervisor_libvirt_networks:
     bridge: br3
   - name: vlan4
     bridge: br4
+  - name: vlan9
+    bridge: br9
 
 hypervisor_netplan_vlans:
   - id: 3
     link: "{{ hypervisor_netplan_uplink }}"
   - id: 4
     link: "{{ hypervisor_netplan_uplink }}"
+  - id: 9
+    link: "{{ hypervisor_netplan_uplink }}"
 
-# br0 uses DHCP (router reservations); br3/br4 are bridge-only for libvirt VLANs.
+# br0 uses DHCP (router reservations); br3/br4/br9 are bridge-only for libvirt VLANs.
 # br4 address: hypervisor_netplan_br4_address in host_vars (mirrored .7.x octet).
 # Interfaces are derived from hypervisor_netplan_uplink in the netplan template.
+#
+# br0 pins resolvers to the Pi-hole pair and refuses DHCP/RA-supplied DNS: the UCG
+# advertises itself via RDNSS but cannot answer AD SRV records, so resolved selecting
+# it breaks Kerberos KDC discovery and winbind lookups. See
+# docs/hypervisor-runbook.md § Host resolvers (br0 DNS).
 hypervisor_netplan_bridges:
   br0:
     dhcp4: true
     dhcp6: true
+    dhcp4-overrides:
+      use-dns: false
+    dhcp6-overrides:
+      use-dns: false
+    ra-overrides:
+      use-dns: false
     nameservers:
+      addresses:
+        - 192.168.1.18
+        - 192.168.1.22
       search:
         - "{{ vm_dns_search | default('home.2123studios.com') }}"
   br3:
     dhcp4: false
   br4:
+    dhcp4: false
+  br9:
     dhcp4: false
 
 backup_restic_repository: /var/lib/restic/prod-backup
@@ -63,6 +87,13 @@ backup_prune_keep_monthly: 6
 # Hypervisor OS reboot stops all local VMs — install security updates but reboot manually.
 # See docs/security-updates-runbook.md.
 unattended_upgrades_auto_reboot: false
+
+# Stop needrestart running `systemctl daemon-reexec` after a library upgrade. A re-exec
+# whose generator sandbox times out leaves PID 1 frozen and the whole D-Bus surface dead
+# (slow logins, systemctl hangs) until a forced reboot — this bit kvm01 repeatedly.
+# See docs/security-updates-runbook.md § needrestart and systemd re-exec.
+unattended_upgrades_needrestart_manage: true
+unattended_upgrades_needrestart_skip_systemd_manager: true
 
 # Host performance tuning (tuned, sysctl, THP) — off by default on production.
 # Enable after lab validation; see docs/hypervisor-performance.md.

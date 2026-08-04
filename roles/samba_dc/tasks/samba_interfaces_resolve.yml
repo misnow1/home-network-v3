@@ -1,6 +1,10 @@
 ---
 # Resolve Samba interface list for smb.conf and samba-tool --option.
 # Imported before domain provision/join and from smb_conf_deploy.yml.
+#
+# Prefer interface *names* (lo + primary NIC). The LDAP VIP lives on a dedicated
+# macvlan (ldap0), not on the Samba NIC, so samba_dnsupdate never sees .12.
+# Do not freeze DHCPv6/SLAAC literals into smb.conf — they change with the ISP prefix.
 
 - name: Samba DC interfaces | Resolve from explicit list
   ansible.builtin.set_fact:
@@ -20,8 +24,7 @@
       - ansible_facts['default_ipv4']['address'] | length > 0
     fail_msg: >-
       samba_dc_interfaces is empty and default_ipv4 is unavailable.
-      Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]
-      or [lo, 192.168.1.10]).
+      Set samba_dc_interfaces explicitly in host_vars (e.g. [lo, enp1s0]).
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length == 0
@@ -35,37 +38,6 @@
   when:
     - samba_dc_bind_interfaces_only | bool
     - samba_dc_interfaces | length == 0
-    - not (ldap_vip_enabled | default(false) | bool)
-  tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
-
-# When keepalived places the LDAP VIP on the same NIC, binding Samba to the NIC
-# name makes samba_dnsupdate register the VIP under this DC hostname. Bind to
-# concrete addresses instead (primary IPv4 + global IPv6 on that NIC, minus VIP).
-- name: Samba DC interfaces | Auto-detect addresses when LDAP VIP enabled
-  ansible.builtin.set_fact:
-    samba_dc_effective_interfaces: >-
-      {{
-        (
-          ['lo', ansible_facts['default_ipv4']['address']]
-          + (
-              (
-                ansible_facts[ansible_facts['default_ipv4']['interface']]['ipv6']
-                | default([])
-              )
-              | selectattr('scope', 'defined')
-              | selectattr('scope', 'equalto', 'global')
-              | map(attribute='address')
-              | reject('equalto', ldap_vip_address | default(''))
-              | list
-            )
-        )
-        | unique
-        | list
-      }}
-  when:
-    - samba_dc_bind_interfaces_only | bool
-    - samba_dc_interfaces | length == 0
-    - ldap_vip_enabled | default(false) | bool
   tags: [samba_dns, samba_converge, samba_provision, samba_smb_conf, samba_tls]
 
 - name: Samba DC interfaces | Build smb.conf interfaces value

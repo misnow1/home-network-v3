@@ -9,7 +9,12 @@ ldap_vip_vrid: 51
 # Per-host: ldap_vip_state (MASTER|BACKUP) and ldap_vip_priority (e.g. 100/90).
 ldap_vip_state: BACKUP
 ldap_vip_priority: 90
+# VRRP advertisements ride the primary LAN NIC.
 ldap_vip_interface: "{{ ansible_facts['default_ipv4']['interface'] | default('eth0') }}"
+# VIP address lives on this macvlan (linked to ldap_vip_interface), NOT on the
+# Samba bind NIC — so smb.conf can use interface names (lo + enp1s0) without
+# samba_dnsupdate registering .12 as dc1/dc2.
+ldap_vip_device: ldap0
 # Primary IP Samba already listens on — VIP:389/636 are DNATed here (not bound by Samba).
 ldap_vip_backend_ip: "{{ ansible_host | default(ansible_facts['default_ipv4']['address'] | default('')) }}"
 ldap_vip_dnat_ports:

@@ -28,9 +28,10 @@
   when: docker_engine_enabled | bool
   tags: [docker_engine]
 
-- name: Docker engine | Restrict published ports to edge proxy (UFW)
-  ansible.builtin.include_tasks: ufw.yml
-  when:
-    - docker_engine_enabled | bool
-    - docker_engine_manage_ufw | bool
-  tags: [docker_engine, docker_engine_ufw]
+- name: Docker engine | Refuse legacy UFW variables (moved to host_firewall)
+  ansible.builtin.fail:
+    msg: >-
+      docker_engine_manage_ufw is removed. Use host_firewall_enabled and
+      host_firewall_* variables — see docs/host-firewall-runbook.md.
+  when: docker_engine_manage_ufw | default(false) | bool
+  tags: [docker_engine]

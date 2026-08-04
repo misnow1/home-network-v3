@@ -3,7 +3,9 @@
 Package lists for Ubuntu 24.04 managed hosts. All `linux` inventory hosts receive
 [`linux_baseline`](../roles/linux_baseline/); role playbooks add functional packages on top.
 
-Hosts with `ansible_managed: false` in inventory are out of scope for apt playbooks.
+Hosts with `host_managed: false` in inventory are out of scope for apt playbooks.
+(Do not name the inventory flag `ansible_managed` — that shadows Ansible's built-in
+`ansible_managed` string and makes every templated file header render as `# True`.)
 Production hypervisors **kif** and **kvm01** are Ubuntu-managed post-reimage (Slice 19).
 Non-Ubuntu VMs (e.g. Pi-hole) use config-only roles until repaved as Ubuntu.
 
@@ -196,7 +198,9 @@ the shared `unattended_upgrades` role (also available fleet-wide via
 | `unattended-upgrades` | Automatic security patching |
 
 Deploys APT periodic upgrade configuration, inventory-driven reboot windows, and
-email to `root` on package changes (`MailReport: on-change`). See
+email to `root` on package changes (`MailReport: on-change`). Optionally owns
+`/etc/needrestart/conf.d/90-ansible.conf` to suppress needrestart's
+`systemctl daemon-reexec` hook (enabled on hypervisors). See
 [security-updates-runbook.md](security-updates-runbook.md).
 
 ### Reverse proxy (`reverse_proxy`)
@@ -231,6 +235,28 @@ CKA nodes also receive the full baseline (including fzf, htop, zsh). The role cr
 local user (`$USER` from the control node) with zsh login shell and passwordless sudo.
 `kubeadm`, `kubelet`, and `containerd` are **not** automated — install per course materials.
 
+### Kubernetes cluster nodes (`k8s`)
+
+**Playbook:** [`playbooks/k8s-node-prep.yml`](../playbooks/k8s-node-prep.yml)  
+**Role:** [`roles/k8s_node`](../roles/k8s_node/) — variables `k8s_kubernetes_packages`, `k8s_containerd_packages`
+
+| Package | Purpose |
+|---|---|
+| `containerd.io` | Container runtime (SystemdCgroup) |
+| `kubelet` | Kubernetes node agent |
+| `kubeadm` | Cluster bootstrap CLI |
+| `kubectl` | Kubernetes admin CLI |
+| `helm` | Cilium / MetalLB / Envoy Gateway charts — pinned binary from `get.helm.sh` with SHA256 verification (`k8s_helm_*`), not the community apt/snap builds |
+| `cilium` | Cilium CLI for install/status/Hubble — pinned from GitHub releases (`k8s_cilium_cli_*`) |
+| `bash-completion` | Required for kubectl tab completion on bash |
+| `conntrack` | Required by kube-proxy; fatal `kubeadm init` preflight check |
+| `ebtables`, `ethtool`, `iproute2`, `iptables`, `socat` | Remaining kubeadm preflight dependencies (`k8s_preflight_packages`) |
+
+Nodes also receive baseline packages, swap disabled, kernel modules (`overlay`,
+`br_netfilter`), and sysctl for forwarding/bridge netfilter. Optional local operator
+break-glass SSH (`k8s_operator_*`). **`kubeadm init/join`, Cilium, MetalLB, and
+Envoy Gateway are manual** — see [kubernetes-runbook.md](kubernetes-runbook.md).
+
 ### Backup hosts (`hypervisors` with backup playbook)
 
 **Playbook:** [`playbooks/backup.yml`](../playbooks/backup.yml)  
@@ -243,14 +269,17 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 When `backup_schedule_enabled: true`, deploys `ansible-backup.timer` (docker volume backup,
 retention prune, optional offsite `restic copy`). See [backup-runbook.md](backup-runbook.md).
 
-### Docker workload hosts (`docker_engine` with UFW)
+### Host firewall (`host_firewall`)
 
-When `docker_engine_manage_ufw: true`, restricts published container ports to edge proxy
-hosts. See [edge-access-model.md](edge-access-model.md).
+When `host_firewall_enabled: true`, manages UFW with default-deny incoming, explicit
+LAN/internet allows, and optional Docker edge proxy restrictions. See
+[host-firewall-runbook.md](host-firewall-runbook.md).
 
 | Package | Purpose |
 |---|---|
-| `ufw` | Host firewall for Docker port isolation |
+| `ufw` | Host firewall |
+
+### Docker workload hosts (`docker_engine`)
 
 ## Apply order
 
@@ -261,6 +290,7 @@ hosts. See [edge-access-model.md](edge-access-model.md).
 | Bastion | `baseline.yml` → `domain-join.yml` → `bastion.yml` (includes `unattended_upgrades`) |
 | Reverse proxy | `baseline.yml` → `certbot.yml` → `reverse-proxy.yml` (proxy01; no domain-join) |
 | CKA | `cka-converge.yml` (baseline + `cka_node`) |
+| Kubernetes | `baseline.yml` → `k8s-node-prep.yml` (baseline + `k8s_node`); cluster bootstrap manual |
 
 ## Overriding package lists
 

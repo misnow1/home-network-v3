@@ -67,11 +67,20 @@ bind interfaces only = yes
 | Variable | Default | Purpose |
 |---|---|---|
 | `samba_dc_bind_interfaces_only` | `true` | Enable interface binding |
-| `samba_dc_interfaces` | `[]` | Explicit list (e.g. `[lo, enp1s0]`); empty = auto-detect `lo` + `ansible_default_ipv4.interface` |
+| `samba_dc_interfaces` | `[]` | Explicit list (e.g. `[lo, enp1s0]`); empty = auto-detect `lo` + primary NIC **name** |
+| `samba_dc_register_ipv6` | `false` | When false, DNS prune deletes DC hostname AAAA (ISP GUAs); smb.conf still uses NIC names |
+
+Auto-detect always uses **interface names** (`lo` + primary NIC). The LDAP VIP lives on
+macvlan `ldap0` (see [ldap-vip-runbook.md](ldap-vip-runbook.md)), so it never appears on the
+Samba NIC and does not need IP literals in `smb.conf`.
 
 After binding, converge prunes stale A/AAAA records for the DC hostname and runs
 `samba_dnsupdate`. Override `samba_dc_interfaces` in host_vars when auto-detect picks
 the wrong NIC.
+
+**Do not** embed DHCPv6/SLAAC addresses in smb.conf — they change when the ISP
+delegates a new prefix or leases renew. Samba discovers runtime addresses on the named NIC;
+converge prunes DNS that no longer matches.
 
 ## Integration test proof
 
@@ -158,7 +167,7 @@ network corresponding to a local interface address — when the ISP delegates a 
 
 | Concern | Approach |
 |---|---|
-| DC hostname AAAA | **Do not publish** ISP GUA — `samba_interfaces.yml` binds Samba to LAN NIC + lo |
+| DC hostname AAAA | **`samba_dc_register_ipv6: false`** — prune deletes AAAA; smb.conf binds NIC by name (Samba may still listen on IPv6) |
 | Client AAAA | DHCPv6 lease path via `dhcp-ddns-hook.sh` (Slice 9) |
 | Hardcoded `2600:…/64` | **Never** in inventory — use `localnets` |
 | Stale client AAAA after prefix change | DDNS upsert on lease renew; manual `samba-tool dns delete` for orphans |

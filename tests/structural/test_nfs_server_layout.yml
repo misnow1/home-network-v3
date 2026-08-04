@@ -49,11 +49,13 @@
       ansible.builtin.shell: |
         grep -q 'nfs_server_export_sec: krb5i' "{{ nfs_defaults }}"
         grep -q 'nfs_server_exports:' "{{ nfs_defaults }}"
+        grep -q 'nfs_server_extra_exports:' "{{ nfs_defaults }}"
         grep -q '/archive' "{{ nfs_defaults }}"
         grep -q 'nfs_server_manage_spn' "{{ nfs_defaults }}"
         grep -q 'net ads setspn add' "{{ repo_root }}/roles/nfs_server/tasks/spn.yml"
         grep -q 'NEED_SVCGSSD=yes' "{{ repo_root }}/roles/nfs_server/tasks/exports.yml"
         grep -q 'sec=' "{{ repo_root }}/roles/nfs_server/templates/exports.j2"
+        grep -q 'nfs_server_extra_exports' "{{ repo_root }}/roles/nfs_server/templates/exports.j2"
       args:
         executable: /bin/bash
       changed_when: false
@@ -62,6 +64,16 @@
       ansible.builtin.shell: |
         grep -q 'nfs_server_enabled: true' "{{ kif_host_vars_example }}"
         grep -q 'nfs_server_client_networks' "{{ kif_host_vars_example }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: NFS server | assert krb5 scrub removes retired static KDC pins
+      ansible.builtin.shell: |
+        grep -q 'nfs_server_krb5_retired_kdcs' "{{ nfs_defaults }}"
+        grep -q 'pdc.home.2123studios.com' "{{ nfs_defaults }}"
+        grep -q 'Remove retired static KDC pins' "{{ repo_root }}/roles/nfs_server/tasks/krb5.yml"
+        grep -q 'Cannot contact any KDC' "{{ nfs_runbook }}"
       args:
         executable: /bin/bash
       changed_when: false

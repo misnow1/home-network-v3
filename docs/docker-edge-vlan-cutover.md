@@ -85,7 +85,7 @@ Set Transmission `port_forwarding_enabled: false` if using explicit UniFi forwar
 ### 5. kif UFW + forwarded-header trust boundary
 
 ```bash
-${PROD} playbooks/hypervisor.yml --limit kif.home.2123studios.com --tags docker_engine_ufw
+${PROD} playbooks/host-firewall.yml --limit kif.home.2123studios.com
 ```
 
 Authelia does not need a `trusted_proxies` entry in `configuration.yml`. With no
@@ -151,7 +151,7 @@ Remove any `reverse_proxy_enabled` / certbot overrides from shell-clt01 host_var
 1. Revert UniFi 80/443 forwards to shell-clt01 (`192.168.1.17`).
 2. Re-enable nginx on shell-clt01 (if not purged).
 3. Revert kif Compose bindings to `0.0.0.0` temporarily.
-4. Revert `docker_engine_ufw_edge_proxy_cidrs` to shell-clt01 LAN IP.
+4. Revert `host_firewall_edge_proxy_cidrs` to shell-clt01 LAN IP.
 
 ## Related docs
 

@@ -31,6 +31,36 @@ nfs_server_client_networks:
 Optional overrides: `nfs_server_exports`, `nfs_server_export_sec`,
 `nfs_server_manage_spn: false` (SPN/keytab already correct).
 
+### Extra export for Kubernetes CSI (`sec=sys`)
+
+Domain-joined Kerberos exports stay on `nfs_server_exports`. Append a VLAN-9-only
+sys export via `nfs_server_extra_exports` (per-export `sec` / `clients`; `ensure: true`
+creates the directory):
+
+```yaml
+nfs_server_extra_exports:
+  - path: /export/k8s
+    fsid: 4
+    sec: sys
+    clients:
+      - 192.168.9.0/24
+    ensure: true
+    # root_squash maps client root → nobody (65534). Own the share accordingly:
+    owner: nobody
+    group: nogroup
+    mode: "0775"
+```
+
+One-shot on kif if the directory already exists:
+
+```bash
+sudo chown nobody:nogroup /export/k8s
+sudo chmod 775 /export/k8s
+```
+
+Also allow 2049 from `192.168.9.0/24` on kif (`host_firewall_rules`) and UniFi
+VLAN 9 → VLAN 1 NFS. See [kubernetes-runbook.md](kubernetes-runbook.md) Phase 6.
+
 ## Production apply (kif)
 
 Run **before** client validation on kvm01 (`nfs-client.yml`).
@@ -93,6 +123,22 @@ missing (RHEL→Ubuntu leftover). The role creates it when detected; or manually
 
 ```bash
 sudo mkdir -p /etc/krb5.conf.d
+```
+
+### `Cannot contact any KDC` / kinit hits the legacy `pdc`
+
+`dns_lookup_kdc = true` is ignored when `[realms]` still pins
+`kdc = pdc.home.2123studios.com`. The retired PDC answers ICMP/SSH but is not a
+KDC, so machine `kinit` and NFS GSS fail even though `dc1`/`dc2` SRV records are
+healthy.
+
+The role strips hostnames in `nfs_server_krb5_retired_kdcs` (default: `pdc…`).
+Verify after converge:
+
+```bash
+grep -E '^\s*(kdc|admin_server)\s*=' /etc/krb5.conf   # no pdc lines
+KRB5_TRACE=/dev/stderr kinit -k -t /etc/krb5.keytab 'KIF$@HOME.2123STUDIOS.COM'
+# expect: Resolving hostname dc1… / dc2…
 ```
 
 ### `access denied by server` with correct export ACL

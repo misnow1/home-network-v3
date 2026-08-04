@@ -1,0 +1,66 @@
+---
+- name: Kubernetes node | Assert role is enabled
+  ansible.builtin.assert:
+    that:
+      - k8s_node_enabled | bool
+    fail_msg: k8s_node_enabled is false — set true in group_vars/k8s/vars.yml
+  tags: [k8s_node]
+
+- name: Kubernetes node | Install apt prerequisites for repositories
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [k8s_node]
+
+- name: Kubernetes node | Disable swap
+  ansible.builtin.include_tasks: swap.yml
+  when: k8s_disable_swap | bool
+  tags: [k8s_node, k8s_swap]
+
+- name: Kubernetes node | Load kernel modules
+  ansible.builtin.include_tasks: modules.yml
+  tags: [k8s_node, k8s_modules]
+
+- name: Kubernetes node | Apply sysctl settings
+  ansible.builtin.include_tasks: sysctl.yml
+  tags: [k8s_node, k8s_sysctl]
+
+- name: Kubernetes node | Configure containerd apt repository
+  ansible.builtin.include_tasks: containerd_repo.yml
+  tags: [k8s_node, k8s_containerd]
+
+- name: Kubernetes node | Install and configure containerd
+  ansible.builtin.include_tasks: containerd.yml
+  tags: [k8s_node, k8s_containerd]
+
+- name: Kubernetes node | Configure Kubernetes apt repository
+  ansible.builtin.include_tasks: kubernetes_repo.yml
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Install Kubernetes packages
+  ansible.builtin.include_tasks: packages.yml
+  tags: [k8s_node, k8s_packages]
+
+- name: Kubernetes node | Install Helm CLI
+  ansible.builtin.include_tasks: helm.yml
+  when: k8s_helm_enabled | bool
+  tags: [k8s_node, k8s_helm]
+
+- name: Kubernetes node | Install Cilium CLI
+  ansible.builtin.include_tasks: cilium_cli.yml
+  when: k8s_cilium_cli_enabled | bool
+  tags: [k8s_node, k8s_cilium_cli]
+
+- name: Kubernetes node | Enable kubectl shell tab completion
+  ansible.builtin.include_tasks: kubectl_completion.yml
+  when: k8s_kubectl_completion_enabled | bool
+  tags: [k8s_node, k8s_kubectl_completion]
+
+- name: Kubernetes node | Configure operator break-glass SSH
+  ansible.builtin.include_tasks: operator_ssh.yml
+  tags: [k8s_node, k8s_operator]
