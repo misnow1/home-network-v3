@@ -66,8 +66,9 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the slice plan and deferred work.
 
 ## GitHub Actions
 
-Configure repository secret `VAULT_PASS_LAB` to match the lab vault password documented in
-[docs/vault-schema.md](docs/vault-schema.md).
+Configure `VAULT_PASS_LAB` as both an Actions secret and a Dependabot secret (same value as
+the lab vault password in [docs/vault-schema.md](docs/vault-schema.md)). Dependabot PRs do
+not receive Actions secrets.
 
 - **Test Quick** — linters and structural tests on every push/PR
 - **Test Integration DC Replica** — nightly + manual `workflow_dispatch` on the kvm01
