@@ -1,6 +1,6 @@
 # Python dependencies for the Ansible control node.
 # Install: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-ansible-core>=2.16,<2.21
+ansible-core>=2.21.2,<2.22
 ansible-lint>=24,<27
 yamllint>=1.38.0,<2
 jmespath>=1.0,<2
