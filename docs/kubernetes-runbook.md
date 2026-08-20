@@ -142,7 +142,7 @@ Three components stay `Pending` by design until Phase 3 adds an untainted worker
 
 | Pending pod | Why | Clears when |
 |---|---|---|
-| `cilium-operator` (2nd of 2 replicas) | `hostNetwork: true` with hostPorts 9234/9963; two replicas cannot bind the same ports on one node | A second node joins |
+| `cilium-operator` (2nd of 2 replicas) | `hostNetwork: true` with hostPorts 9234/9963; two replicas cannot bind the same ports on one node. After workers exist, replica 2 may still schedule on the **tainted CP** (operator tolerates that taint) and CrashLoop: host-netns cannot reach ClusterIP `10.96.0.1:443`. Delete the crashing pod so it lands on a worker; one Running replica is enough. | A second **worker** holds the extra replica |
 | `hubble-relay` | No toleration for `node-role.kubernetes.io/control-plane:NoSchedule` | An untainted worker joins |
 | `hubble-ui` | Same — ordinary workload, CP is tainted per ADR 003 | An untainted worker joins |
 
@@ -577,6 +577,17 @@ namespaces.
 
 ## Phase 8 — etcd backup (required before graduation app)
 
+`etcdctl` is not part of the kubeadm/kubernetes-common packages. On **control-plane**
+hosts (Ubuntu), install the client before the first snapshot:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y etcd-client
+```
+
+(Optional later: add `etcd-client` to CP-only package lists in `k8s_node` / host_vars so
+`k8s-node-prep.yml` keeps it present.)
+
 On **k8s-cp01**, schedule snapshots:
 
 ```bash
@@ -588,25 +599,120 @@ sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd-$(date +%F).db \
   --key=/etc/kubernetes/pki/etcd/server.key
 ```
 
-Copy snapshots and `/etc/kubernetes/pki` off-box (kif restic scope or rsync). Document restore:
+Copy snapshots and `/etc/kubernetes/pki` off-box (e.g. kif `/archive/backup/` via
+user-staged rsync — avoid root SSH). Long-term automation (NFS drop + kif restic)
+is still open.
+
+### Safe verify drill (no live cutover)
+
+Proves the off-box `.db` restores without touching production etcd. Live API stays up.
 
 ```bash
-# Disaster recovery outline — practice in lab first:
-# 1. Reimage CP VM, rerun k8s-node-prep
-# 2. kubeadm init --ignore-preflight-errors=all (or restore static pods from backup procedure)
-# 3. etcdctl snapshot restore ...
-# 4. Rejoin workers or rebuild cluster per upstream disaster recovery docs
+# On a host with etcd-client (kif or CP):
+sudo ETCDCTL_API=3 etcdctl -w table snapshot status /path/to/etcd-YYYY-MM-DD.db
+# Prefer etcdutl when available: etcdutl --write-out=table snapshot status …
+
+# On k8s-cp01 — restore ONLY to a throwaway directory (never /var/lib/etcd):
+sudo rm -rf /var/lib/etcd-restore-drill
+sudo ETCDCTL_API=3 etcdctl snapshot restore /var/backups/drill/etcd-YYYY-MM-DD.db \
+  --data-dir=/var/lib/etcd-restore-drill
+sudo du -sh /var/lib/etcd-restore-drill
+sudo ls /var/lib/etcd-restore-drill/member
+
+kubectl get nodes   # must still work
+# Do NOT edit /etc/kubernetes/manifests/etcd.yaml
+
+sudo rm -rf /var/lib/etcd-restore-drill /var/backups/drill
 ```
 
-**Do not deploy Uptime Kuma or other useful apps until a snapshot restore drill succeeds.**
+This is a **partial** Phase 8 gate (integrity + restore mechanics).
+
+### Full cutover drill (API outage — single stacked CP)
+
+Proven on prod `k8s-cp01` (2026-08-18). Accept a brief API outage. Prefer a **fresh
+snapshot + post-snapshot canary** so success is unambiguous.
+
+```bash
+# 0) Identity from the live etcd static pod (do not guess):
+grep -E 'name=|initial-cluster=|initial-advertise-peer-urls=|data-dir=' \
+  /etc/kubernetes/manifests/etcd.yaml
+
+# 1) Snapshot, THEN create a canary object after the save:
+sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd-pre-cutover-$(date +%F-%H%M).db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+kubectl create configmap etcd-cutover-canary -n default --from-literal=drill=full-cutover
+
+# 2) Stop writers (apiserver first, then etcd):
+sudo mkdir -p /root/etcd-cutover-manifests
+sudo mv /etc/kubernetes/manifests/kube-apiserver.yaml /root/etcd-cutover-manifests/
+sleep 20
+sudo mv /etc/kubernetes/manifests/etcd.yaml /root/etcd-cutover-manifests/
+# wait until: crictl pods | grep -E 'etcd|kube-apiserver' is empty
+
+# 3) Preserve live data-dir, restore snapshot into /var/lib/etcd
+#    (match --name / --initial-cluster / peer URL to etcd.yaml):
+sudo mv /var/lib/etcd /var/lib/etcd.pre-cutover-bak-$(date +%F)
+sudo ETCDCTL_API=3 etcdctl snapshot restore /var/backups/etcd-pre-cutover-….db \
+  --data-dir=/var/lib/etcd \
+  --name=k8s-cp01.home.2123studios.com \
+  --initial-cluster=k8s-cp01.home.2123studios.com=https://192.168.9.10:2380 \
+  --initial-advertise-peer-urls=https://192.168.9.10:2380
+sudo chown -R root:root /var/lib/etcd
+
+# 4) Start etcd, then apiserver:
+sudo mv /root/etcd-cutover-manifests/etcd.yaml /etc/kubernetes/manifests/
+sleep 15
+sudo mv /root/etcd-cutover-manifests/kube-apiserver.yaml /etc/kubernetes/manifests/
+kubectl get --raw=/readyz
+kubectl get nodes
+kubectl get cm etcd-cutover-canary -n default   # must be NotFound
+```
+
+Keep `/var/lib/etcd.pre-cutover-bak-*` until you are satisfied, then remove it to reclaim
+disk. Prefer `etcdutl snapshot restore` when available (Ubuntu `etcd-client` may only
+ship `etcdctl`).
+
+**Phase 8 gate for graduation apps:** full cutover drill succeeded (canary absent +
+API healthy). Safe verify alone is not enough.
 
 ## Phase 9 — Graduation app
 
-Deploy **Uptime Kuma** (or similar) with:
+**Uptime Kuma** is live at `uptime.2123studios.com` (first-run setup done, SQLite on
+local-path). Manifests: `k8s/uptime-kuma/uptime-kuma.yaml`.
 
-- `HTTPRoute` + `auth_required` on proxy01
-- PVC on local-path or NFS StorageClass
-- Confirm pod survives node drain to the other worker
+Do not use NFS for this app — Kuma’s SQLite needs POSIX locks. The PVC uses StorageClass
+`local-path` (node-local, `WaitForFirstConsumer`). A drain of the worker that holds the
+volume does **not** move the pod to the other worker: the replacement stays `Pending`
+(`didn't match PersistentVolume's node affinity`). Uncordon the original node to recover.
+Stateless apps (whoami) *do* reschedule.
+
+Public hostname must CNAME through `bastion.2123studios.com` (same as whoami) before
+Let's Encrypt DNS-01. Adding a SAN does not happen automatically — re-issue with
+`-e certbot_force_renewal=true` ([certbot-runbook.md](certbot-runbook.md)). Dreamhost
+secondary NXDOMAIN is flaky; retry, and bump
+`certbot_dreamhost_propagation_settle_seconds` (e.g. 180) if the auth hook already saw
+the TXT on all three NS.
+
+Edge wiring (same hybrid path as Phase 7):
+
+- Authelia `access_control` for `uptime.2123studios.com`
+- `reverse_proxy_sites` → `http://192.168.9.200` with `auth_required` and `websocket`
+- `HTTPRoute` hostname matching the public name
+
+Checks:
+
+```bash
+# Authelia intercept (unauthenticated)
+curl -sSI https://uptime.2123studios.com/
+# Cluster path (Kuma itself typically 302s)
+curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: uptime.2123studios.com' http://192.168.9.200/
+```
+
+Drain drill (2026-08-20): evicted from `k8s-node-1` → `Pending` on affinity; uncordon →
+`Running` again on `k8s-node-1`. whoami moved to `k8s-node-2`.
 
 ## Later milestones
 
@@ -639,12 +745,15 @@ Deploy **Uptime Kuma** (or similar) with:
 | Warning: sandbox image `""` inconsistent with kubeadm | Cosmetic. kubeadm reads `sandboxImage` from the CRI runtime status, which containerd 2.x no longer reports there. Confirm with `containerd config dump \| grep -A2 pinned_images` and compare against `kubeadm config images list`; set `k8s_pause_image` if they differ |
 | Nodes NotReady | Cilium pods / `cilium status`; `journalctl -u kubelet` |
 | `cilium status` never converges; operator/hubble `Pending` | Expected before workers join — see Phase 2. `didn't have free ports` = operator replica 2 needs a second node; `untolerated taint` = hubble needs an untainted worker |
+| `cilium-operator` CrashLoop on `k8s-cp01` | Host-networked operator on the CP cannot dial `https://10.96.0.1:443`. Delete that pod so it reschedules onto a worker (anti-affinity). Seen after draining the worker that held the healthy replica |
 | MetalLB VIP unreachable from proxy01 | UniFi firewall VLAN 1→9, ARP on VLAN 9 |
+| `etcdctl: command not found` on CP | `apt-get install -y etcd-client` — see Phase 8 |
 | Gateway 502 from proxy01 | `kubectl get gateway,httproute -A`; Envoy proxy Service EXTERNAL-IP matches pool |
 | `helm template \| kubectl apply` → `apiVersion not set` | Helm 4 prints OCI `Pulled:`/`Digest:` on stdout. Use the one-shot `helm install eg …` or `grep -vE '^(Pulled\|Digest):'` before apply (Phase 5) |
 | HTTPRoute Accepted=False | Gateway `allowedRoutes`, ReferenceGrant, Service/port names |
 | `kubectl top` → Metrics API not available | metrics-server needs `--kubelet-insecure-tls` on kubeadm — see Phase 6 |
 | NFS PVC mount fails | kif exports, firewall 2049, CSI driver logs |
+| Uptime Kuma `Pending` after drain | local-path PVC is node-locked — uncordon the original worker; it will not land on the other node |
 
 ## References
 

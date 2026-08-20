@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference — Phase 8 backup card</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Reference</p>
+      <h1>Phase 8 backup card</h1>
+      <p class="lede">Print-friendly. Snapshot → off-box → then graduation apps.</p>
+    </header>
+
+    <h2>Protects / does not</h2>
+    <pre><code>etcd snapshot  → API objects, cluster config
+pki copy       → /etc/kubernetes/pki (with snapshot)
+NOT covered    → PVC bytes (Kuma DB, NFS data)</code></pre>
+
+    <h2>Prerequisite</h2>
+    <pre><code>sudo apt-get install -y etcd-client   # CP hosts; not pulled in by kubeadm</code></pre>
+
+    <h2>Manual save (k8s-cp01)</h2>
+    <pre><code>sudo mkdir -p /var/backups
+sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd-$(date +%F).db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+
+sudo ETCDCTL_API=3 etcdctl snapshot status /var/backups/etcd-*.db -w table
+# Prefer: etcdutl --write-out=table snapshot status …
+# rsync/scp .db + pki off-box (e.g. kif /archive/backup/)
+
+# Safe verify (no cutover): restore to /var/lib/etcd-restore-drill only,
+# then rm -rf it. Never edit etcd.yaml for this drill.</code></pre>
+
+    <h2>Gate</h2>
+    <pre><code>whoami OK  ≠  ready for Uptime Kuma
+need: snapshot + off-box + full cutover restore
+(safe verify = partial; cutover cleared 2026-08-18)</code></pre>
+
+    <footer class="lesson-foot">
+      Lesson: <a href="../lessons/0006-phase8-etcd-before-graduation.html">0006 Phase 8/9</a>
+      · Runbook:
+      <a href="../../docs/kubernetes-runbook.md">Phase 8–9</a>
+      · Upstream:
+      <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/">etcd ops</a>
+    </footer>
+  </div>
+</body>
+</html>

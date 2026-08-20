@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference — Hybrid edge hop map</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Reference</p>
+      <h1>Hybrid edge hop map</h1>
+      <p class="lede">Compressed path for Phase 7. Print-friendly.</p>
+    </header>
+
+    <div class="diagram">Internet :443
+        │
+        ▼
+   proxy01 nginx          TLS terminate + Authelia forward-auth
+   upstream = http://192.168.9.200
+        │  VLAN 1 → 9 (firewall must allow)
+        ▼
+   MetalLB VIP            192.168.9.200 (pool .200–.210)
+   L2 ARP on VLAN 9       one speaker node owns the MAC answer
+        │
+        ▼
+   Envoy Gateway          Service type LoadBalancer
+   Gateway listener :80   HTTP only (TLS stays on proxy01)
+        │
+        ▼
+   HTTPRoute              match Host (+ path) → Service:port
+        │
+        ▼
+   Pods</div>
+
+    <h2>Who owns what</h2>
+    <ul>
+      <li><strong>proxy01</strong> — public TLS, certbot, Authelia, rate limits</li>
+      <li><strong>MetalLB</strong> — VIP assignment + ARP advertisement</li>
+      <li><strong>Envoy Gateway</strong> — Gateway API implementation (L7 proxy)</li>
+      <li><strong>HTTPRoute</strong> — per-app Host/path → Service (like server_name)</li>
+    </ul>
+
+    <h2>Quick checks</h2>
+    <pre><code>kubectl get svc -n envoy-gateway-system
+kubectl get gateway,httproute -A
+curl -sS -H 'Host: whoami.home.2123studios.com' http://192.168.9.200/</code></pre>
+
+    <footer class="lesson-foot">
+      Lessons:
+      <a href="../lessons/0001-metallb-vip-mental-model.html">0001 VIP</a> ·
+      <a href="../lessons/0002-gateway-httproute-nginx-map.html">0002 Gateway/HTTPRoute</a> ·
+      <a href="../lessons/0003-wire-proxy01-to-vip.html">0003 proxy01</a>
+      · Checklist: <a href="phase7-site-checklist.html">Phase 7</a>
+      · Runbook: <a href="../../docs/kubernetes-runbook.md">kubernetes-runbook.md</a>
+    </footer>
+  </div>
+</body>
+</html>
