@@ -1,0 +1,20 @@
+---
+- name: Backup AD | Deploy offline backup helper on source DC
+  ansible.builtin.template:
+    src: backup-ad-offline.sh.j2
+    dest: "{{ backup_ad_dc_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_ad]
+
+- name: Backup AD | Allow ansible passwordless sudo for helper
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ansible-backup-ad
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+    content: |
+      {{ backup_ad_ssh_user }} ALL=(root) NOPASSWD: {{ backup_ad_dc_script_path }} *
+  tags: [backup_ad]

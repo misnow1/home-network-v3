@@ -28,3 +28,8 @@
   ansible.builtin.include_tasks: schedule.yml
   when: backup_schedule_enabled | bool
   tags: [backup_schedule]
+
+- name: Configure kif-driven AD backup
+  ansible.builtin.include_tasks: ad_kif.yml
+  when: backup_ad_enabled | bool
+  tags: [backup_ad]

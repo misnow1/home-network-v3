@@ -43,7 +43,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | Priority | Slice | Name | Status | Notes |
 |---|---|---|---|---|
 | 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | proxy01 VM + VLAN 4 docker edge; split from bastion — [reverse-proxy-runbook.md](reverse-proxy-runbook.md), [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md), [edge-access-model.md](edge-access-model.md) |
-| 2 | 23 | Restic scheduling + offsite copy | **in progress** | systemd timer, prune, `/archive/restic/` mirror on kif; quarterly restore drill — [backup-runbook.md](backup-runbook.md) |
+| 2 | 23 | Restic scheduling + offsite copy | **in progress** | kif RAID6 repo + timer + host paths + AD job in role; production converge + restore drill pending — [backup-runbook.md](backup-runbook.md) |
 | 3 | 31 | Kubernetes lab platform | **in progress** | Phases 0–9 live (hybrid edge + Uptime Kuma + NFS CSI + etcd snapshots off-box). Remaining: Argo CD — [kubernetes-runbook.md](kubernetes-runbook.md), [adr/003-home-kubernetes.md](adr/003-home-kubernetes.md) |
 
 ## Active — automation backlog (post-reimage)
@@ -62,7 +62,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 14+ | Windows provisioning | Slice 2 AD | Manual/docs only — Windows clients out of scope |
 | 29+ | Stable IPv6-first LAN addressing | Slice 17, gateway topology | Replace ISP-PD-dependent inventory ACLs with stable internal IPv6 addressing (evaluate ULA and alternatives); research Windows RFC 6724 address selection, AAAA/AD DNS behavior, and dual-stack failure modes; apply consistently to NFS, firewalls, and fleet services |
 | 20+ | Mac Time Machine + avahi | Production fileserver | `vfs_fruit`, avahi `_adisk._tcp` / `_device-info._tcp`; Finder discovery for personal Macs |
-| 22+ | backup-libvirt automation | Slice 7 | `backup-libvirt.sh` honoring scope manifest (`offline_copy`, `snapshot`, `exclude`) |
+| 22+ | Stateful guest / AD backups | Slice 7 / 23 | AD tarball + KopiaUI (not whole-qcow2). `backup-libvirt.sh` not planned. |
 | 23+ | Restic air-gap offsite | Slice 23 | SFTP/NAS/object-storage backend; automated copy off kif; immutable retention |
 | 24+ | kif ESP/boot mirror | kif reimage (optional) | Rebuild 2×1TB pair with mirrored ESP/`/boot`; retire spare-as-OS or repurpose 512GB SSD |
 | — | nut_client role | Slice 21 | Server slice done; client role for kvm01 netclient path deferred |

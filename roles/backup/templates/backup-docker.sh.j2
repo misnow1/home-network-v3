@@ -17,6 +17,14 @@ exit 0
 success_count=0
 skip_count=0
 failure_count=0
+STOPPED_ALL=""
+
+restore_stopped_containers() {
+  [ -z "$STOPPED_ALL" ] && return 0
+  docker_start_containers "$STOPPED_ALL" || true
+}
+
+trap restore_stopped_containers EXIT
 
 docker_stop_volume_containers() {
   local vol_name="$1"
@@ -62,6 +70,10 @@ if [ -z "$VOL_PATH" ] || [ ! -d "$VOL_PATH" ]; then
 else
 {% if vol.backup_class == 'crash_consistent' %}
   CONTAINER_ID=$(docker ps -q --filter volume="{{ vol.name }}")
+  if [ -n "$CONTAINER_ID" ]; then
+    STOPPED_ALL="${STOPPED_ALL}
+${CONTAINER_ID}"
+  fi
   if [ -n "$CONTAINER_ID" ] && ! docker_stop_volume_containers "{{ vol.name }}"; then
     failure_count=$((failure_count + 1))
     echo "$(date -Iseconds) | {{ vol.name }} | ERROR: failed to stop containers using volume" >&2

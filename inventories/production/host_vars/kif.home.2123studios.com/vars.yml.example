@@ -208,26 +208,58 @@ docker_engine_data_volumes:
 # Hypervisor OS reboot stops all local VMs — install updates, reboot manually.
 unattended_upgrades_auto_reboot: false
 
-# --- Backups (Slice 23+) -----------------------------------------------------
-# Primary repo on local LV; offsite mirror on /archive (separate disk tier).
+# --- Backups (Slice 23) ------------------------------------------------------
+# Primary restic repo on the RAID6 archive LV (cheap/slow is OK). Do not restic-copy
+# onto the same array; true off-host is ROADMAP 23+.
+backup_restic_repository: /archive/restic/prod-backup
 backup_schedule_enabled: true
 backup_schedule_on_calendar: "02:30"
-backup_offsite_repository: /archive/restic/prod-backup-offsite
-backup_offsite_copy_enabled: true
-# Match names from `docker volume ls` on kif after compose is running.
+backup_schedule_randomized_delay_sec: 300
+backup_offsite_copy_enabled: false
+backup_ad_enabled: true
+backup_ad_peer_ldap_uri: ldap://192.168.1.11
+backup_ad_source_ssh_host: dc1.home.2123studios.com
+backup_ad_ssh_identity: /home/misnow1/workspace/home-network-v3/scripts/vm/keys/prod_id_ed25519
+# Named volumes: verify with `docker volume ls` after compose is up.
 backup_docker_volumes:
-  - name: authelia_redis
+  - name: guacamole_mariadb_data
     backup_class: crash_consistent
-    notes: Authelia Valkey session cache
-  - name: guacamole_guacamole
+    notes: Guacamole MariaDB — compose project prefix
+  - name: paperless_dbdata
     backup_class: crash_consistent
-    notes: Guacamole config — verify compose project prefix
+    notes: Paperless MariaDB
+  - name: paperless_redisdata
+    backup_class: crash_consistent
+    notes: Paperless Redis
   - name: paperless_data
     backup_class: crash_consistent
-    notes: Paperless application data — verify compose project prefix
-  - name: transmission_config
+    notes: Paperless application data
+  - name: paperless_media
     backup_class: crash_consistent
-    notes: Transmission settings — verify compose project prefix
+    notes: Paperless document media
+  - name: paperless_trash
+    backup_class: crash_consistent
+    notes: Paperless trash volume
+backup_host_paths:
+  - path: /home
+    tag: home
+  - path: /archive
+    tag: archive
+    excludes:
+      - restic
+      - "*/kopia"
+      - "pre-reimage-*"
+  - path: /media/projects
+    tag: media-projects
+  - path: /media/software
+    tag: media-software
+  - path: /media/teslausb
+    tag: media-teslausb
+  - path: /srv/docker
+    tag: docker-compose
+  - path: /var/backups/ad
+    tag: ad
+    optional: true
 
 # --- Host firewall (UFW) — see docs/host-firewall-runbook.md ----------------
 # Default deny incoming. Enumerate every LAN/internet listener before enabling.

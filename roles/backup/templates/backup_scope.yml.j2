@@ -2,7 +2,7 @@
 ---
 generated_by: ansible
 hypervisor: "{{ inventory_hostname }}"
-schema_version: "1"
+schema_version: "2"
 
 vms:
 {% if backup_libvirt_vms | length > 0 %}
@@ -25,6 +25,17 @@ docker_volumes:
   - name: "{{ vol.name }}"
     backup_class: "{{ vol.backup_class }}"
     notes: "{{ vol.notes | default('') }}"
+{% endfor %}
+{% else %}
+  []
+{% endif %}
+
+host_paths:
+{% if backup_host_paths | length > 0 %}
+{% for item in backup_host_paths %}
+  - path: "{{ item.path }}"
+    tag: "{{ item.tag | default('path') }}"
+    optional: {{ item.optional | default(false) | bool | lower }}
 {% endfor %}
 {% else %}
   []

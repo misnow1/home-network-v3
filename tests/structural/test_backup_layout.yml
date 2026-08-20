@@ -38,6 +38,22 @@
         test -f "{{ repo_root }}/roles/backup/tasks/schedule.yml"
         test -f "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
         test -f "{{ repo_root }}/roles/backup/templates/backup.timer.j2"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-paths.sh.j2"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-ad.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert wrapper fails closed and uses valid restic copy flags
+      ansible.builtin.shell: |
+        grep -q 'flock -n' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q 'skipped because backup failed' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q -- '--from-repo' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q -- '--from-password-file' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        if grep -q -- '--to-repo' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"; then
+          echo "invalid restic flag --to-repo still present" >&2
+          exit 1
+        fi
       args:
         executable: /bin/bash
       changed_when: false

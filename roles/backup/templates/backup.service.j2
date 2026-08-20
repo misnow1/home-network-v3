@@ -10,6 +10,7 @@ Type=oneshot
 ExecStart={{ backup_run_script_path }}
 Nice=10
 IOSchedulingClass=best-effort
+TimeoutStartSec={{ backup_schedule_timeout_sec }}
 
 [Install]
 WantedBy=multi-user.target

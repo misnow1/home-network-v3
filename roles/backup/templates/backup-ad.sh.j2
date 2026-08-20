@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Kif-side AD backup: preflight peer LDAP, remote offline backup, pull to staging.
+set -uo pipefail
+
+PEER_URI="{{ backup_ad_peer_ldap_uri }}"
+SSH_USER="{{ backup_ad_ssh_user }}"
+SSH_HOST="{{ backup_ad_source_ssh_host }}"
+REMOTE_SCRIPT="{{ backup_ad_dc_script_path }}"
+STAGING_DIR="{{ backup_ad_staging_dir }}"
+ARTIFACT="{{ backup_ad_artifact_name }}"
+MAIL_TO="{{ backup_failure_mail_to }}"
+LDAP_TIMEOUT="{{ backup_ad_ldap_timeout_sec }}"
+
+STAGING="${STAGING_DIR}/${ARTIFACT}"
+
+mail_abort() {
+  local reason="$1"
+  local body
+  body="AD backup aborted on $(hostname -s) at $(date -Iseconds).
+
+Reason: ${reason}
+
+When dc2 LDAP is healthy again, rerun as root on kif:
+
+  ${0}
+
+That runs an LDAP preflight against ${PEER_URI}, SSH to ${SSH_USER}@${SSH_HOST},
+and copies the tarball to ${STAGING}. Nightly restic then picks it up from that path.
+
+See docs/backup-runbook.md (AD section)."
+  if [ -n "$MAIL_TO" ] && command -v mail >/dev/null 2>&1; then
+    printf '%s\n' "$body" | mail -s "[backup-ad] ABORTED on $(hostname -s)" "$MAIL_TO" || true
+  fi
+  echo "$reason" >&2
+}
+
+mkdir -p "$STAGING_DIR"
+chmod 0700 "$STAGING_DIR"
+
+if ! command -v ldapsearch >/dev/null 2>&1; then
+  mail_abort "ldapsearch missing on $(hostname -s); install ldap-utils."
+  exit 1
+fi
+
+if ! timeout "$LDAP_TIMEOUT" ldapsearch -x -LLL -H "$PEER_URI" -s base -b '' namingContexts >/dev/null 2>&1; then
+  mail_abort "dc2 LDAP preflight failed (${PEER_URI}). Samba on dc1 was not stopped."
+  exit 1
+fi
+
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15)
+{% if backup_ad_ssh_identity | length > 0 %}
+SSH+=(-o IdentitiesOnly=yes -i "{{ backup_ad_ssh_identity }}")
+{% endif %}
+if ! "${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" run; then
+  mail_abort "Remote offline backup failed on ${SSH_HOST} (ssh/sudo ${REMOTE_SCRIPT} run)."
+  exit 1
+fi
+
+TMP="${STAGING}.tmp"
+if ! "${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" dump >"$TMP"; then
+  rm -f "$TMP"
+  mail_abort "Failed to pull AD tarball from ${SSH_HOST} (${REMOTE_SCRIPT} dump)."
+  exit 1
+fi
+chmod 0600 "$TMP"
+if ! tar -tjf "$TMP" >/dev/null; then
+  rm -f "$TMP"
+  mail_abort "Pulled AD tarball failed local tar -tjf: ${TMP}"
+  exit 1
+fi
+mv -f "$TMP" "$STAGING"
+
+"${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" purge || true
+
+echo "$(date -Iseconds) | ad | staged ${STAGING} ($(stat -c %s "$STAGING") bytes)"

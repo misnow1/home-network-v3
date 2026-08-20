@@ -7,3 +7,12 @@
     group: root
     mode: "0700"
   tags: [backup_scripts]
+
+- name: Backup | Deploy host path backup script
+  ansible.builtin.template:
+    src: backup-paths.sh.j2
+    dest: "{{ backup_paths_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_scripts]
