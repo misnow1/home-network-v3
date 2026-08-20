@@ -1,5 +1,6 @@
 ---
-# Keep Actions and Python deps current; opens PRs for review.
+# Keep Actions and Python deps current.
+# Patch/minor PRs auto-merge after required checks; majors stay for review.
 version: 2
 updates:
   - package-ecosystem: github-actions
