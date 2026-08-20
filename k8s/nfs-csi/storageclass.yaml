@@ -1,0 +1,20 @@
+# NFS CSI StorageClass — VLAN 9 sec=sys share on kif.
+# Driver is Helm (not Ansible): csi-driver-nfs chart 4.12.0 in kube-system.
+# Do not use this class for Uptime Kuma SQLite (needs POSIX locks → local-path).
+# Reserve share subdirectory etcd-snapshots for CP etcd off-box copies.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: nfs.csi.k8s.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  # kif VLAN 1 address (matches live class). FQDN also works if DNS is reliable
+  # from every worker: kif.home.2123studios.com
+  server: 192.168.1.152
+  share: /export/k8s
+mountOptions:
+  - nfsvers=4.1
+  - sec=sys

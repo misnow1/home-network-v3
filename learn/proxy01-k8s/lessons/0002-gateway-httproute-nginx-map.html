@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0002 — Gateway + HTTPRoute as nginx, in CRDs</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0002 · Hybrid edge</p>
+      <h1>Gateway + HTTPRoute as nginx, in CRDs</h1>
+      <p class="lede">
+        One idea: MetalLB delivers packets to Envoy; <code>Gateway</code> /
+        <code>HTTPRoute</code> decide which app gets which <code>Host</code> —
+        the same job as <code>server_name</code> and <code>location</code>.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      Lesson&nbsp;<a href="0001-metallb-vip-mental-model.html">0001</a> got traffic to
+      <code>192.168.9.200</code>. Phase&nbsp;7 still needs L7 routing: many public names
+      share one VIP, just like many nginx vhosts share one proxy01 IP. Gateway API is how
+      the cluster expresses that — and it is what you will see at work instead of (or
+      beside) classic Ingress.
+    </p>
+
+    <h2>Knowledge — three kinds, three roles</h2>
+    <p>
+      Per the
+      <a href="https://kubernetes.io/docs/concepts/services-networking/gateway/">Kubernetes Gateway API docs</a>,
+      the stable model splits by role:
+    </p>
+    <ul>
+      <li><strong>GatewayClass</strong> — “which controller implements this?” (here Envoy Gateway).
+        Like choosing the nginx package / ingress controller once for the cluster.</li>
+      <li><strong>Gateway</strong> — a listener front door (port, protocol, which routes may attach).
+        Like the shared <code>listen 80</code> / site-enabled skeleton on the VIP.</li>
+      <li><strong>HTTPRoute</strong> — Host + path rules → Service. Like one vhost’s
+        <code>server_name</code> + <code>location</code> + <code>proxy_pass</code>.</li>
+    </ul>
+
+    <div class="diagram">nginx mental model          Gateway API (this lab)
+─────────────────────      ────────────────────────────
+listen + shared IP    →    Gateway (listener :80 on VIP)
+server_name foo.com   →    HTTPRoute.hostnames
+location / { ... }    →    HTTPRoute.rules.matches
+proxy_pass backend    →    HTTPRoute.rules.backendRefs
+(controller choice)   →    GatewayClass → Envoy Gateway</div>
+
+    <h3>Your cluster’s concrete objects</h3>
+    <p>
+      From the
+      <a href="../../docs/kubernetes-runbook.md">runbook Phase&nbsp;5</a>:
+    </p>
+    <ul>
+      <li><code>GatewayClass/eg</code> → controller
+        <code>gateway.envoyproxy.io/gatewayclass-controller</code></li>
+      <li><code>Gateway/eg</code> in <code>envoy-gateway-system</code> — HTTP&nbsp;:80,
+        <code>allowedRoutes.namespaces.from: All</code> (app routes may live in other NS)</li>
+      <li>Envoy’s Service is <code>LoadBalancer</code> pinned to the MetalLB VIP</li>
+    </ul>
+    <p>
+      TLS stays on <strong>proxy01</strong>. The Gateway listener is plain HTTP on purpose —
+      Authelia and certbot never move into this lesson.
+    </p>
+
+    <h3>HTTPRoute — the bit you will write per app</h3>
+    <p>
+      An <code>HTTPRoute</code> attaches to a Gateway with <code>parentRefs</code>, matches
+      the <code>Host</code> header via <code>hostnames</code>, then forwards to a Service
+      via <code>backendRefs</code>. Request flow from the
+      <a href="https://kubernetes.io/docs/concepts/services-networking/gateway/#request-flow">same docs</a>:
+      client → Gateway address → Host match → optional path match → backend.
+    </p>
+    <pre><code>apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whoami
+  namespace: whoami
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - whoami.home.2123studios.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: whoami
+          port: 80</code></pre>
+
+    <div class="callout">
+      <strong>Critical:</strong> curling the VIP <em>without</em> a matching
+      <code>Host</code> header yields 404. Envoy is doing vhost routing — same as hitting
+      an IP with the wrong <code>server_name</code>. Always:
+      <code>-H 'Host: whoami.home.2123studios.com'</code>.
+    </div>
+
+    <div class="callout warn">
+      Attachment is <em>bidirectional</em>: the route names the Gateway
+      (<code>parentRefs</code>), and the Gateway must allow that route’s namespace
+      (<code>allowedRoutes</code>). If either side refuses, status shows
+      <code>Accepted=False</code> — not a silent nginx misconfig.
+    </div>
+
+    <h2>Skill — whoami over the VIP (LAN)</h2>
+    <p>
+      If whoami is not already deployed, use the runbook smoke test. Then verify acceptance
+      and Host-based routing:
+    </p>
+    <pre><code>kubectl -n whoami get httproute whoami -o wide
+kubectl -n whoami describe httproute whoami
+# Want: Accepted=True, ResolvedRefs=True
+
+curl -sS -H 'Host: whoami.home.2123studios.com' http://192.168.9.200/
+# Want: whoami text body
+
+curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.9.200/
+# Want: 404 (no Host match) — proves L7 routing, not “any HTTP works”</code></pre>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Yes — HTTPRoute owns Host/path → Service, like server_name + location + proxy_pass."
+      data-explain-wrong="GatewayClass picks the controller; Gateway is the listener; MetalLB only owns the VIP/ARP."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">Which object maps a hostname to a Service?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">GatewayClass names the controller only.</button>
+        <button type="button" class="option" data-i="1">MetalLB pool lists VIP candidates only.</button>
+        <button type="button" class="option" data-i="2">HTTPRoute matches Host then backends.</button>
+        <button type="button" class="option" data-i="3">EnvoyProxy only pins the Service type.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="1"
+      data-explain-correct="Correct — without a matching Host, Envoy has no HTTPRoute; 404 is expected."
+      data-explain-wrong="A bare VIP curl does not mean MetalLB failed; L7 needs the Host header."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">curl http://192.168.9.200/ with no Host header…</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">must return whoami if the VIP is up.</button>
+        <button type="button" class="option" data-i="1">often returns 404 with routing healthy.</button>
+        <button type="button" class="option" data-i="2">proves Authelia rejected the request.</button>
+        <button type="button" class="option" data-i="3">means ARP failed on the VLAN fabric.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      Read
+      <a href="https://kubernetes.io/docs/concepts/services-networking/gateway/">Gateway API</a>
+      on kubernetes.io — especially Resource model and Request flow. Then re-skim your own
+      whoami <code>HTTPRoute</code> in
+      <a href="../../docs/kubernetes-runbook.md">kubernetes-runbook.md</a> Phase&nbsp;5.
+    </p>
+
+    <div class="callout warn">
+      Ask follow-up questions in chat — <code>Accepted=False</code>? wrong namespace on
+      <code>parentRefs</code>? I’m the teacher for this workspace.
+    </div>
+
+    <footer class="lesson-foot">
+      Prev: <a href="0001-metallb-vip-mental-model.html">0001 MetalLB VIP</a>
+      · Ref: <a href="../reference/hybrid-edge-hop-map.html">hop map</a>
+      · Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Next: <a href="0003-wire-proxy01-to-vip.html">0003 Wire proxy01 → VIP</a>
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>

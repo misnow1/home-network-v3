@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference — Failure triage card</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Reference</p>
+      <h1>Failure triage card</h1>
+      <p class="lede">Print-friendly. Start at the top; stop at the first broken hop.</p>
+    </header>
+
+    <h2>Decision order</h2>
+    <ol>
+      <li>From proxy01: <code>curl -m5 -sS -o /dev/null -w '%{http_code}\n' http://192.168.9.200/</code></li>
+      <li>Same with <code>-H 'Host: &lt;public-name&gt;'</code></li>
+      <li><code>kubectl get svc -n envoy-gateway-system</code> — EXTERNAL-IP = VIP?</li>
+      <li><code>kubectl get gateway,httproute -A</code> then <code>describe httproute</code></li>
+      <li>Backend <code>pods</code> Ready? Service port name matches <code>backendRefs</code>?</li>
+    </ol>
+
+    <h2>Symptom → hop</h2>
+    <pre><code>timeout          → firewall VLAN 1→9 / MetalLB ARP / VIP pending
+502              → Envoy / Gateway / backends (not Authelia first)
+404 + good Host  → HTTPRoute host/path; Host header rewrite
+Accepted=False   → allowedRoutes, parentRefs, ports, ReferenceGrant
+302/401 Authelia → edge auth rules (VIP path may still be fine)</code></pre>
+
+    <h2>Runbook anchors</h2>
+    <ul>
+      <li>MetalLB VIP unreachable from proxy01</li>
+      <li>Gateway 502 from proxy01</li>
+      <li>HTTPRoute Accepted=False</li>
+    </ul>
+    <p class="sources">
+      <a href="../../docs/kubernetes-runbook.md#troubleshooting">kubernetes-runbook.md#troubleshooting</a>
+    </p>
+
+    <footer class="lesson-foot">
+      Lesson: <a href="../lessons/0004-failure-triage.html">0004 Failure triage</a>
+    </footer>
+  </div>
+</body>
+</html>
