@@ -44,7 +44,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 |---|---|---|---|---|
 | 1 | 26 | Reverse proxy (nginx + Authelia) | **in progress** | proxy01 VM + VLAN 4 docker edge; split from bastion — [reverse-proxy-runbook.md](reverse-proxy-runbook.md), [adr/002-docker-edge-vlan.md](adr/002-docker-edge-vlan.md), [edge-access-model.md](edge-access-model.md) |
 | 2 | 23 | Restic scheduling + offsite copy | **in progress** | systemd timer, prune, `/archive/restic/` mirror on kif; quarterly restore drill — [backup-runbook.md](backup-runbook.md) |
-| 3 | 31 | Kubernetes lab platform | **in progress** | Phases 0–9 live (hybrid edge + Uptime Kuma). Remaining: scheduled etcd off-box copy, Argo CD — [kubernetes-runbook.md](kubernetes-runbook.md), [adr/003-home-kubernetes.md](adr/003-home-kubernetes.md) |
+| 3 | 31 | Kubernetes lab platform | **in progress** | Phases 0–9 live (hybrid edge + Uptime Kuma + NFS CSI + etcd snapshots off-box). Remaining: Argo CD — [kubernetes-runbook.md](kubernetes-runbook.md), [adr/003-home-kubernetes.md](adr/003-home-kubernetes.md) |
 
 ## Active — automation backlog (post-reimage)
 

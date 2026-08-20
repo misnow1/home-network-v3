@@ -31,6 +31,8 @@
         - "{{ repo_root }}/roles/k8s_node/tasks/kubectl_completion.yml"
         - "{{ repo_root }}/roles/k8s_node/tasks/etcd_snapshot.yml"
         - "{{ repo_root }}/roles/k8s_node/templates/k8s-etcd-snapshot.sh.j2"
+        - "{{ repo_root }}/k8s/nfs-csi/storageclass.yaml"
+        - "{{ repo_root }}/k8s/uptime-kuma/uptime-kuma.yaml"
 
     - name: Kubernetes | assert paths present
       ansible.builtin.assert:

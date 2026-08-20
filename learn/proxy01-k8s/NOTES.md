@@ -35,8 +35,8 @@ Safe verify etcd restore drill on prod CP completed (throwaway
 `/var/lib/etcd-restore-drill`; API stayed up).
 
 ## Ops note (2026-08-18)
-Full etcd cutover on prod succeeded (canary absent, API healthy). Optional:
-delete `/var/lib/etcd.pre-cutover-bak-2026-08-17` when ready. Phase 9 unblocked.
+Full etcd cutover on prod succeeded (canary absent, API healthy). Bailout dir
+`/var/lib/etcd.pre-cutover-bak-2026-08-17` removed 2026-08-20. Phase 9 unblocked.
 
 ## Ops note (2026-08-20)
 Phase 9: added Dreamhost CNAME `uptime` → `bastion`, force-renewed SAN (settle 180s),
@@ -46,6 +46,6 @@ whoami rescheduled to `k8s-node-2`.
 First-run setup completed in the UI using SQLite (2026-08-20).
 
 ## Next lesson candidates
-1. Optional: automate etcd off-box (NFS drop + kif restic vs restic-on-CP)
-2. Optional: intentional break/fix failure labs
-3. Later: RWX/replicated storage if Kuma should survive worker loss
+1. Argo CD for in-cluster manifests
+2. Optional: kif restic ingest of `/export/k8s/etcd-snapshots`
+3. Optional: intentional break/fix failure labs

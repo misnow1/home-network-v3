@@ -412,7 +412,7 @@ Install before any “useful” app:
 |---|---|
 | metrics-server | `kubectl top` |
 | local-path-provisioner | Default StorageClass for scratch |
-| NFS CSI (optional) | RWX PVCs from kif — after NFS server proof |
+| NFS CSI | RWX PVCs from kif `/export/k8s` — **installed** (Helm `csi-driver-nfs` 4.12.0; StorageClass in `k8s/nfs-csi/storageclass.yaml`) |
 
 ### metrics-server
 
@@ -453,65 +453,32 @@ kubectl get sc   # local-path should show (default)
 
 Volumes land under `/opt/local-path-provisioner` on the **node that schedules the pod**
 (`WaitForFirstConsumer`). Data is node-local — not shared across workers; drain/reschedule
-to another node needs a new volume (or NFS CSI later).
+to another node needs a new volume (or NFS CSI).
 
-### NFS CSI (optional — RWX from kif)
+### NFS CSI (RWX from kif)
 
-Do **not** point CSI at kif’s Kerberos `/home`/`/media`/`/archive` exports. Use a dedicated
-`sec=sys` share for VLAN 9 (`nfs_server_extra_exports` on kif — see
-[nfs-server-runbook.md](nfs-server-runbook.md)). With `root_squash`, own the share as
-`nobody:nogroup` mode `0775` so the provisioner can create PVC subdirs (client root is
-mapped to uid 65534). Reserve `/export/k8s/etcd-snapshots` on that share for CP etcd
-off-box copies (Phase 8); CSI will create sibling `pvc-*` directories and must not
-use that name.
+**Installed** (2026-08-03): Helm release `csi-driver-nfs` in `kube-system`, chart
+`csi-driver-nfs-4.12.0`. StorageClass `nfs-csi` is not the default (`local-path` stays
+default). Manifest: `k8s/nfs-csi/storageclass.yaml` (server `192.168.1.152` matches
+live). Helm stays manual, same as Cilium/MetalLB — not Ansible.
 
-Driver (pin version; verify against upstream charts README):
+Do **not** point CSI at kif’s Kerberos `/home`/`/media`/`/archive` exports. The VLAN 9
+`sec=sys` share is `nfs_server_extra_exports` on kif
+([nfs-server-runbook.md](nfs-server-runbook.md)). With `root_squash`, own the share as
+`nobody:nogroup` mode `0775`. Reserve `/export/k8s/etcd-snapshots` for CP etcd
+off-box copies; CSI creates sibling `pvc-*` directories and must not use that name.
+
+Reinstall / pin bump:
 
 ```bash
 helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
-helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
+helm upgrade --install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
   --namespace kube-system --version 4.12.0
-```
-
-StorageClass (keep `local-path` as default):
-
-```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nfs-csi
-provisioner: nfs.csi.k8s.io
-parameters:
-  server: kif.home.2123studios.com
-  share: /export/k8s
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
-mountOptions:
-  - nfsvers=4.1
-  - sec=sys
-```
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nfs-csi
-provisioner: nfs.csi.k8s.io
-parameters:
-  server: kif.home.2123studios.com
-  share: /export/k8s
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
-mountOptions:
-  - nfsvers=4.1
-  - sec=sys
-EOF
-
+kubectl apply -f k8s/nfs-csi/storageclass.yaml
 kubectl get sc
 ```
 
-Smoke test (PVC + pod; leave `local-path` as default by setting `storageClassName` explicitly):
+Smoke test (leave `local-path` as default by setting `storageClassName` explicitly):
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -673,8 +640,8 @@ kubectl get cm etcd-cutover-canary -n default   # must be NotFound
 ```
 
 Keep `/var/lib/etcd.pre-cutover-bak-*` until you are satisfied, then remove it to reclaim
-disk. Prefer `etcdutl snapshot restore` when available (Ubuntu `etcd-client` may only
-ship `etcdctl`).
+disk. The 2026-08-18 production bailout dir was removed 2026-08-20. Prefer `etcdutl
+snapshot restore` when available (Ubuntu `etcd-client` may only ship `etcdctl`).
 
 **Phase 8 gate for graduation apps:** full cutover drill succeeded (canary absent +
 API healthy). Safe verify alone is not enough.
