@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0003 — Wire proxy01 to the MetalLB VIP</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0003 · Hybrid edge · Phase 7</p>
+      <h1>Wire proxy01 to the MetalLB VIP</h1>
+      <p class="lede">
+        One idea: Phase&nbsp;7 is not new nginx knowledge — it is pointing an existing
+        <code>reverse_proxy_sites</code> entry at <code>192.168.9.200</code> and making
+        four names agree.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      Lessons
+      <a href="0001-metallb-vip-mental-model.html">0001</a> and
+      <a href="0002-gateway-httproute-nginx-map.html">0002</a> proved the LAN path:
+      VIP → Envoy → <code>HTTPRoute</code> → whoami. Your mission’s done check is the
+      <em>public</em> curl through proxy01 (TLS + Authelia). That is just another upstream —
+      VLAN&nbsp;9 VIP instead of kif VLAN&nbsp;4.
+    </p>
+
+    <h2>Knowledge — what changes vs a Docker backend</h2>
+    <p>
+      You already add sites per
+      <a href="../../docs/reverse-proxy-runbook.md#site-schema">reverse-proxy-runbook site schema</a>.
+      Compose apps use <code>proxy_pass: http://192.168.7.152:PORT</code>. Kubernetes apps use
+      the MetalLB VIP on port&nbsp;80 — Envoy does Host-based routing afterward.
+    </p>
+
+    <div class="diagram">Compose app backend          K8s app backend (Phase 7)
+─────────────────────        ──────────────────────────
+proxy_pass                   proxy_pass
+  http://192.168.7.152:PORT    http://192.168.9.200
+(kif br4, one port/app)      (one VIP; many Hosts via HTTPRoute)
+TLS + Authelia on proxy01    TLS + Authelia on proxy01  ← unchanged</div>
+
+    <h3>The four-name contract</h3>
+    <p>
+      Traffic fails in confusing ways if these disagree. They must be the <em>same</em>
+      public hostname (example: <code>whoami.2123studios.com</code>):
+    </p>
+    <ol>
+      <li><strong>DNS</strong> — A/AAAA (or CNAME) → proxy01’s public address</li>
+      <li><strong>certbot SAN</strong> — name in <code>certbot_domains</code></li>
+      <li><strong>nginx</strong> — <code>server_names</code> in <code>reverse_proxy_sites</code></li>
+      <li><strong>HTTPRoute</strong> — <code>spec.hostnames</code> (what Envoy matches)</li>
+    </ol>
+    <div class="callout">
+      nginx should forward the client <code>Host</code> (your shared proxy snippet does).
+      Envoy then selects the route. If nginx rewrote Host to the VIP IP, every request
+      would 404 on the Gateway — same failure mode as lesson&nbsp;0002’s bare-IP curl.
+    </div>
+
+    <h3>Site shape (matches the role schema)</h3>
+    <p>
+      The runbook Phase&nbsp;7 snippet is a pattern sketch. Prefer the real schema —
+      <code>auth_required</code> lives on the <em>location</em>, not as a top-level site key
+      (<a href="../../docs/reverse-proxy-runbook.md#site-schema">site schema</a>):
+    </p>
+    <pre><code>- name: whoami.2123studios.com
+  server_names:
+    - whoami.2123studios.com
+  locations:
+    - path: /
+      proxy_pass: http://192.168.9.200
+      auth_required: true
+      rate_limit:
+        zone: proxied_apps
+        burst: 20</code></pre>
+    <p>
+      Pair that with an <code>HTTPRoute</code> whose <code>hostnames</code> list includes
+      <code>whoami.2123studios.com</code> (update the Phase&nbsp;5 whoami route if it still
+      says <code>whoami.home.…</code> only).
+    </p>
+
+    <div class="callout warn">
+      Authelia rules on kif must allow the new domain (same as any other Authelia-gated
+      vhost). Edge policy:
+      <a href="../../docs/edge-access-model.md">edge-access-model.md</a>.
+      Production apply uses <code>./scripts/prod-run.sh --confirm-production --</code> —
+      never bare <code>ansible-playbook -i inventories/production</code>.
+    </div>
+
+    <h2>Skill — land Phase 7 end-to-end</h2>
+    <p>Work this checklist when you are ready to touch prod inventory (or lab first):</p>
+    <ol>
+      <li>LAN still green:
+        <code>curl -sS -H 'Host: &lt;name&gt;' http://192.168.9.200/</code></li>
+      <li>Add FQDN to DNS + <code>certbot_domains</code>; issue/renew cert</li>
+      <li>Add <code>reverse_proxy_sites</code> entry → <code>http://192.168.9.200</code></li>
+      <li>Align <code>HTTPRoute</code> <code>hostnames</code> with that FQDN</li>
+      <li>Update Authelia <code>access_control</code> if <code>auth_required: true</code></li>
+      <li>
+        <code>./scripts/prod-run.sh --confirm-production -- playbooks/reverse-proxy.yml --limit proxy01…</code>
+        (and certbot playbook if the SAN is new)
+      </li>
+      <li>Done check:
+        <code>curl -sS -I https://&lt;name&gt;/</code>
+        — expect Authelia challenge or app body after login, not 502/timeout</li>
+    </ol>
+    <pre><code># From an admin host after apply (auth may redirect):
+curl -sS -o /dev/null -w '%{http_code}\n' https://whoami.2123studios.com/
+# 302/401 toward Authelia = edge alive; 502 = VIP/Gateway/route; timeout = firewall</code></pre>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Yes — one VIP upstream; Envoy picks the app from the Host header via HTTPRoute."
+      data-explain-wrong="Do not put worker node IPs or NodePorts in reverse_proxy_sites for this design."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">For a new k8s app behind proxy01, proxy_pass should target…</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">k8s-node-1’s VLAN 9 address and NodePort.</button>
+        <button type="button" class="option" data-i="1">kif’s br4 address like other Compose apps.</button>
+        <button type="button" class="option" data-i="2">the MetalLB VIP that fronts Envoy Gateway.</button>
+        <button type="button" class="option" data-i="3">the control-plane API on port 6443 only.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="1"
+      data-explain-correct="Right — DNS, cert SAN, nginx server_names, and HTTPRoute hostnames must match."
+      data-explain-wrong="MetalLB pool size and replica count do not replace hostname alignment."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">Public HTTPS hits nginx but Envoy returns 404. Likeliest cause?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">MetalLB pool has too few addresses left.</button>
+        <button type="button" class="option" data-i="1">HTTPRoute hostname ≠ nginx server_name.</button>
+        <button type="button" class="option" data-i="2">Authelia Redis lost the session cookie.</button>
+        <button type="button" class="option" data-i="3">whoami Deployment replica count is two.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      <a href="../../docs/kubernetes-runbook.md">kubernetes-runbook.md</a> Phase&nbsp;7, then
+      <a href="../../docs/reverse-proxy-runbook.md#adding-a-proxied-container">Adding a proxied
+      container</a> (same ceremony; different upstream IP). Decision context:
+      <a href="../../docs/edge-access-model.md">edge-access-model.md</a> principle 4.
+    </p>
+
+    <div class="callout warn">
+      Ask in chat before you apply production — inventory path, hostname choice, Authelia
+      rule, or a 502 after apply. I’m the teacher for this workspace.
+    </div>
+
+    <footer class="lesson-foot">
+      Prev: <a href="0002-gateway-httproute-nginx-map.html">0002 Gateway + HTTPRoute</a>
+      · Ref: <a href="../reference/hybrid-edge-hop-map.html">hop map</a>
+      · <a href="../reference/phase7-site-checklist.html">Phase 7 checklist</a>
+      · Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Next: <a href="0004-failure-triage.html">0004 Failure triage</a>
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>

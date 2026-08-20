@@ -25,6 +25,45 @@ k8s_preflight_packages:
   - iptables
   - socat
 
+# Host-specific extras (e.g. etcd-client on the control plane).
+k8s_extra_packages: []
+
+# Daily etcd + kubeadm pki snapshot on the control plane. Off-box copy is a
+# writable directory (NFS mount), never root SSH. When using the VLAN 9
+# CSI share, copy into a reserved subdirectory (not the share root).
+k8s_etcd_snapshot_enabled: false
+k8s_etcd_snapshot_dir: /var/backups/etcd
+k8s_etcd_snapshot_offbox_dir: ""
+k8s_etcd_snapshot_retain_days: 7
+k8s_etcd_snapshot_on_calendar: "*-*-* 03:15:00"
+k8s_etcd_snapshot_randomized_delay_sec: 300
+k8s_etcd_snapshot_script_path: /usr/local/sbin/k8s-etcd-snapshot
+k8s_etcd_snapshot_unit: k8s-etcd-snapshot
+k8s_etcd_snapshot_endpoints: https://127.0.0.1:2379
+k8s_etcd_snapshot_cacert: /etc/kubernetes/pki/etcd/ca.crt
+k8s_etcd_snapshot_cert: /etc/kubernetes/pki/etcd/server.crt
+k8s_etcd_snapshot_key: /etc/kubernetes/pki/etcd/server.key
+
+# Optional sec=sys NFS automount for off-box copy (control plane is not
+# domain-joined; do not use roles/nfs_client).
+k8s_etcd_snapshot_nfs_mount_enabled: false
+k8s_etcd_snapshot_nfs_server: kif.home.2123studios.com
+k8s_etcd_snapshot_nfs_remote: /export/k8s
+k8s_etcd_snapshot_nfs_path: /export/k8s
+k8s_etcd_snapshot_nfs_soft_timeo: 600
+k8s_etcd_snapshot_nfs_soft_retrans: 2
+k8s_etcd_snapshot_nfs_opts:
+  - rw
+  - soft
+  - "timeo={{ k8s_etcd_snapshot_nfs_soft_timeo }}"
+  - "retrans={{ k8s_etcd_snapshot_nfs_soft_retrans }}"
+  - nfsvers=4.1
+  - sec=sys
+  - _netdev
+  - nofail
+  - x-systemd.automount
+  - x-systemd.mount-timeout=30s
+
 # Hold kubelet/kubeadm/kubectl at the installed version until deliberate upgrade.
 k8s_kubernetes_package_hold: true
 
