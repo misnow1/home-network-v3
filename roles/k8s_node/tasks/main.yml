@@ -46,6 +46,11 @@
   ansible.builtin.include_tasks: packages.yml
   tags: [k8s_node, k8s_packages]
 
+- name: Kubernetes node | Schedule etcd snapshots
+  ansible.builtin.include_tasks: etcd_snapshot.yml
+  when: k8s_etcd_snapshot_enabled | bool
+  tags: [k8s_node, k8s_etcd_snapshot]
+
 - name: Kubernetes node | Install Helm CLI
   ansible.builtin.include_tasks: helm.yml
   when: k8s_helm_enabled | bool

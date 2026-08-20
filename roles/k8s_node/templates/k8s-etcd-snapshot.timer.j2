@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Run Kubernetes etcd snapshot on schedule
+Requires={{ k8s_etcd_snapshot_unit }}.service
+
+[Timer]
+OnCalendar={{ k8s_etcd_snapshot_on_calendar }}
+RandomizedDelaySec={{ k8s_etcd_snapshot_randomized_delay_sec }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -25,6 +25,24 @@ k8s_preflight_packages:
   - iptables
   - socat
 
+# Host-specific extras (e.g. etcd-client on the control plane).
+k8s_extra_packages: []
+
+# Daily etcd + kubeadm pki snapshot on the control plane. Off-box copy is a
+# writable directory (NFS mount), never root SSH.
+k8s_etcd_snapshot_enabled: false
+k8s_etcd_snapshot_dir: /var/backups/etcd
+k8s_etcd_snapshot_offbox_dir: ""
+k8s_etcd_snapshot_retain_days: 7
+k8s_etcd_snapshot_on_calendar: "*-*-* 03:15:00"
+k8s_etcd_snapshot_randomized_delay_sec: 300
+k8s_etcd_snapshot_script_path: /usr/local/sbin/k8s-etcd-snapshot
+k8s_etcd_snapshot_unit: k8s-etcd-snapshot
+k8s_etcd_snapshot_endpoints: https://127.0.0.1:2379
+k8s_etcd_snapshot_cacert: /etc/kubernetes/pki/etcd/ca.crt
+k8s_etcd_snapshot_cert: /etc/kubernetes/pki/etcd/server.crt
+k8s_etcd_snapshot_key: /etc/kubernetes/pki/etcd/server.key
+
 # Hold kubelet/kubeadm/kubectl at the installed version until deliberate upgrade.
 k8s_kubernetes_package_hold: true
 

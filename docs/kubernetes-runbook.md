@@ -577,31 +577,27 @@ namespaces.
 
 ## Phase 8 — etcd backup (required before graduation app)
 
-`etcdctl` is not part of the kubeadm/kubernetes-common packages. On **control-plane**
-hosts (Ubuntu), install the client before the first snapshot:
+`etcdctl` is not part of the kubeadm/kubernetes-common packages. The control-plane
+host_vars example sets `k8s_extra_packages: [etcd-client]` and
+`k8s_etcd_snapshot_enabled: true`. Apply `k8s-node-prep.yml` (limit the CP) so
+`k8s-etcd-snapshot.timer` writes dated files under `/var/backups/etcd/`
+(`etcd-YYYY-MM-DD.db` + `k8s-pki-YYYY-MM-DD.tgz`, 7-day retention). Set
+`k8s_etcd_snapshot_offbox_dir` to a writable NFS directory when you want the
+script to copy off-box — do not use root SSH to kif.
+
+Manual snapshot (same flags the timer uses):
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y etcd-client
-```
-
-(Optional later: add `etcd-client` to CP-only package lists in `k8s_node` / host_vars so
-`k8s-node-prep.yml` keeps it present.)
-
-On **k8s-cp01**, schedule snapshots:
-
-```bash
-# Manual test:
-sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd-$(date +%F).db \
+sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd/etcd-$(date +%F).db \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
   --cert=/etc/kubernetes/pki/etcd/server.crt \
   --key=/etc/kubernetes/pki/etcd/server.key
 ```
 
-Copy snapshots and `/etc/kubernetes/pki` off-box (e.g. kif `/archive/backup/` via
-user-staged rsync — avoid root SSH). Long-term automation (NFS drop + kif restic)
-is still open.
+Copy snapshots and `/etc/kubernetes/pki` off-box via `k8s_etcd_snapshot_offbox_dir`
+(NFS) or a one-shot rsync as the operator user. Long-term kif restic ingest of that
+drop directory is still open.
 
 ### Safe verify drill (no live cutover)
 

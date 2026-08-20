@@ -13,3 +13,7 @@
 - name: Apply sysctl
   ansible.builtin.command: sysctl --system
   changed_when: false
+
+- name: Reload systemd etcd snapshot units
+  ansible.builtin.systemd:
+    daemon_reload: true

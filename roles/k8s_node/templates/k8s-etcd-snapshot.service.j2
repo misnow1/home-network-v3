@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Kubernetes etcd + kubeadm PKI snapshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ k8s_etcd_snapshot_script_path }}
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

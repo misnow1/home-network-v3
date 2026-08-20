@@ -249,6 +249,7 @@ local user (`$USER` from the control node) with zsh login shell and passwordless
 | `helm` | Cilium / MetalLB / Envoy Gateway charts — pinned binary from `get.helm.sh` with SHA256 verification (`k8s_helm_*`), not the community apt/snap builds |
 | `cilium` | Cilium CLI for install/status/Hubble — pinned from GitHub releases (`k8s_cilium_cli_*`) |
 | `bash-completion` | Required for kubectl tab completion on bash |
+| `etcdctl` | `etcd-client` on the control plane (`k8s_extra_packages` / `k8s_etcd_snapshot_enabled`) |
 | `conntrack` | Required by kube-proxy; fatal `kubeadm init` preflight check |
 | `ebtables`, `ethtool`, `iproute2`, `iptables`, `socat` | Remaining kubeadm preflight dependencies (`k8s_preflight_packages`) |
 

@@ -1,0 +1,53 @@
+---
+- name: Kubernetes node | Install etcd-client for snapshots
+  ansible.builtin.apt:
+    name: etcd-client
+    state: present
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Ensure etcd snapshot directory exists
+  ansible.builtin.file:
+    path: "{{ k8s_etcd_snapshot_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Deploy etcd snapshot script
+  ansible.builtin.template:
+    src: k8s-etcd-snapshot.sh.j2
+    dest: "{{ k8s_etcd_snapshot_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Deploy etcd snapshot systemd service
+  ansible.builtin.template:
+    src: k8s-etcd-snapshot.service.j2
+    dest: "/etc/systemd/system/{{ k8s_etcd_snapshot_unit }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd etcd snapshot units
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Deploy etcd snapshot systemd timer
+  ansible.builtin.template:
+    src: k8s-etcd-snapshot.timer.j2
+    dest: "/etc/systemd/system/{{ k8s_etcd_snapshot_unit }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd etcd snapshot units
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Enable etcd snapshot timer
+  ansible.builtin.systemd:
+    name: "{{ k8s_etcd_snapshot_unit }}.timer"
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
+  tags: [k8s_node, k8s_etcd_snapshot]

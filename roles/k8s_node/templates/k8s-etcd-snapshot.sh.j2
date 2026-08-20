@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+set -euo pipefail
+umask 077
+
+DIR="{{ k8s_etcd_snapshot_dir }}"
+OFFBOX="{{ k8s_etcd_snapshot_offbox_dir }}"
+RETAIN_DAYS="{{ k8s_etcd_snapshot_retain_days }}"
+STAMP="$(date +%F)"
+SNAP="${DIR}/etcd-${STAMP}.db"
+PKI="${DIR}/k8s-pki-${STAMP}.tgz"
+
+mkdir -p "${DIR}"
+
+export ETCDCTL_API=3
+etcdctl snapshot save "${SNAP}" \
+  --endpoints="{{ k8s_etcd_snapshot_endpoints }}" \
+  --cacert="{{ k8s_etcd_snapshot_cacert }}" \
+  --cert="{{ k8s_etcd_snapshot_cert }}" \
+  --key="{{ k8s_etcd_snapshot_key }}"
+
+tar -C /etc/kubernetes -czf "${PKI}" pki
+chmod 600 "${SNAP}" "${PKI}"
+
+find "${DIR}" -maxdepth 1 -type f \( -name 'etcd-*.db' -o -name 'k8s-pki-*.tgz' \) \
+  -mtime "+${RETAIN_DAYS}" -delete
+
+if [[ -n "${OFFBOX}" && -d "${OFFBOX}" && -w "${OFFBOX}" ]]; then
+  cp -a "${SNAP}" "${PKI}" "${OFFBOX}/"
+fi

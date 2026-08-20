@@ -29,7 +29,8 @@
         - "{{ repo_root }}/roles/k8s_node/tasks/helm.yml"
         - "{{ repo_root }}/roles/k8s_node/tasks/cilium_cli.yml"
         - "{{ repo_root }}/roles/k8s_node/tasks/kubectl_completion.yml"
-        - "{{ repo_root }}/roles/k8s_node/templates/containerd-config.toml.j2"
+        - "{{ repo_root }}/roles/k8s_node/tasks/etcd_snapshot.yml"
+        - "{{ repo_root }}/roles/k8s_node/templates/k8s-etcd-snapshot.sh.j2"
 
     - name: Kubernetes | assert paths present
       ansible.builtin.assert:
@@ -58,6 +59,8 @@
         grep -q 'k8s_helm_enabled:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_cilium_cli_enabled:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_kubectl_completion_enabled:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_extra_packages:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_etcd_snapshot_enabled:' "{{ k8s_role_defaults }}"
       args:
         executable: /bin/bash
       changed_when: false
