@@ -461,7 +461,9 @@ Do **not** point CSI at kif’s Kerberos `/home`/`/media`/`/archive` exports. Us
 `sec=sys` share for VLAN 9 (`nfs_server_extra_exports` on kif — see
 [nfs-server-runbook.md](nfs-server-runbook.md)). With `root_squash`, own the share as
 `nobody:nogroup` mode `0775` so the provisioner can create PVC subdirs (client root is
-mapped to uid 65534).
+mapped to uid 65534). Reserve `/export/k8s/etcd-snapshots` on that share for CP etcd
+off-box copies (Phase 8); CSI will create sibling `pvc-*` directories and must not
+use that name.
 
 Driver (pin version; verify against upstream charts README):
 
@@ -581,9 +583,13 @@ namespaces.
 host_vars example sets `k8s_extra_packages: [etcd-client]` and
 `k8s_etcd_snapshot_enabled: true`. Apply `k8s-node-prep.yml` (limit the CP) so
 `k8s-etcd-snapshot.timer` writes dated files under `/var/backups/etcd/`
-(`etcd-YYYY-MM-DD.db` + `k8s-pki-YYYY-MM-DD.tgz`, 7-day retention). Set
-`k8s_etcd_snapshot_offbox_dir` to a writable NFS directory when you want the
-script to copy off-box — do not use root SSH to kif.
+(`etcd-YYYY-MM-DD.db` + `k8s-pki-YYYY-MM-DD.tgz`, 7-day retention). On the CP,
+set `k8s_etcd_snapshot_nfs_mount_enabled: true` and
+`k8s_etcd_snapshot_offbox_dir: /export/k8s/etcd-snapshots` so the same VLAN 9
+`sec=sys` share used for NFS CSI gets a **reserved subdirectory** for snapshots
+(do not drop files at the share root next to PVC dirs). root_squash maps client
+root to `nobody`; umask `077` keeps the copies mode `600`. Do not use root SSH
+to kif.
 
 Manual snapshot (same flags the timer uses):
 
@@ -595,9 +601,8 @@ sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd/etcd-$(date +%F).db \
   --key=/etc/kubernetes/pki/etcd/server.key
 ```
 
-Copy snapshots and `/etc/kubernetes/pki` off-box via `k8s_etcd_snapshot_offbox_dir`
-(NFS) or a one-shot rsync as the operator user. Long-term kif restic ingest of that
-drop directory is still open.
+Copy snapshots off-box via `k8s_etcd_snapshot_offbox_dir` (NFS subdirectory).
+kif restic ingest of that drop directory is still open.
 
 ### Safe verify drill (no live cutover)
 

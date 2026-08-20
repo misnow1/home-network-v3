@@ -27,4 +27,6 @@ find "${DIR}" -maxdepth 1 -type f \( -name 'etcd-*.db' -o -name 'k8s-pki-*.tgz' 
 
 if [[ -n "${OFFBOX}" && -d "${OFFBOX}" && -w "${OFFBOX}" ]]; then
   cp -a "${SNAP}" "${PKI}" "${OFFBOX}/"
+  find "${OFFBOX}" -maxdepth 1 -type f \( -name 'etcd-*.db' -o -name 'k8s-pki-*.tgz' \) \
+    -mtime "+${RETAIN_DAYS}" -delete
 fi

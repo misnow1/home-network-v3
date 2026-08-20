@@ -61,6 +61,7 @@
         grep -q 'k8s_kubectl_completion_enabled:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_extra_packages:' "{{ k8s_role_defaults }}"
         grep -q 'k8s_etcd_snapshot_enabled:' "{{ k8s_role_defaults }}"
+        grep -q 'k8s_etcd_snapshot_nfs_mount_enabled:' "{{ k8s_role_defaults }}"
       args:
         executable: /bin/bash
       changed_when: false

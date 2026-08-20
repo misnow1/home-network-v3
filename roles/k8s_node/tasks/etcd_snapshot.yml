@@ -5,6 +5,47 @@
     state: present
   tags: [k8s_node, k8s_etcd_snapshot]
 
+- name: Kubernetes node | Install nfs-common for snapshot off-box mount
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+  when: k8s_etcd_snapshot_nfs_mount_enabled | bool
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Ensure NFS mountpoint exists
+  ansible.builtin.file:
+    path: "{{ k8s_etcd_snapshot_nfs_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - k8s_etcd_snapshot_nfs_mount_enabled | bool
+    - k8s_etcd_snapshot_nfs_path not in (ansible_mounts | default([]) | map(attribute='mount') | list)
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Mount NFS share for etcd off-box copy
+  ansible.builtin.mount:
+    path: "{{ k8s_etcd_snapshot_nfs_path }}"
+    src: "{{ k8s_etcd_snapshot_nfs_server }}:{{ k8s_etcd_snapshot_nfs_remote }}"
+    fstype: nfs
+    opts: "{{ k8s_etcd_snapshot_nfs_opts | join(',') }}"
+    dump: "0"
+    passno: "0"
+    state: mounted
+  when: k8s_etcd_snapshot_nfs_mount_enabled | bool
+  notify: Reload systemd etcd snapshot units
+  tags: [k8s_node, k8s_etcd_snapshot]
+
+- name: Kubernetes node | Ensure etcd off-box directory exists
+  ansible.builtin.file:
+    path: "{{ k8s_etcd_snapshot_offbox_dir }}"
+    state: directory
+    mode: "0700"
+  when:
+    - k8s_etcd_snapshot_offbox_dir | length > 0
+  tags: [k8s_node, k8s_etcd_snapshot]
+
 - name: Kubernetes node | Ensure etcd snapshot directory exists
   ansible.builtin.file:
     path: "{{ k8s_etcd_snapshot_dir }}"

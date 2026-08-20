@@ -14,6 +14,8 @@
 k8s_extra_packages:
   - etcd-client
 
-# Daily local snapshot; set k8s_etcd_snapshot_offbox_dir to a writable NFS path
-# when an export is mounted on the CP (do not use root SSH to kif).
+# Daily local snapshot plus off-box copy into a reserved dir on the VLAN 9
+# CSI share (sibling of PVC subdirs — not the share root).
 k8s_etcd_snapshot_enabled: true
+k8s_etcd_snapshot_nfs_mount_enabled: true
+k8s_etcd_snapshot_offbox_dir: /export/k8s/etcd-snapshots

@@ -3,6 +3,9 @@
 Description=Kubernetes etcd + kubeadm PKI snapshot
 After=network-online.target
 Wants=network-online.target
+{% if k8s_etcd_snapshot_offbox_dir | length > 0 %}
+RequiresMountsFor={{ k8s_etcd_snapshot_offbox_dir }}
+{% endif %}
 
 [Service]
 Type=oneshot
