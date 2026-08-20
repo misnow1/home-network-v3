@@ -26,7 +26,9 @@ find "${DIR}" -maxdepth 1 -type f \( -name 'etcd-*.db' -o -name 'k8s-pki-*.tgz' 
   -mtime "+${RETAIN_DAYS}" -delete
 
 if [[ -n "${OFFBOX}" && -d "${OFFBOX}" && -w "${OFFBOX}" ]]; then
-  cp -a "${SNAP}" "${PKI}" "${OFFBOX}/"
+  # root_squash: cannot preserve uid/gid (client root -> nobody).
+  cp --no-preserve=ownership "${SNAP}" "${PKI}" "${OFFBOX}/"
+  chmod 600 "${OFFBOX}/etcd-${STAMP}.db" "${OFFBOX}/k8s-pki-${STAMP}.tgz"
   find "${OFFBOX}" -maxdepth 1 -type f \( -name 'etcd-*.db' -o -name 'k8s-pki-*.tgz' \) \
     -mtime "+${RETAIN_DAYS}" -delete
 fi

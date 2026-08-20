@@ -21,7 +21,7 @@
     mode: "0755"
   when:
     - k8s_etcd_snapshot_nfs_mount_enabled | bool
-    - k8s_etcd_snapshot_nfs_path not in (ansible_mounts | default([]) | map(attribute='mount') | list)
+    - k8s_etcd_snapshot_nfs_path not in (ansible_facts['mounts'] | default([]) | map(attribute='mount') | list)
   tags: [k8s_node, k8s_etcd_snapshot]
 
 - name: Kubernetes node | Mount NFS share for etcd off-box copy
