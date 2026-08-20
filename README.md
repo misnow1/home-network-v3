@@ -73,6 +73,9 @@ not receive Actions secrets.
 - **Test Quick** — linters and structural tests on every push/PR
 - **Test Integration DC Replica** — nightly + manual `workflow_dispatch` on the kvm01
   self-hosted runner (`INTEGRATION_SLICE=dc_replica`)
+- **Dependabot Auto-Merge** — squash-merges patch and minor Dependabot PRs after
+  required checks pass (majors stay for review). Enable **Allow auto-merge** under
+  Settings → General → Pull Requests, and require the **`quick`** check on `main`.
 
 ## Production runs
 
