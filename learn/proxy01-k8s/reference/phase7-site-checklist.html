@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference — Phase 7 site checklist</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Reference</p>
+      <h1>Phase 7 site checklist</h1>
+      <p class="lede">Print-friendly. One public k8s hostname through proxy01.</p>
+    </header>
+
+    <h2>Four-name contract</h2>
+    <pre><code>DNS ─────────────► proxy01 public IP
+certbot_domains ─► same FQDN on SAN cert
+server_names ────► reverse_proxy_sites
+HTTPRoute hostnames ► Envoy Host match</code></pre>
+
+    <h2>Site YAML skeleton</h2>
+    <pre><code>- name: app.example.com
+  server_names:
+    - app.example.com
+  locations:
+    - path: /
+      proxy_pass: http://192.168.9.200
+      auth_required: true   # location-scoped
+      rate_limit:
+        zone: proxied_apps
+        burst: 20</code></pre>
+
+    <h2>Apply (production)</h2>
+    <pre><code>./scripts/prod-run.sh --confirm-production -- \
+  playbooks/certbot.yml --limit proxy01… -e allow_production=true
+
+./scripts/prod-run.sh --confirm-production -- \
+  playbooks/reverse-proxy.yml --limit proxy01… -e allow_production=true</code></pre>
+
+    <h2>Verify</h2>
+    <pre><code># LAN / VIP
+curl -sS -H 'Host: app.example.com' http://192.168.9.200/
+
+# Public edge
+curl -sS -I https://app.example.com/
+# 302/401 Authelia = path alive; 502 = Gateway/VIP; timeout = firewall</code></pre>
+
+    <footer class="lesson-foot">
+      Lesson: <a href="../lessons/0003-wire-proxy01-to-vip.html">0003 Wire proxy01</a>
+      · Hop map: <a href="hybrid-edge-hop-map.html">hybrid-edge-hop-map.html</a>
+    </footer>
+  </div>
+</body>
+</html>

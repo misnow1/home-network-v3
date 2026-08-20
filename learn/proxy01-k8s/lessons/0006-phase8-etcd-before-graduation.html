@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0006 — Phase 8/9 bridge: etcd before graduation</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0006 · Beyond the edge</p>
+      <h1>Phase 8/9 bridge — etcd before graduation</h1>
+      <p class="lede">
+        One idea: the hybrid edge is boring now — so the runbook raises the bar.
+        A useful app waits until you can snapshot (and eventually restore) etcd.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      Lessons 0001–0005 made
+      Internet → proxy01 → VIP → Gateway → app real. Work clusters treat control-plane
+      backup as non-optional before anything you would mourn. ADR&nbsp;003 and
+      <a href="../../docs/kubernetes-runbook.md">Phase&nbsp;8</a> say the same:
+      <strong>do not deploy Uptime Kuma (or other useful apps) until a snapshot restore
+      drill succeeds.</strong>
+    </p>
+
+    <h2>Knowledge — what etcd is (and is not)</h2>
+    <ul>
+      <li><strong>etcd</strong> holds cluster state: API objects, whoami Deployment/Service/HTTPRoute,
+        Gateway config, Secrets metadata, etc.</li>
+      <li><strong>PVC data</strong> (Uptime Kuma DB, future NFS volumes) is <em>not</em> in etcd.
+        Phase&nbsp;8 protects the control plane; Velero/PVC backup is a later milestone.</li>
+      <li><strong>PKI</strong> under <code>/etc/kubernetes/pki</code> must travel with snapshots —
+        restore without certs is a different kind of pain.</li>
+    </ul>
+
+    <div class="diagram">Before Phase 9
+─────────────────────────────
+✓ hybrid edge (you did this)
+✓ whoami disposable smoke app
+□ etcd snapshot on k8s-cp01
+□ copy snapshot + pki off-box
+□ restore drill (lab or documented)
+□ then Uptime Kuma + PVC + drain test</div>
+
+    <h3>Manual snapshot (Phase 8 skill)</h3>
+    <p>
+      Install the CLI first — kubeadm does not ship <code>etcdctl</code> on the host:
+      <code>sudo apt-get install -y etcd-client</code> on control-plane nodes
+      (<a href="../../docs/kubernetes-runbook.md">runbook Phase&nbsp;8</a>).
+    </p>
+    <p>On <strong>k8s-cp01</strong>:</p>
+    <pre><code>sudo ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd-$(date +%F).db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+
+# Then copy off-box (kif restic scope or rsync), including /etc/kubernetes/pki</code></pre>
+    <p>
+      Upstream mental model:
+      <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/">Backing up an etcd cluster</a>
+      (kubeadm uses stacked etcd on the CP; same <code>etcdctl snapshot</code> tool).
+    </p>
+
+    <div class="callout warn">
+      A file on the CP disk is not a backup. Off-box copy is part of “done.”
+      Scheduling (cron/systemd timer) comes after a manual save works once.
+      Safe verify (restore to a throwaway data-dir) proves the file; full cutover
+      is still required before graduation apps — see runbook Phase&nbsp;8.
+    </div>
+
+    <h3>Phase 9 — what “graduation” reuses</h3>
+    <p>Uptime Kuma (or similar) is the same Phase&nbsp;7 ceremony plus durability:</p>
+    <ul>
+      <li><code>HTTPRoute</code> + proxy01 <code>auth_required</code> (lessons 0002–0003)</li>
+      <li>PVC on local-path or NFS StorageClass</li>
+      <li>Drain one worker; confirm the pod lands on the other</li>
+    </ul>
+
+    <h2>Skill — clear the backup bar (first step)</h2>
+    <p>
+      This lesson’s win is a <em>verified snapshot file off the CP</em>, not a full disaster
+      recovery yet. Restore drill is the next practice session (use lab if you do not want
+      to risk prod CP).
+    </p>
+    <ol>
+      <li>SSH to <code>k8s-cp01</code>; ensure <code>/var/backups</code> exists and is writable by root</li>
+      <li>Run <code>etcdctl snapshot save …</code>; confirm non-zero file size</li>
+      <li><code>etcdctl snapshot status &lt;file&gt; -w table</code> (sanity)</li>
+      <li>Copy <code>.db</code> + note path to pki tarball/rsync target off-box</li>
+      <li>Write one sentence in your notes: where the copy lives and the date</li>
+    </ol>
+
+    <div
+      class="quiz"
+      data-correct="1"
+      data-explain-correct="Yes — etcd is API/cluster state; app PVC bytes need a separate backup story."
+      data-explain-wrong="Snapshots do not replace PVC/restic backups or Authelia session stores."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">An etcd snapshot primarily protects…</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">Uptime Kuma SQLite files on the PVC.</button>
+        <button type="button" class="option" data-i="1">Kubernetes API objects and cluster state.</button>
+        <button type="button" class="option" data-i="2">Dreamhost DNS TXT challenge strings.</button>
+        <button type="button" class="option" data-i="3">UniFi firewall rules for VLAN nine.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Correct — runbook gate: restore drill before useful apps like Uptime Kuma."
+      data-explain-wrong="whoami was disposable; edge TLS and ReferenceGrant are not the Phase 8 gate."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">Per this lab’s runbook, deploy Uptime Kuma only after…</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">whoami answers on the MetalLB VIP once.</button>
+        <button type="button" class="option" data-i="1">cert-manager is installed cluster-wide.</button>
+        <button type="button" class="option" data-i="2">an etcd snapshot restore drill succeeds.</button>
+        <button type="button" class="option" data-i="3">ReferenceGrant exists in every namespace.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      <a href="../../docs/kubernetes-runbook.md">kubernetes-runbook.md</a> Phase&nbsp;8 and&nbsp;9,
+      plus
+      <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/">Kubernetes: Operating etcd clusters for Kubernetes</a>
+      (backup/restore sections). ADR gate:
+      <a href="../../docs/adr/003-home-kubernetes.md">adr/003</a> backup bar.
+    </p>
+
+    <div class="callout warn">
+      When you have a snapshot path (or a restore-drill snag), paste it here — we can
+      walk status/restore outline next. I’m the teacher for this workspace.
+    </div>
+
+    <footer class="lesson-foot">
+      Prev: <a href="0005-referencegrant.html">0005 ReferenceGrant</a>
+      · Ref: <a href="../reference/phase8-backup-card.html">Phase 8 card</a>
+      · Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Next up: restore drill practice, then Phase&nbsp;9 Uptime Kuma.
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>

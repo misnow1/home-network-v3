@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference — ReferenceGrant card</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Reference</p>
+      <h1>ReferenceGrant card</h1>
+      <p class="lede">Print-friendly. Two handshakes, one grant shape.</p>
+    </header>
+
+    <h2>When you need it</h2>
+    <pre><code>HTTPRoute.backendRefs.namespace != HTTPRoute.metadata.namespace
+  → ReferenceGrant required in the Service’s namespace
+
+HTTPRoute → Gateway in another NS
+  → Gateway.spec.listeners[].allowedRoutes
+  → (not ReferenceGrant)</code></pre>
+
+    <h2>Skeleton</h2>
+    <pre><code>apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-from-edge
+  namespace: &lt;service-ns&gt;
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: &lt;route-ns&gt;
+  to:
+    - group: ""
+      kind: Service</code></pre>
+
+    <h2>Verify</h2>
+    <pre><code>kubectl -n &lt;route-ns&gt; describe httproute &lt;name&gt;
+# Want: ResolvedRefs=True
+
+kubectl -n &lt;service-ns&gt; get referencegrant</code></pre>
+
+    <footer class="lesson-foot">
+      Lesson: <a href="../lessons/0005-referencegrant.html">0005 ReferenceGrant</a>
+      · Upstream:
+      <a href="https://gateway-api.sigs.k8s.io/docs/concepts/security/">Gateway API security</a>
+    </footer>
+  </div>
+</body>
+</html>

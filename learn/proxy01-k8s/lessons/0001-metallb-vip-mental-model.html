@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0001 — What the MetalLB VIP actually is</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0001 · Hybrid edge</p>
+      <h1>What the MetalLB VIP actually is</h1>
+      <p class="lede">
+        One idea: the address proxy01 will <code>proxy_pass</code> to is not a node IP —
+        it is a service VIP that MetalLB teaches the LAN via ARP.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      You already point nginx at fixed backends (e.g. kif on VLAN&nbsp;4). Phase&nbsp;7 does
+      the same shape — but the backend is a <strong>LoadBalancer Service IP on VLAN&nbsp;9</strong>
+      that belongs to Envoy Gateway, not to <code>k8s-node-1</code> or <code>k8s-cp01</code>.
+      Until that VIP clicks, Gateway and <code>HTTPRoute</code> feel like magic sitting on top of fog.
+    </p>
+
+    <h2>Knowledge — cloud LB, bare metal edition</h2>
+    <p>
+      On AWS/GCP/Azure, a Service of type <code>LoadBalancer</code> gets a public or VPC IP from
+      the cloud provider. On bare metal there is no cloud controller — so
+      <a href="https://metallb.io/concepts/layer2/">MetalLB</a> fills that gap.
+    </p>
+    <p>
+      In <em>layer&nbsp;2 mode</em> (what this lab uses), MetalLB does not invent a fancy router
+      protocol. One cluster node <em>answers ARP</em> for the VIP: “Who has
+      <code>192.168.9.200</code>?” → that node’s MAC. From the network’s perspective, that
+      machine simply appears to own an extra IP.
+      <a href="https://metallb.io/concepts/layer2/">(MetalLB L2 concepts)</a>
+    </p>
+    <p>
+      Important limitation (worth remembering for work too): L2 mode steers
+      <em>all</em> traffic for that VIP to <em>one</em> node first; then kube-proxy / the
+      datapath fans out to pods. It is failover-oriented advertisement, not true
+      multi-node L2 load balancing.
+      <a href="https://metallb.io/concepts/layer2/#load-balancing-behavior">(same doc)</a>
+    </p>
+
+    <h3>Two CRs, two jobs</h3>
+    <p>Per <a href="https://metallb.io/configuration/">MetalLB configuration</a>:</p>
+    <ul>
+      <li><code>IPAddressPool</code> — which IPs MetalLB is allowed to assign (here
+        <code>192.168.9.200</code>–<code>.210</code>).</li>
+      <li><code>L2Advertisement</code> — announce those IPs with ARP/NDP on the LAN.</li>
+    </ul>
+    <p>
+      Envoy Gateway’s Service is type <code>LoadBalancer</code>, pinned to
+      <code>192.168.9.200</code> via annotation (runbook Phase&nbsp;5). MetalLB assigns that
+      EXTERNAL-IP; speakers advertise it. proxy01’s upstream is then just
+      <code>http://192.168.9.200</code>.
+    </p>
+
+    <div class="diagram">Internet
+   │
+   ▼
+proxy01  (TLS + Authelia)     ← you already own this
+   │  plain HTTP upstream
+   ▼
+192.168.9.200                 ← MetalLB VIP (ARP on VLAN 9)
+   │  lands on one speaker node
+   ▼
+Envoy Gateway pods            ← next lesson: Gateway / HTTPRoute
+   │
+   ▼
+Service → Pods</div>
+
+    <div class="callout">
+      <strong>Nginx map:</strong> think of <code>192.168.9.200</code> as a keepalived-style VIP
+      for the Envoy front door — except Kubernetes owns the Service object, and MetalLB
+      owns the ARP. You do <em>not</em> put a worker’s node IP in
+      <code>reverse_proxy_sites</code>.
+    </div>
+
+    <h2>Skill — prove the VIP is alive (LAN side)</h2>
+    <p>
+      Before changing proxy01, confirm the VIP answers from a host that can reach VLAN&nbsp;9
+      (proxy01 itself, or your admin box if routed). From the
+      <a href="../../docs/kubernetes-runbook.md">runbook</a>:
+    </p>
+    <pre><code>kubectl get svc -n envoy-gateway-system
+# EXTERNAL-IP should be 192.168.9.200
+
+# From proxy01 / VLAN 1 with firewall allowing it:
+curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.9.200/
+# Want: connection refused or HTTP status — NOT a timeout</code></pre>
+    <p>
+      Timeout ⇒ routing/firewall/ARP problem (VIP not advertised or VLAN&nbsp;1→9 blocked).
+      Refused/404 ⇒ packets reached <em>something</em> on that IP — MetalLB path is working;
+      L7 routing may still be incomplete.
+    </p>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Yes — MetalLB answers ARP so the VIP is owned by a speaker node; the Service EXTERNAL-IP is what proxy01 should target."
+      data-explain-wrong="Re-read the L2 section: the VIP is not ‘whichever pod is lucky’ and not the control-plane node IP by definition."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">When proxy01 proxies to the cluster, which statement is true?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">It should use k8s-cp01’s IP as upstream.</button>
+        <button type="button" class="option" data-i="1">It should round-robin both worker IPs itself.</button>
+        <button type="button" class="option" data-i="2">It should use the MetalLB VIP as upstream.</button>
+        <button type="button" class="option" data-i="3">It should target a random Pod IP directly.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="1"
+      data-explain-correct="Right — L2 mode attracts all VIP traffic to one node first; failover moves the ARP ownership."
+      data-explain-wrong="MetalLB L2 is not ECMP across nodes for a single VIP; see the official load-balancing behavior note."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">In MetalLB layer&nbsp;2 mode, traffic to one VIP…</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">is split evenly across all worker NICs.</button>
+        <button type="button" class="option" data-i="1">goes to one speaker node, then to pods.</button>
+        <button type="button" class="option" data-i="2">always terminates on the control plane.</button>
+        <button type="button" class="option" data-i="3">bypasses kube-proxy and hits etcd.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      Start with the official short page:
+      <a href="https://metallb.io/concepts/layer2/">MetalLB in layer 2 mode</a>.
+      Then skim
+      <a href="https://metallb.io/configuration/">Configuration</a>
+      for <code>IPAddressPool</code> / <code>L2Advertisement</code>.
+    </p>
+
+    <div class="callout warn">
+      Ask follow-up questions here in chat — unclear ARP? EXTERNAL-IP pending?
+      Firewall rule shape? I’m the teacher for this workspace; use me.
+    </div>
+
+    <footer class="lesson-foot">
+      Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Resources: <a href="../RESOURCES.md">RESOURCES.md</a>
+      · Next: <a href="0002-gateway-httproute-nginx-map.html">0002 Gateway + HTTPRoute</a>
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>

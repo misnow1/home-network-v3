@@ -5,6 +5,13 @@
     state: present
   tags: [k8s_node, k8s_packages]
 
+- name: Kubernetes node | Install extra packages
+  ansible.builtin.apt:
+    name: "{{ k8s_extra_packages }}"
+    state: present
+  when: k8s_extra_packages | length > 0
+  tags: [k8s_node, k8s_packages]
+
 - name: Kubernetes node | Gather installed package versions
   ansible.builtin.package_facts:
     manager: apt
