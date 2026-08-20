@@ -44,6 +44,23 @@
         executable: /bin/bash
       changed_when: false
 
+    - name: Backup | assert every notify string resolves to a handler name or listen
+      ansible.builtin.shell: |
+        set -euo pipefail
+        handlers="{{ repo_root }}/roles/backup/handlers/main.yml"
+        missing=0
+        while read -r target; do
+          [ -z "$target" ] && continue
+          grep -qE "^[[:space:]]*(- name|[[:space:]]*listen):[[:space:]]*${target}$" "$handlers" || {
+            echo "notify '${target}' has no matching handler name or listen" >&2
+            missing=1
+          }
+        done < <(grep -rh 'notify:' "{{ repo_root }}/roles/backup/tasks/" | sed 's/.*notify:[[:space:]]*//' | sort -u)
+        exit "$missing"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
     - name: Backup | assert wrapper fails closed and uses valid restic copy flags
       ansible.builtin.shell: |
         grep -q 'flock -n' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"

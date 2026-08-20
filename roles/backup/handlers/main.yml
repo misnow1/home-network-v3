@@ -1,4 +1,5 @@
 ---
 - name: Reload systemd after backup unit changes
+  listen: reload systemd backup units
   ansible.builtin.systemd:
     daemon_reload: true
