@@ -9,3 +9,13 @@
 # Requires hypervisor br9/vlan9 — see docs/kubernetes-runbook.md
 
 # Control-plane taint is applied at kubeadm init (runbook), not by Ansible in v1.
+
+# etcdctl for Phase 8 snapshots (not in kubeadm packages).
+k8s_extra_packages:
+  - etcd-client
+
+# Daily local snapshot plus off-box copy into a reserved dir on the VLAN 9
+# CSI share (sibling of PVC subdirs — not the share root).
+k8s_etcd_snapshot_enabled: true
+k8s_etcd_snapshot_nfs_mount_enabled: true
+k8s_etcd_snapshot_offbox_dir: /export/k8s/etcd-snapshots

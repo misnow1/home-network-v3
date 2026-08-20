@@ -106,17 +106,18 @@ nfs_server_enabled: true
 nfs_server_client_networks:
   - 192.168.1.0/24
 # Kubernetes CSI (sec=sys) — VLAN 9 only; keep Kerberos exports on nfs_server_exports.
-# nfs_server_extra_exports:
-#   - path: /export/k8s
-#     fsid: 4
-#     sec: sys
-#     clients:
-#       - 192.168.9.0/24
-#     ensure: true
-#     # root_squash → nobody (65534); CSI provisioner must be able to mkdir as nobody.
-#     owner: nobody
-#     group: nogroup
-#     mode: "0775"
+# Also used for CP etcd off-box copies under /export/k8s/etcd-snapshots.
+nfs_server_extra_exports:
+  - path: /export/k8s
+    fsid: 4
+    sec: sys
+    clients:
+      - 192.168.9.0/24
+    ensure: true
+    # root_squash → nobody (65534); CSI provisioner must be able to mkdir as nobody.
+    owner: nobody
+    group: nogroup
+    mode: "0775"
 
 mdadm_monitor_enabled: true
 

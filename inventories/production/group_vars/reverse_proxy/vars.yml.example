@@ -33,6 +33,8 @@ certbot_domains:
   - kif.2123studios.com
   - paperless.2123studios.com
   - plex.2123studios.com
+  - whoami.2123studios.com
+  - uptime.2123studios.com
 
 # --- Reverse proxy -----------------------------------------------------------
 reverse_proxy_enabled: true
@@ -153,6 +155,29 @@ reverse_proxy_sites:
           proxy_pass_header X-Transmission-Session-Id;
       - path: /guacamole
         proxy_pass: http://192.168.7.152:4080/guacamole
+        auth_required: true
+        websocket: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 20
+
+  # In-cluster apps — proxy01 TLS + Authelia → MetalLB VIP (Phase 7 / 9).
+  - name: whoami.2123studios.com
+    server_names:
+      - whoami.2123studios.com
+    locations:
+      - path: /
+        proxy_pass: http://192.168.9.200
+        auth_required: true
+        rate_limit:
+          zone: proxied_apps
+          burst: 20
+  - name: uptime.2123studios.com
+    server_names:
+      - uptime.2123studios.com
+    locations:
+      - path: /
+        proxy_pass: http://192.168.9.200
         auth_required: true
         websocket: true
         rate_limit:

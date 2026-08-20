@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0004 — Failure triage on the hybrid edge</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0004 · Hybrid edge</p>
+      <h1>Failure triage on the hybrid edge</h1>
+      <p class="lede">
+        One idea: isolate the hop before you change config. Timeout, 502, 404, and
+        <code>Accepted=False</code> each point at a different layer.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      You already proved the happy path for
+      <code>whoami.2123studios.com</code>. At work, the skill that transfers is not
+      “remember the YAML” — it is <em>naming which hop failed</em> from a symptom.
+      Same stack: edge proxy → LB VIP → Gateway → Route → Service → Pod.
+    </p>
+
+    <h2>Knowledge — four symptoms, four layers</h2>
+    <p>
+      Map symptoms to the hop map
+      (<a href="../reference/hybrid-edge-hop-map.html">reference</a>). Runbook table:
+      <a href="../../docs/kubernetes-runbook.md#troubleshooting">kubernetes-runbook troubleshooting</a>.
+    </p>
+
+    <div class="diagram">Symptom                 Broken hop (usual)
+─────────────────────   ──────────────────────────────
+timeout / no connect    VLAN 1→9 firewall, or MetalLB ARP
+502 from proxy01        Envoy up? VIP? backends Ready?
+404 (with correct Host) HTTPRoute host/path mismatch
+Accepted=False          Gateway allowlist / refs / ports
+401/302 to Authelia     edge auth (usually NOT the VIP)</div>
+
+    <h3>1. Timeout — packets never arrive</h3>
+    <p>
+      From proxy01 (or VLAN&nbsp;1):
+      <code>curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.9.200/</code>
+      hanging or “Connection timed out” means the VIP is not reachable — UniFi
+      VLAN&nbsp;1→9 allow for proxy→VIP, or MetalLB not answering ARP on VLAN&nbsp;9.
+    </p>
+    <pre><code># On a VLAN 9 host / via kubectl debug node if needed:
+ip neigh show 192.168.9.200
+kubectl get svc -n envoy-gateway-system
+# EXTERNAL-IP must be 192.168.9.200 (not &lt;pending&gt;)</code></pre>
+
+    <h3>2. 502 from proxy01 — TCP works, upstream unhappy</h3>
+    <p>
+      nginx reached <em>something</em> but got a bad gateway response. Check Gateway /
+      HTTPRoute / Envoy Service, and that backends are Ready — not Authelia first
+      (Authelia failures look like redirects/401, not classic 502 to the VIP).
+    </p>
+    <pre><code>kubectl get gateway,httproute -A
+kubectl get pods -n envoy-gateway-system
+kubectl -n whoami get pods,svc,httproute</code></pre>
+
+    <h3>3. 404 — L7 routing miss</h3>
+    <p>
+      You already saw this on purpose: VIP up, wrong or missing <code>Host</code>.
+      Same class of bug: nginx <code>server_names</code> ≠ <code>HTTPRoute</code>
+      <code>hostnames</code>, or Host rewritten to the VIP IP.
+    </p>
+
+    <h3>4. <code>Accepted=False</code> — control plane said no</h3>
+    <p>
+      <code>kubectl describe httproute …</code> status reasons usually:
+      Gateway <code>allowedRoutes</code> blocked the namespace, parentRef name/namespace
+      wrong, Service/port name mismatch, or (later) missing
+      <code>ReferenceGrant</code> for cross-namespace backends.
+      <a href="https://kubernetes.io/docs/concepts/services-networking/gateway/">(Gateway API model)</a>
+    </p>
+
+    <div class="callout">
+      <strong>Order of checks:</strong> public HTTPS symptom → curl VIP from proxy01
+      with Host → <code>kubectl get gateway,httproute,svc</code> → describe route →
+      pod Ready. Do not start in Authelia config for timeouts/502s to the VIP.
+    </div>
+
+    <h2>Skill — diagnose from the symptom (retrieval)</h2>
+    <p>
+      Mentally walk your live path. Prefer the <em>first</em> failing hop — do not
+      stack unrelated fixes.
+    </p>
+
+    <div
+      class="quiz"
+      data-correct="0"
+      data-explain-correct="Yes — timeout before any HTTP means firewall/ARP/VIP, not HTTPRoute hostnames."
+      data-explain-wrong="Hostname mismatch yields 404 after a connection; Authelia is redirects/401."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">curl from proxy01 to the VIP hangs until timeout. First suspect?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">VLAN path or MetalLB ARP for the VIP.</button>
+        <button type="button" class="option" data-i="1">HTTPRoute hostname string does not match.</button>
+        <button type="button" class="option" data-i="2">Authelia access_control denied the user.</button>
+        <button type="button" class="option" data-i="3">whoami container image tag is too old.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Correct — 502 means TCP reached an upstream that failed; inspect Gateway/route/backends."
+      data-explain-wrong="Timeout is reachability; 401/302 is Authelia; pending EXTERNAL-IP is assignment."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">Public HTTPS returns 502 from nginx to the k8s upstream. Best next step?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">Raise UniFi VLAN 9 DHCP pool size now.</button>
+        <button type="button" class="option" data-i="1">Delete Authelia Redis to clear sessions.</button>
+        <button type="button" class="option" data-i="2">kubectl get gateway,httproute and backends.</button>
+        <button type="button" class="option" data-i="3">Force-renew the Let’s Encrypt certificate.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="1"
+      data-explain-correct="Yes — Accepted=False is attach/ref rejection; describe the HTTPRoute for the reason."
+      data-explain-wrong="ARP and certbot do not set HTTPRoute Accepted; 404 can happen while Accepted=True."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">HTTPRoute shows Accepted=False. Where do you look first?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">Dreamhost panel for the public A record.</button>
+        <button type="button" class="option" data-i="1">describe HTTPRoute — parentRefs / allowlist.</button>
+        <button type="button" class="option" data-i="2">openssl s_client against port 443 only.</button>
+        <button type="button" class="option" data-i="3">MetalLB speaker logs for gratuitous ARP.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      Re-read
+      <a href="../../docs/kubernetes-runbook.md#troubleshooting">Troubleshooting</a>
+      in the kubernetes runbook (VIP unreachable, Gateway 502, HTTPRoute Accepted).
+      Keep
+      <a href="../reference/failure-triage-card.html">failure-triage-card.html</a>
+      handy when something breaks.
+    </p>
+
+    <div class="callout warn">
+      Paste a real symptom + one command’s output in chat anytime — we triage together.
+      I’m the teacher for this workspace.
+    </div>
+
+    <footer class="lesson-foot">
+      Prev: <a href="0003-wire-proxy01-to-vip.html">0003 Wire proxy01</a>
+      · Ref: <a href="../reference/failure-triage-card.html">triage card</a>
+      · <a href="../reference/hybrid-edge-hop-map.html">hop map</a>
+      · Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Next: <a href="0005-referencegrant.html">0005 ReferenceGrant</a>
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>

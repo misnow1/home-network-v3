@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0005 — ReferenceGrant (cross-namespace backends)</title>
+  <link rel="stylesheet" href="../assets/lesson.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="lesson-head">
+      <p class="eyebrow">Lesson 0005 · Hybrid edge</p>
+      <h1>ReferenceGrant — when routes and Services diverge</h1>
+      <p class="lede">
+        One idea: attaching a route <em>to</em> a Gateway and pointing a route
+        <em>at</em> a Service in another namespace are two different trust handshakes.
+      </p>
+    </header>
+
+    <h2>Why this matters for your mission</h2>
+    <p>
+      Your whoami path kept the <code>HTTPRoute</code> and Service in the same
+      <code>whoami</code> namespace — so you never needed a
+      <code>ReferenceGrant</code>. Work clusters often split “edge routes” and
+      “app Services” across namespaces. Without the grant, you get
+      <code>Accepted=False</code> / unresolved refs that look like random 502s
+      (lesson&nbsp;<a href="0004-failure-triage.html">0004</a>).
+    </p>
+
+    <h2>Knowledge — two handshakes</h2>
+    <p>
+      Per
+      <a href="https://gateway-api.sigs.k8s.io/docs/concepts/security/">Gateway API security</a>
+      and
+      <a href="https://gateway-api.sigs.k8s.io/reference/api-types/referencegrant/">ReferenceGrant</a>:
+    </p>
+
+    <div class="diagram">Cross-namespace link              Who must agree
+───────────────────────────────    ─────────────────────────────
+HTTPRoute  →  Gateway (attach)     Gateway.allowedRoutes
+                                   (NOT ReferenceGrant)
+
+HTTPRoute  →  Service other NS     ReferenceGrant in the
+                                   *Service’s* namespace
+                                   (from: HTTPRoute ns)</div>
+
+    <p>
+      Your lab Gateway already allows routes from all namespaces
+      (<code>allowedRoutes.namespaces.from: All</code> in the runbook). That only
+      covers <em>attach</em>. Forwarding to a backend in another namespace still
+      needs an explicit grant in that backend namespace.
+    </p>
+
+    <h3>What a grant looks like</h3>
+    <p>
+      The grant lives next to the <em>target</em> (the Service).
+      <code>from</code> = trusted callers; <code>to</code> = kinds (and optional name)
+      in this same namespace that may be referenced.
+    </p>
+    <pre><code># Lives in namespace "apps" — where the Service is
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-edge-routes
+  namespace: apps
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: edge          # where the HTTPRoute lives
+  to:
+    - group: ""              # core API group
+      kind: Service
+      # name: whoami        # optional; omit = any Service in apps</code></pre>
+    <p>
+      Matching route fragment (namespace <code>edge</code>):
+    </p>
+    <pre><code>backendRefs:
+  - name: whoami
+    namespace: apps
+    port: 80</code></pre>
+
+    <div class="callout">
+      <strong>Security detail:</strong> without a grant, implementations must treat the
+      cross-namespace ref as invalid and must <em>not</em> leak whether the remote
+      Service exists. Status focuses on “no ReferenceGrant,” not “Service missing.”
+      (<a href="https://gateway-api.sigs.k8s.io/reference/api-types/referencegrant/">same docs</a>)
+    </div>
+
+    <div class="callout warn">
+      Your live whoami does <em>not</em> need this today (route + Service same NS).
+      Learn the shape now so Phase&nbsp;9 / work clusters do not surprise you.
+    </div>
+
+    <h2>Skill — spot when you need one</h2>
+    <p>
+      Optional lab drill (safe): create a throwaway route in another namespace that
+      <code>backendRefs</code> the existing whoami Service <em>with</em>
+      <code>namespace: whoami</code>, observe status without a grant, then add the
+      grant in <code>whoami</code> and re-check. Clean up when done.
+    </p>
+    <pre><code>kubectl -n &lt;route-ns&gt; describe httproute …
+# Look for ResolvedRefs=False / reason about ReferenceGrant
+
+kubectl -n whoami get referencegrant
+# After grant: ResolvedRefs=True (assuming Service/port OK)</code></pre>
+
+    <div
+      class="quiz"
+      data-correct="2"
+      data-explain-correct="Yes — ReferenceGrant lives in the target (Service) namespace and allows named from namespaces."
+      data-explain-wrong="allowedRoutes covers Gateway←Route attach only; grants are not created in the route namespace alone."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">HTTPRoute in edge → Service in apps. Where does ReferenceGrant go?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">Only in edge, beside the HTTPRoute object.</button>
+        <button type="button" class="option" data-i="1">Only on the Gateway as allowedRoutes All.</button>
+        <button type="button" class="option" data-i="2">In apps, granting from edge HTTPRoutes.</button>
+        <button type="button" class="option" data-i="3">In kube-system as a cluster ClusterRole.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <div
+      class="quiz"
+      data-correct="0"
+      data-explain-correct="Correct — same-namespace backendRefs do not need ReferenceGrant; your whoami path is this case."
+      data-explain-wrong="MetalLB and Authelia are unrelated to cross-namespace backend trust."
+    >
+      <h3>Check (retrieval)</h3>
+      <p class="prompt">When is ReferenceGrant unnecessary for a backendRef?</p>
+      <div class="options">
+        <button type="button" class="option" data-i="0">Route and Service share one namespace.</button>
+        <button type="button" class="option" data-i="1">MetalLB has already assigned the VIP.</button>
+        <button type="button" class="option" data-i="2">Authelia auth_required is set true.</button>
+        <button type="button" class="option" data-i="3">The Gateway listener protocol is HTTP.</button>
+      </div>
+      <p class="feedback" hidden></p>
+    </div>
+
+    <h2>Primary source (read this)</h2>
+    <p class="sources">
+      Read
+      <a href="https://gateway-api.sigs.k8s.io/docs/concepts/security/">Gateway API — Security</a>
+      (ReferenceGrant section), then skim
+      <a href="https://gateway-api.sigs.k8s.io/reference/api-types/referencegrant/">ReferenceGrant API</a>.
+      Lab mention:
+      <a href="../../docs/kubernetes-runbook.md">kubernetes-runbook.md</a> Phase&nbsp;7 /
+      troubleshooting.
+    </p>
+
+    <div class="callout warn">
+      Ask in chat if a describe output mentions ReferenceGrant / ResolvedRefs — paste it
+      and we’ll read it together. I’m the teacher for this workspace.
+    </div>
+
+    <footer class="lesson-foot">
+      Prev: <a href="0004-failure-triage.html">0004 Failure triage</a>
+      · Ref: <a href="../reference/referencegrant-card.html">ReferenceGrant card</a>
+      · Mission: <a href="../MISSION.md">MISSION.md</a>
+      · Next: <a href="0006-phase8-etcd-before-graduation.html">0006 Phase 8/9 bridge</a>
+    </footer>
+  </div>
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>
