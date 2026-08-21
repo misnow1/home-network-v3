@@ -8,6 +8,27 @@
     mode: "0700"
   tags: [backup_ad]
 
+- name: Backup AD | Read source DC host public key
+  ansible.builtin.slurp:
+    src: "{{ backup_ad_source_host_key_file }}"
+  delegate_to: "{{ backup_ad_source_ssh_host }}"
+  register: backup_ad_source_host_key
+  tags: [backup_ad]
+
+# The orchestrator runs as root under systemd with BatchMode=yes, so it cannot
+# accept a host key interactively. Seed it from the key Ansible read over its
+# own trusted connection rather than trusting on first use.
+- name: Backup AD | Trust source DC host key for root
+  ansible.builtin.known_hosts:
+    path: /root/.ssh/known_hosts
+    name: "{{ backup_ad_source_ssh_host }}"
+    key: >-
+      {{ backup_ad_source_ssh_host }}
+      {{ (backup_ad_source_host_key.content | b64decode).split()[0] }}
+      {{ (backup_ad_source_host_key.content | b64decode).split()[1] }}
+    state: present
+  tags: [backup_ad]
+
 - name: Backup AD | Deploy kif orchestrator script
   ansible.builtin.template:
     src: backup-ad.sh.j2

@@ -5,6 +5,16 @@ backup_scope_dir: /etc/ansible-managed
 backup_scope_path: /etc/ansible-managed/backup_scope.yml
 backup_docker_script_path: /usr/local/bin/backup-docker.sh
 backup_paths_script_path: /usr/local/bin/backup-paths.sh
+backup_common_script_path: /usr/local/lib/backup-common.sh
+
+# restic metadata cache. Without HOME set, systemd-run backups are cacheless and
+# re-read the whole repository index every snapshot. Sized ~1% of repo data.
+backup_cache_dir: /var/cache/restic
+backup_cache_home: /root
+
+# Refuse to back up when the repository filesystem drops below this much free
+# space, so a backup can never fill the volume it lives on.
+backup_min_free_percent: 15
 
 backup_libvirt_vms: []
 backup_docker_volumes: []
@@ -52,6 +62,7 @@ backup_ad_peer_ldap_uri: ldap://192.168.1.11
 backup_ad_ssh_user: ansible
 backup_ad_ssh_identity: ""
 backup_ad_source_ssh_host: dc1.home.2123studios.com
+backup_ad_source_host_key_file: /etc/ssh/ssh_host_ed25519_key.pub
 backup_ad_ldap_timeout_sec: 10
 backup_ad_offline_timeout_sec: 1200
 backup_ad_schedule_on_calendar: "*-*-* 01:15:00"
@@ -60,6 +71,7 @@ backup_ad_timer_persistent: false
 backup_ad_timeout_sec: 1800
 backup_ad_script_path: /usr/local/bin/backup-ad.sh
 backup_ad_dc_script_path: /usr/local/bin/backup-ad-offline.sh
+backup_ad_dc_env_path: /etc/default/backup-ad-offline
 backup_ad_dc_workdir: /var/tmp/ad-backup-work
 backup_ad_dc_latest: /var/tmp/ad-backup-latest.tar.bz2
 backup_ad_staging_dir: /var/backups/ad

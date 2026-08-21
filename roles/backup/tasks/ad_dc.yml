@@ -1,7 +1,16 @@
 ---
-- name: Backup AD | Deploy offline backup helper on source DC
+- name: Backup AD | Deploy offline backup helper config on source DC
   ansible.builtin.template:
-    src: backup-ad-offline.sh.j2
+    src: backup-ad-offline.env.j2
+    dest: "{{ backup_ad_dc_env_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [backup_ad]
+
+- name: Backup AD | Deploy offline backup helper on source DC
+  ansible.builtin.copy:
+    src: backup-ad-offline.sh
     dest: "{{ backup_ad_dc_script_path }}"
     owner: root
     group: root

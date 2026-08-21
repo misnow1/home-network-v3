@@ -3,33 +3,24 @@
 # Scheduled backup entrypoint — docker volumes, host paths, retention, optional copy.
 set -uo pipefail
 
+COMMON="{{ backup_common_script_path }}"
+if [ ! -r "$COMMON" ]; then
+  echo "$(date -Iseconds) | ERROR: shared backup environment missing: $COMMON" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$COMMON"
+
 exec 9>/run/ansible-backup.lock
 if ! flock -n 9; then
   echo "$(date -Iseconds) | ERROR: another ansible-backup run holds /run/ansible-backup.lock" >&2
   exit 1
 fi
 
-export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
-export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
-
 DOCKER_SCRIPT="{{ backup_docker_script_path }}"
 PATHS_SCRIPT="{{ backup_paths_script_path }}"
 OFFSITE_REPO="{{ backup_offsite_repository }}"
 OFFSITE_COPY="{{ backup_offsite_copy_enabled | lower }}"
-MAIL_TO="{{ backup_failure_mail_to }}"
-
-mail_failure() {
-  local subject="$1"
-  local body="$2"
-  if [ -z "$MAIL_TO" ]; then
-    return 0
-  fi
-  if command -v mail >/dev/null 2>&1; then
-    printf '%s\n' "$body" | mail -s "$subject" "$MAIL_TO" || true
-  else
-    echo "$(date -Iseconds) | WARNING: mail command missing; cannot notify ${MAIL_TO}" >&2
-  fi
-}
 
 run_docker_backup() {
   if [ ! -x "$DOCKER_SCRIPT" ]; then
@@ -68,6 +59,12 @@ run_offsite_copy() {
     copy --from-repo "$RESTIC_REPOSITORY" --from-password-file "$RESTIC_PASSWORD_FILE"
 }
 
+# Retention still runs when headroom is gone — pruning is how space comes back.
+if ! backup_require_repo_space "docker volume and host path backups"; then
+  run_prune || true
+  exit 1
+fi
+
 status=0
 run_docker_backup || status=1
 run_paths_backup || status=1
@@ -85,7 +82,7 @@ else
 fi
 
 if [ "$status" -ne 0 ]; then
-  mail_failure \
+  backup_mail \
     "[ansible-backup] FAILED on $(hostname -s)" \
     "ansible-backup.service failed on $(hostname -s) at $(date -Iseconds).
 Check: journalctl -u {{ backup_systemd_unit }}.service -n 80

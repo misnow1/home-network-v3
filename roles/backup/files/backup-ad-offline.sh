@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
-# {{ ansible_managed }}
+# Managed by Ansible (roles/backup). Do not edit on the host.
 # Offline Samba AD backup on the source DC. Restarts directory services on every exit.
+# Paths and timeout come from the config file below, so this script stays free of
+# templating and can use bash sigils such as ${#array[@]} safely.
 # Usage: backup-ad-offline.sh [run|dump|purge]
 set -uo pipefail
 
-WORKDIR="{{ backup_ad_dc_workdir }}"
-LATEST="{{ backup_ad_dc_latest }}"
-TIMEOUT_SEC="{{ backup_ad_offline_timeout_sec }}"
+CONFIG="${BACKUP_AD_OFFLINE_CONFIG:-/etc/default/backup-ad-offline}"
+if [ ! -r "$CONFIG" ]; then
+  echo "ERROR: missing config $CONFIG" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$CONFIG"
+
+: "${WORKDIR:?WORKDIR not set in $CONFIG}"
+: "${LATEST:?LATEST not set in $CONFIG}"
+: "${TIMEOUT_SEC:?TIMEOUT_SEC not set in $CONFIG}"
+
 CMD="${1:-run}"
 
 dump_artifact() {

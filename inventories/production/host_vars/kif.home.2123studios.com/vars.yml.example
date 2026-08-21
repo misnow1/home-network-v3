@@ -249,8 +249,9 @@ backup_host_paths:
       - restic
       - "*/kopia"
       - "pre-reimage-*"
-  - path: /media/projects
-    tag: media-projects
+  # /media/projects (1.9 TB of video projects) is deliberately absent: the repo
+  # lives on /archive, which cannot hold it. Needs its own repo on separate
+  # storage — see the capacity section of docs/backup-runbook.md.
   - path: /media/software
     tag: media-software
   - path: /media/teslausb

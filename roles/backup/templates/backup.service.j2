@@ -8,6 +8,8 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart={{ backup_run_script_path }}
+Environment=HOME={{ backup_cache_home }}
+Environment=RESTIC_CACHE_DIR={{ backup_cache_dir }}
 Nice=10
 IOSchedulingClass=best-effort
 TimeoutStartSec={{ backup_schedule_timeout_sec }}

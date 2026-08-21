@@ -64,6 +64,7 @@ Canonical backlog for slices and deferred work. Update this file when scope chan
 | 20+ | Mac Time Machine + avahi | Production fileserver | `vfs_fruit`, avahi `_adisk._tcp` / `_device-info._tcp`; Finder discovery for personal Macs |
 | 22+ | Stateful guest / AD backups | Slice 7 / 23 | AD tarball + KopiaUI (not whole-qcow2). `backup-libvirt.sh` not planned. |
 | 23+ | Restic air-gap offsite | Slice 23 | SFTP/NAS/object-storage backend; automated copy off kif; immutable retention |
+| 23+ | `/media/projects` backup repo | Slice 23, new storage | 1.9 TB of video projects does not fit the `/archive` repo (usable ~3.1 TB, scope already 2.45 TB). RAID6-protected but unbacked; needs its own repo on separate storage |
 | 24+ | kif ESP/boot mirror | kif reimage (optional) | Rebuild 2×1TB pair with mirrored ESP/`/boot`; retire spare-as-OS or repurpose 512GB SSD |
 | — | nut_client role | Slice 21 | Server slice done; client role for kvm01 netclient path deferred |
 | — | AD SSH public keys | Slice 18 | [ad-ssh-public-keys.md](ad-ssh-public-keys.md) |

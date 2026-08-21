@@ -3,8 +3,13 @@
 # Host path restic backup from backup_host_paths.
 set -uo pipefail
 
-export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
-export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+COMMON="{{ backup_common_script_path }}"
+if [ ! -r "$COMMON" ]; then
+  echo "$(date -Iseconds) | ERROR: shared backup environment missing: $COMMON" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$COMMON"
 
 AD_LATEST="{{ backup_ad_staging_dir }}/{{ backup_ad_artifact_name }}"
 AD_MAX_AGE_HOURS="{{ backup_ad_max_age_hours }}"
@@ -23,6 +28,12 @@ failure_count=0
 path="{{ item.path }}"
 optional="{{ item.optional | default(false) | lower }}"
 echo "$(date -Iseconds) | ${path} | host-path backup starting"
+
+# Re-checked per path: a single large path can consume the remaining headroom.
+if ! backup_require_repo_space "host path ${path}"; then
+  echo "$(date -Iseconds) | paths | aborting remaining paths, out of headroom" >&2
+  exit 1
+fi
 
 if [ ! -d "$path" ]; then
   if [ "$optional" = "true" ]; then

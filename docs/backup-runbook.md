@@ -20,7 +20,9 @@ true off-host remains ROADMAP Slice 23+.
 - Vault variable `vault_backup_repository_key` set (keep a copy in 1Password)
 - AD job: kif `ansible` user must SSH to dc1 (`backup_ad_ssh_identity` points at the
   prod VM key). That user needs passwordless sudo for `/usr/local/bin/backup-ad-offline.sh`
-  and `tar`/`cat`/`rm` of the tarball.
+  and `tar`/`cat`/`rm` of the tarball. The orchestrator runs as root under systemd with
+  `BatchMode=yes`, so the role seeds `/root/.ssh/known_hosts` from dc1's host key read
+  over Ansible's own connection — no manual first-time `ssh` needed.
 
 ## Converge order
 
@@ -39,11 +41,13 @@ ansible-playbook playbooks/backup.yml --limit hv01.lab.test
 | Lab restic repo | `/var/lib/restic/lab-backup` |
 | Production kif repo | `/archive/restic/prod-backup` |
 | Scope manifest | `/etc/ansible-managed/backup_scope.yml` |
+| Shared env + space guard | `/usr/local/lib/backup-common.sh` (sourced by every script) |
+| restic cache | `/var/cache/restic` (`RESTIC_CACHE_DIR`; systemd sets no `HOME`) |
 | Docker backup script | `/usr/local/bin/backup-docker.sh` |
 | Path backup script | `/usr/local/bin/backup-paths.sh` |
 | Scheduled wrapper (opt-in) | `/usr/local/bin/backup-run.sh` + `ansible-backup.timer` |
 | AD orchestrator (kif, opt-in) | `/usr/local/bin/backup-ad.sh` + `ansible-backup-ad.timer` (01:15) |
-| AD helper (dc1) | `/usr/local/bin/backup-ad-offline.sh` |
+| AD helper (dc1) | `/usr/local/bin/backup-ad-offline.sh` + `/etc/default/backup-ad-offline` |
 
 Scope is declared in host_vars:
 
@@ -60,6 +64,7 @@ Scheduling variables (defaults off in lab):
 | `backup_offsite_repository` | `""` | Second restic repo path |
 | `backup_offsite_copy_enabled` | `false` | Run `restic copy` after backup |
 | `backup_prune_enabled` | `true` | Apply retention after backup |
+| `backup_min_free_percent` | `15` | Abort (and mail) when repo filesystem is this low |
 | `backup_ad_enabled` | `false` | Kif AD orchestrator + timer |
 | `backup_ad_source` | `false` | Deploy offline helper on that DC |
 
@@ -103,7 +108,7 @@ kif host_vars (see `vars.yml.example`):
 
 - Repo: `/archive/restic/prod-backup` (RAID6). `backup_offsite_copy_enabled: false`.
 - Paths: `/home`, `/archive` (exclude `restic`, `*/kopia`, `pre-reimage-*`),
-  `/media/projects`, `/media/software`, `/media/teslausb`, `/srv/docker`, `/var/backups/ad`.
+  `/media/software`, `/media/teslausb`, `/srv/docker`, `/var/backups/ad`.
 - Docker named volumes for Guacamole/Paperless DBs (crash-consistent stop/start).
 - Authelia Valkey/Plex/Transmission config live under `/srv/docker` bind mounts.
 - KopiaUI on calculon2 writes `/archive/<user>/kopia/<hostname>` — restic excludes it.
@@ -127,8 +132,32 @@ After converge, run one AD backup so the 02:30 restic run has an artifact:
 sudo /usr/local/bin/backup-ad.sh
 ```
 
-First full restic of `/home` + `/archive` + `/media/projects` can take hours. The unit
-timeout is 12h. Do not treat a green timer as success — check snapshots.
+First full restic of `/home` + `/archive` takes hours (measured 2026-08-21: `/home`
+425 GiB in 1h05, `/archive` 1.85 TiB in 5h25). The unit timeout is 12h. Do not treat a
+green timer as success — check snapshots.
+
+### Capacity
+
+The repository lives on the same 5 TB `/archive` volume it backs up, so usable repo
+space is total minus `/archive`'s own data — roughly 3.1 TB. Current scope needs about
+2.45 TB.
+
+`/media/projects` (1.9 TB of video projects) does **not** fit and is excluded from this
+repo. It is RAID6-protected but **not backed up**; it needs its own repository on
+separate storage (tracked in [issue #54](https://github.com/misnow1/home-network-v3/issues/54)).
+Video dedupes and compresses poorly, so restic will not rescue the math.
+
+`backup_min_free_percent` (default 15) makes every backup script re-check free space
+before each volume and each path. Below the threshold the run aborts, mails `root`, and
+still runs `restic forget --prune`, since pruning is how space comes back. A backup can
+therefore never be what fills the array.
+
+Growing the scope means adding storage first. Check headroom with:
+
+```bash
+df -h /archive
+sudo du -sh /archive/restic/prod-backup
+```
 
 ### Verify
 
