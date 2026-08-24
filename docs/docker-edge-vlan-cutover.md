@@ -68,12 +68,15 @@ Transmission splits RPC (VLAN 4) from peer port (VLAN 1):
 
 ```yaml
 # transmission — example
+environment:
+  - TRANSMISSION_WEB_HOME=/config/flood-for-transmission  # Flood for Transmission drop-in
 ports:
   - "192.168.7.152:9091:9091"
   - "192.168.1.152:51413:51413"
 ```
 
-See [authelia-runbook.md](authelia-runbook.md#docker-compose-port-bindings-vlan-4).
+See [authelia-runbook.md](authelia-runbook.md#docker-compose-port-bindings-vlan-4)
+for the Flood UI install notes.
 
 Restart stacks: `cd /srv/docker/<stack> && sudo docker compose up -d`
 
