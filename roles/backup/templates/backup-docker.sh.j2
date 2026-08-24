@@ -3,8 +3,13 @@
 # Docker volume backup script — crash_consistent volumes from backup scope manifest.
 set -uo pipefail
 
-export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
-export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+COMMON="{{ backup_common_script_path }}"
+if [ ! -r "$COMMON" ]; then
+  echo "$(date -Iseconds) | ERROR: shared backup environment missing: $COMMON" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$COMMON"
 
 REQUIRE_EXISTING_PATHS="{{ backup_docker_require_existing_paths | lower }}"
 DECLARED_VOLUME_COUNT={{ backup_docker_volumes | length }}
@@ -17,6 +22,14 @@ exit 0
 success_count=0
 skip_count=0
 failure_count=0
+STOPPED_ALL=""
+
+restore_stopped_containers() {
+  [ -z "$STOPPED_ALL" ] && return 0
+  docker_start_containers "$STOPPED_ALL" || true
+}
+
+trap restore_stopped_containers EXIT
 
 docker_stop_volume_containers() {
   local vol_name="$1"
@@ -46,6 +59,11 @@ docker_start_containers() {
 {% for vol in backup_docker_volumes %}
 echo "$(date -Iseconds) | {{ vol.name }} | {{ vol.backup_class }} backup starting"
 
+if ! backup_require_repo_space "docker volume {{ vol.name }}"; then
+  echo "$(date -Iseconds) | summary | aborting remaining volumes, out of headroom" >&2
+  exit 1
+fi
+
 VOL_PATH=""
 if ! VOL_PATH="$(docker volume inspect -f '{{ '{{' }} .Mountpoint {{ '}}' }}' "{{ vol.name }}" 2>/dev/null)"; then
   VOL_PATH=""
@@ -62,6 +80,10 @@ if [ -z "$VOL_PATH" ] || [ ! -d "$VOL_PATH" ]; then
 else
 {% if vol.backup_class == 'crash_consistent' %}
   CONTAINER_ID=$(docker ps -q --filter volume="{{ vol.name }}")
+  if [ -n "$CONTAINER_ID" ]; then
+    STOPPED_ALL="${STOPPED_ALL}
+${CONTAINER_ID}"
+  fi
   if [ -n "$CONTAINER_ID" ] && ! docker_stop_volume_containers "{{ vol.name }}"; then
     failure_count=$((failure_count + 1))
     echo "$(date -Iseconds) | {{ vol.name }} | ERROR: failed to stop containers using volume" >&2

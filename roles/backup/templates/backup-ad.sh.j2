@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Kif-side AD backup: preflight peer LDAP, remote offline backup, pull to staging.
+set -uo pipefail
+
+PEER_URI="{{ backup_ad_peer_ldap_uri }}"
+SSH_USER="{{ backup_ad_ssh_user }}"
+SSH_HOST="{{ backup_ad_source_ssh_host }}"
+REMOTE_SCRIPT="{{ backup_ad_dc_script_path }}"
+STAGING_DIR="{{ backup_ad_staging_dir }}"
+ARTIFACT="{{ backup_ad_artifact_name }}"
+MAIL_TO="{{ backup_failure_mail_to }}"
+LDAP_TIMEOUT="{{ backup_ad_ldap_timeout_sec }}"
+
+STAGING="${STAGING_DIR}/${ARTIFACT}"
+ERRLOG="$(mktemp)"
+trap 'rm -f "$ERRLOG"' EXIT
+
+# mail_abort <reason> <what to do about it>
+mail_abort() {
+  local reason="$1"
+  local guidance="$2"
+  local detail=""
+  local body
+
+  if [ -s "$ERRLOG" ]; then
+    detail="
+
+Command output:
+$(tail -n 20 "$ERRLOG")"
+  fi
+
+  body="AD backup aborted on $(hostname -s) at $(date -Iseconds).
+
+Reason: ${reason}
+
+Next step: ${guidance}${detail}
+
+Once resolved, rerun as root on $(hostname -s):
+
+  ${0}
+
+That runs an LDAP preflight against ${PEER_URI}, SSH to ${SSH_USER}@${SSH_HOST},
+and copies the tarball to ${STAGING}. Nightly restic then picks it up from that path.
+
+See docs/backup-runbook.md (AD section)."
+
+  if [ -n "$MAIL_TO" ] && command -v mail >/dev/null 2>&1; then
+    printf '%s\n' "$body" | mail -s "[backup-ad] ABORTED on $(hostname -s)" "$MAIL_TO" || true
+  fi
+  echo "$reason" >&2
+}
+
+mkdir -p "$STAGING_DIR"
+chmod 0700 "$STAGING_DIR"
+
+if ! command -v ldapsearch >/dev/null 2>&1; then
+  mail_abort \
+    "ldapsearch missing on $(hostname -s)." \
+    "Install ldap-utils by converging playbooks/backup.yml against this host."
+  exit 1
+fi
+
+if ! timeout "$LDAP_TIMEOUT" ldapsearch -x -LLL -H "$PEER_URI" -s base -b '' namingContexts \
+  >/dev/null 2>"$ERRLOG"; then
+  mail_abort \
+    "Peer LDAP preflight failed (${PEER_URI})." \
+    "Check the peer DC: systemctl status samba-ad-dc. Directory services on ${SSH_HOST} were never stopped, so the domain took no downtime."
+  exit 1
+fi
+
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 -o CheckHostIP=no)
+{% if backup_ad_ssh_identity | length > 0 %}
+SSH+=(-o IdentitiesOnly=yes -i "{{ backup_ad_ssh_identity }}")
+{% endif %}
+
+if ! "${SSH[@]}" "${SSH_USER}@${SSH_HOST}" true 2>"$ERRLOG"; then
+  mail_abort \
+    "Cannot SSH to ${SSH_USER}@${SSH_HOST} as root on $(hostname -s)." \
+    "Verify the host key in /root/.ssh/known_hosts and the key at {{ backup_ad_ssh_identity | default('the configured identity', true) }}. Directory services on ${SSH_HOST} were never stopped."
+  exit 1
+fi
+
+if ! "${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" run 2>"$ERRLOG"; then
+  mail_abort \
+    "Offline backup failed on ${SSH_HOST}." \
+    "The helper restarts samba-ad-dc and named from an EXIT trap, but confirm both are running on ${SSH_HOST} before anything else. Then check journalctl on ${SSH_HOST} and rerun ${REMOTE_SCRIPT} run there by hand."
+  exit 1
+fi
+
+TMP="${STAGING}.tmp"
+if ! "${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" dump >"$TMP" 2>"$ERRLOG"; then
+  rm -f "$TMP"
+  mail_abort \
+    "Failed to pull the AD tarball from ${SSH_HOST}." \
+    "The backup itself succeeded; only the transfer failed. Rerun this script — it redoes the backup — or copy ${REMOTE_SCRIPT} dump output manually."
+  exit 1
+fi
+chmod 0600 "$TMP"
+if ! tar -tjf "$TMP" >/dev/null 2>"$ERRLOG"; then
+  rm -f "$TMP"
+  mail_abort \
+    "Pulled AD tarball is not a readable bzip2 archive." \
+    "Suspect a truncated transfer. Rerun this script; if it repeats, run ${REMOTE_SCRIPT} run on ${SSH_HOST} and inspect the tarball there."
+  exit 1
+fi
+mv -f "$TMP" "$STAGING"
+
+"${SSH[@]}" "${SSH_USER}@${SSH_HOST}" sudo -n "$REMOTE_SCRIPT" purge || true
+
+echo "$(date -Iseconds) | ad | staged ${STAGING} ($(stat -c %s "$STAGING") bytes)"

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Host path restic backup from backup_host_paths.
+set -uo pipefail
+
+COMMON="{{ backup_common_script_path }}"
+if [ ! -r "$COMMON" ]; then
+  echo "$(date -Iseconds) | ERROR: shared backup environment missing: $COMMON" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$COMMON"
+
+AD_LATEST="{{ backup_ad_staging_dir }}/{{ backup_ad_artifact_name }}"
+AD_MAX_AGE_HOURS="{{ backup_ad_max_age_hours }}"
+AD_STALE_CHECK="{{ backup_ad_enabled | lower }}"
+
+{% if backup_host_paths | length == 0 %}
+echo "$(date -Iseconds) | paths | none declared — skipping"
+exit 0
+{% endif %}
+
+success_count=0
+skip_count=0
+failure_count=0
+
+{% for item in backup_host_paths %}
+path="{{ item.path }}"
+optional="{{ item.optional | default(false) | lower }}"
+echo "$(date -Iseconds) | ${path} | host-path backup starting"
+
+# Re-checked per path: a single large path can consume the remaining headroom.
+if ! backup_require_repo_space "host path ${path}"; then
+  echo "$(date -Iseconds) | paths | aborting remaining paths, out of headroom" >&2
+  exit 1
+fi
+
+if [ ! -d "$path" ]; then
+  if [ "$optional" = "true" ]; then
+    echo "$(date -Iseconds) | ${path} | WARNING: missing optional path, skipping" >&2
+    skip_count=$((skip_count + 1))
+  else
+    echo "$(date -Iseconds) | ${path} | ERROR: path missing" >&2
+    failure_count=$((failure_count + 1))
+  fi
+else
+  restic_args=(backup "$path" --tag host-path --tag "{{ item.tag | default('path') }}" --verbose)
+{% if item.excludes | default([]) | length > 0 %}
+{% for ex in item.excludes %}
+  restic_args+=(--exclude "{{ ex }}")
+{% endfor %}
+{% endif %}
+  if restic "${restic_args[@]}"; then
+    success_count=$((success_count + 1))
+    echo "$(date -Iseconds) | ${path} | backup complete"
+  else
+    failure_count=$((failure_count + 1))
+    echo "$(date -Iseconds) | ${path} | ERROR: restic backup failed" >&2
+  fi
+fi
+
+{% endfor %}
+
+if [ "$AD_STALE_CHECK" = "true" ] && [ -n "$AD_LATEST" ]; then
+  if [ ! -f "$AD_LATEST" ]; then
+    echo "$(date -Iseconds) | ad | ERROR: expected AD artifact missing: $AD_LATEST" >&2
+    failure_count=$((failure_count + 1))
+  else
+    age_hours=$(( ($(date +%s) - $(stat -c %Y "$AD_LATEST")) / 3600 ))
+    if [ "$age_hours" -gt "$AD_MAX_AGE_HOURS" ]; then
+      echo "$(date -Iseconds) | ad | ERROR: AD artifact stale (${age_hours}h > ${AD_MAX_AGE_HOURS}h): $AD_LATEST" >&2
+      failure_count=$((failure_count + 1))
+    fi
+  fi
+fi
+
+echo "$(date -Iseconds) | paths | success=${success_count} skip=${skip_count} failure=${failure_count}"
+if [ "$failure_count" -gt 0 ]; then
+  exit 1
+fi
+exit 0

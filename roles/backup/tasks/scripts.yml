@@ -1,8 +1,35 @@
 ---
+- name: Backup | Ensure restic cache directory exists
+  ansible.builtin.file:
+    path: "{{ backup_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_scripts]
+
+- name: Backup | Deploy shared backup environment
+  ansible.builtin.template:
+    src: backup-common.sh.j2
+    dest: "{{ backup_common_script_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [backup_scripts]
+
 - name: Backup | Deploy docker volume backup script
   ansible.builtin.template:
     src: backup-docker.sh.j2
     dest: "{{ backup_docker_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_scripts]
+
+- name: Backup | Deploy host path backup script
+  ansible.builtin.template:
+    src: backup-paths.sh.j2
+    dest: "{{ backup_paths_script_path }}"
     owner: root
     group: root
     mode: "0700"

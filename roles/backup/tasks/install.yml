@@ -6,3 +6,12 @@
     update_cache: true
     cache_valid_time: 3600
   tags: [backup_install]
+
+- name: Backup | Install AD preflight packages
+  ansible.builtin.apt:
+    name: "{{ backup_ad_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: backup_ad_enabled | bool
+  tags: [backup_install]

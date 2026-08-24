@@ -9,6 +9,7 @@
     scope_tasks: "{{ repo_root }}/roles/backup/tasks/scope.yml"
     backup_playbook: "{{ repo_root }}/playbooks/backup.yml"
     docker_script: "{{ repo_root }}/roles/backup/templates/backup-docker.sh.j2"
+    common_script: "{{ repo_root }}/roles/backup/templates/backup-common.sh.j2"
   tasks:
     - name: Backup | assert scope task validates backup_class
       ansible.builtin.shell: |
@@ -24,10 +25,11 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Backup | assert docker backup script uses local restic repository
+    - name: Backup | assert shared env points restic at the configured repository
       ansible.builtin.shell: |
-        grep -q 'RESTIC_REPOSITORY=' "{{ docker_script }}"
-        grep -q 'backup_restic_repository' "{{ docker_script }}"
+        grep -q 'RESTIC_REPOSITORY=' "{{ common_script }}"
+        grep -q 'backup_restic_repository' "{{ common_script }}"
+        grep -q 'backup_restic_password_file' "{{ common_script }}"
       args:
         executable: /bin/bash
       changed_when: false
@@ -38,6 +40,78 @@
         test -f "{{ repo_root }}/roles/backup/tasks/schedule.yml"
         test -f "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
         test -f "{{ repo_root }}/roles/backup/templates/backup.timer.j2"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-paths.sh.j2"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-ad.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert AD helper ships as a static script with templated config
+      ansible.builtin.shell: |
+        test -f "{{ repo_root }}/roles/backup/files/backup-ad-offline.sh"
+        test -f "{{ repo_root }}/roles/backup/templates/backup-ad-offline.env.j2"
+        test ! -f "{{ repo_root }}/roles/backup/templates/backup-ad-offline.sh.j2"
+        grep -q 'ansible.builtin.copy' "{{ repo_root }}/roles/backup/tasks/ad_dc.yml"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert every notify string resolves to a handler name or listen
+      ansible.builtin.shell: |
+        set -euo pipefail
+        handlers="{{ repo_root }}/roles/backup/handlers/main.yml"
+        missing=0
+        while read -r target; do
+          [ -z "$target" ] && continue
+          grep -qE "^[[:space:]]*(- name|[[:space:]]*listen):[[:space:]]*${target}$" "$handlers" || {
+            echo "notify '${target}' has no matching handler name or listen" >&2
+            missing=1
+          }
+        done < <(grep -rh 'notify:' "{{ repo_root }}/roles/backup/tasks/" | sed 's/.*notify:[[:space:]]*//' | sort -u)
+        exit "$missing"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert every restic script sources the shared env and space guard
+      ansible.builtin.shell: |
+        set -euo pipefail
+        test -f "{{ repo_root }}/roles/backup/templates/backup-common.sh.j2"
+        grep -q 'RESTIC_CACHE_DIR' "{{ repo_root }}/roles/backup/templates/backup-common.sh.j2"
+        grep -q 'backup_require_repo_space' "{{ repo_root }}/roles/backup/templates/backup-common.sh.j2"
+        for script in backup-run backup-paths backup-docker; do
+          template="{{ repo_root }}/roles/backup/templates/${script}.sh.j2"
+          grep -q 'backup_common_script_path' "$template"
+          if grep -q 'export RESTIC_REPOSITORY' "$template"; then
+            echo "${script}.sh.j2 sets RESTIC_REPOSITORY itself instead of sourcing the shared env" >&2
+            exit 1
+          fi
+        done
+        grep -q 'backup_require_repo_space' "{{ repo_root }}/roles/backup/templates/backup-paths.sh.j2"
+        grep -q 'backup_require_repo_space' "{{ repo_root }}/roles/backup/templates/backup-docker.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert AD orchestrator cannot be blocked by an unknown host key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        grep -q 'known_hosts' "{{ repo_root }}/roles/backup/tasks/ad_kif.yml"
+        grep -q 'CheckHostIP=no' "{{ repo_root }}/roles/backup/templates/backup-ad.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert wrapper fails closed and uses valid restic copy flags
+      ansible.builtin.shell: |
+        grep -q 'flock -n' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q 'skipped because backup failed' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q -- '--from-repo' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        grep -q -- '--from-password-file' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"
+        if grep -q -- '--to-repo' "{{ repo_root }}/roles/backup/templates/backup-run.sh.j2"; then
+          echo "invalid restic flag --to-repo still present" >&2
+          exit 1
+        fi
       args:
         executable: /bin/bash
       changed_when: false

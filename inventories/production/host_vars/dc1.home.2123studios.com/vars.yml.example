@@ -12,6 +12,9 @@ ldap_vip_priority: 100
 unattended_upgrades_auto_reboot: true
 unattended_upgrades_reboot_time: "02:45"
 
+# Nightly AD offline backup is orchestrated from kif (01:15), not from this host.
+backup_ad_source: true
+
 # Optional SMB share served from this DC only.
 samba_dc_shares:
   - name: images

@@ -81,8 +81,9 @@ backup_prune_keep_daily: 7
 backup_prune_keep_weekly: 4
 backup_prune_keep_monthly: 6
 
-# Declare docker volumes and VM disks in host_vars/{hostname}/vars.yml.
-# Scheduled backups and offsite copy: see docs/backup-runbook.md (production section).
+# kif overrides repository path, schedule, host paths, and AD — see kif host_vars.
+# Do not enable backup_offsite_copy_enabled when primary and copy would share RAID6.
+# Scheduled backups: docs/backup-runbook.md
 
 # Hypervisor OS reboot stops all local VMs — install security updates but reboot manually.
 # See docs/security-updates-runbook.md.

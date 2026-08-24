@@ -1,0 +1,76 @@
+# {{ ansible_managed }}
+# Shared restic environment and guards. Sourced by the backup scripts, not executed.
+
+export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+# systemd starts these units without HOME, and restic then runs with no cache at
+# all ("unable to locate cache directory"), re-reading repository metadata on
+# every snapshot. Set both so scheduled and manual runs behave the same.
+export RESTIC_CACHE_DIR="{{ backup_cache_dir }}"
+export HOME="{{ backup_cache_home }}"
+
+BACKUP_MIN_FREE_PERCENT="{{ backup_min_free_percent }}"
+BACKUP_MAIL_TO="{{ backup_failure_mail_to }}"
+BACKUP_UNIT="{{ backup_systemd_unit }}"
+
+backup_mail() {
+  local subject="$1"
+  local body="$2"
+  if [ -z "$BACKUP_MAIL_TO" ]; then
+    return 0
+  fi
+  if command -v mail >/dev/null 2>&1; then
+    printf '%s\n' "$body" | mail -s "$subject" "$BACKUP_MAIL_TO" || true
+  else
+    echo "$(date -Iseconds) | WARNING: mail command missing; cannot notify ${BACKUP_MAIL_TO}" >&2
+  fi
+}
+
+# Fails when the repository filesystem is below the configured headroom, so a
+# backup can never be the thing that fills the volume. Only local repositories
+# can be measured; remote backends return success.
+backup_repo_space_ok() {
+  case "$RESTIC_REPOSITORY" in
+    /*) ;;
+    *) return 0 ;;
+  esac
+
+  local used_pct
+  local free_pct
+  local avail
+  used_pct="$(df --output=pcent "$RESTIC_REPOSITORY" 2>/dev/null | tail -1 | tr -dc '0-9')"
+  if [ -z "$used_pct" ]; then
+    echo "$(date -Iseconds) | space | WARNING: cannot measure free space on $RESTIC_REPOSITORY" >&2
+    return 0
+  fi
+  free_pct=$((100 - used_pct))
+  avail="$(df -BG --output=avail "$RESTIC_REPOSITORY" 2>/dev/null | tail -1 | tr -dc '0-9')"
+
+  if [ "$free_pct" -lt "$BACKUP_MIN_FREE_PERCENT" ]; then
+    echo "$(date -Iseconds) | space | ERROR: ${free_pct}% free (${avail:-?} GiB) on $RESTIC_REPOSITORY, minimum is ${BACKUP_MIN_FREE_PERCENT}%" >&2
+    return 1
+  fi
+  return 0
+}
+
+# Aborts the caller with a mailed explanation when headroom is gone.
+backup_require_repo_space() {
+  local stage="$1"
+  if backup_repo_space_ok; then
+    return 0
+  fi
+  backup_mail \
+    "[ansible-backup] ABORTED — repository nearly full on $(hostname -s)" \
+    "Backup aborted on $(hostname -s) at $(date -Iseconds), before: ${stage}
+
+The filesystem holding ${RESTIC_REPOSITORY} has less than ${BACKUP_MIN_FREE_PERCENT}% free,
+so this run stopped instead of filling the volume. Nothing was removed.
+
+Reduce backup_host_paths scope, move the repository to larger storage, or lower
+retention (restic forget --prune) and then rerun:
+
+  systemctl start ${BACKUP_UNIT}.service
+
+See docs/backup-runbook.md (capacity section)."
+  return 1
+}
