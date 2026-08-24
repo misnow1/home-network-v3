@@ -1,6 +1,8 @@
 ---
 # Configure restic backups and scope manifests on hypervisors.
 # Run hypervisor.yml first. Lab: scripts/test-integration.sh (hv01.lab.test).
+# Production: scripts/prod-run.sh --confirm-production -- playbooks/backup.yml
+#   --limit 'kif.home.2123studios.com:dc1.home.2123studios.com'
 
 - name: Configure hypervisor backups
   hosts: hypervisors
@@ -8,3 +10,14 @@
   serial: 1
   roles:
     - role: backup
+
+- name: Deploy AD offline backup helper on source DC
+  hosts: dc
+  become: true
+  serial: 1
+  tasks:
+    - name: Include AD DC helper tasks
+      ansible.builtin.include_role:
+        name: backup
+        tasks_from: ad_dc.yml
+      when: backup_ad_source | default(false) | bool

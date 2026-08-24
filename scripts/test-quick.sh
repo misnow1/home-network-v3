@@ -31,6 +31,9 @@ main() {
   log_info "Tier 1 — ansible-playbook --syntax-check"
   run_ansible_syntax_check "${ROOT}"
 
+  log_info "Tier 1 — role template Jinja syntax"
+  bash "${ROOT}/scripts/test-template-syntax.sh"
+
   log_info "Tier 1 — dhcp-ddns-hook parse tests"
   "${ROOT}/scripts/test-dhcp-ddns-hook-parse.sh"
 

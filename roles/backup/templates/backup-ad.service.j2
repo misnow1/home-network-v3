@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Offline AD domain backup (kif orchestrator)
+Documentation=file:///usr/share/doc/home-network-v3/backup-runbook.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ backup_ad_script_path }}
+Nice=10
+TimeoutStartSec={{ backup_ad_timeout_sec }}
+
+[Install]
+WantedBy=multi-user.target

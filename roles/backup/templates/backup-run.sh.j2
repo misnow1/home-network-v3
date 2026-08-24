@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # {{ ansible_managed }}
-# Scheduled backup entrypoint — docker volumes, retention, optional offsite copy.
+# Scheduled backup entrypoint — docker volumes, host paths, retention, optional copy.
 set -uo pipefail
 
-export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
-export RESTIC_PASSWORD_FILE="{{ backup_restic_password_file }}"
+COMMON="{{ backup_common_script_path }}"
+if [ ! -r "$COMMON" ]; then
+  echo "$(date -Iseconds) | ERROR: shared backup environment missing: $COMMON" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "$COMMON"
+
+exec 9>/run/ansible-backup.lock
+if ! flock -n 9; then
+  echo "$(date -Iseconds) | ERROR: another ansible-backup run holds /run/ansible-backup.lock" >&2
+  exit 1
+fi
 
 DOCKER_SCRIPT="{{ backup_docker_script_path }}"
+PATHS_SCRIPT="{{ backup_paths_script_path }}"
 OFFSITE_REPO="{{ backup_offsite_repository }}"
 OFFSITE_COPY="{{ backup_offsite_copy_enabled | lower }}"
 
@@ -16,6 +28,14 @@ run_docker_backup() {
     return 1
   fi
   "$DOCKER_SCRIPT"
+}
+
+run_paths_backup() {
+  if [ ! -x "$PATHS_SCRIPT" ]; then
+    echo "$(date -Iseconds) | ERROR: path backup script missing: $PATHS_SCRIPT" >&2
+    return 1
+  fi
+  "$PATHS_SCRIPT"
 }
 
 run_prune() {
@@ -34,13 +54,39 @@ run_offsite_copy() {
   if [ "$OFFSITE_COPY" != "true" ] || [ -z "$OFFSITE_REPO" ]; then
     return 0
   fi
-  restic copy --from-repo "$RESTIC_REPOSITORY" --to-repo "$OFFSITE_REPO" --password-file "$RESTIC_PASSWORD_FILE"
+  # Destination repository is -r; source is --from-repo.
+  restic -r "$OFFSITE_REPO" --password-file "$RESTIC_PASSWORD_FILE" \
+    copy --from-repo "$RESTIC_REPOSITORY" --from-password-file "$RESTIC_PASSWORD_FILE"
 }
 
-main() {
-  run_docker_backup
-  run_prune
-  run_offsite_copy
-}
+# Retention still runs when headroom is gone — pruning is how space comes back.
+if ! backup_require_repo_space "docker volume and host path backups"; then
+  run_prune || true
+  exit 1
+fi
 
-main "$@"
+status=0
+run_docker_backup || status=1
+run_paths_backup || status=1
+
+if [ "$status" -eq 0 ]; then
+  run_prune || status=1
+else
+  echo "$(date -Iseconds) | prune | skipped because backup failed" >&2
+fi
+
+if [ "$status" -eq 0 ]; then
+  run_offsite_copy || status=1
+else
+  echo "$(date -Iseconds) | offsite | skipped because backup failed" >&2
+fi
+
+if [ "$status" -ne 0 ]; then
+  backup_mail \
+    "[ansible-backup] FAILED on $(hostname -s)" \
+    "ansible-backup.service failed on $(hostname -s) at $(date -Iseconds).
+Check: journalctl -u {{ backup_systemd_unit }}.service -n 80
+Repo: $RESTIC_REPOSITORY"
+fi
+
+exit "$status"

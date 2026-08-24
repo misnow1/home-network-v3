@@ -4,9 +4,21 @@ backup_restic_password_file: /root/.restic-password
 backup_scope_dir: /etc/ansible-managed
 backup_scope_path: /etc/ansible-managed/backup_scope.yml
 backup_docker_script_path: /usr/local/bin/backup-docker.sh
+backup_paths_script_path: /usr/local/bin/backup-paths.sh
+backup_common_script_path: /usr/local/lib/backup-common.sh
+
+# restic metadata cache. Without HOME set, systemd-run backups are cacheless and
+# re-read the whole repository index every snapshot. Sized ~1% of repo data.
+backup_cache_dir: /var/cache/restic
+backup_cache_home: /root
+
+# Refuse to back up when the repository filesystem drops below this much free
+# space, so a backup can never fill the volume it lives on.
+backup_min_free_percent: 15
 
 backup_libvirt_vms: []
 backup_docker_volumes: []
+backup_host_paths: []
 
 backup_docker_require_existing_paths: false
 
@@ -23,11 +35,13 @@ backup_valid_backup_classes:
 backup_schedule_enabled: false
 backup_schedule_on_calendar: daily
 backup_schedule_randomized_delay_sec: 1800
+backup_schedule_timeout_sec: 43200
 
-# Wrapper invoked by systemd — docker volumes, prune, optional offsite copy.
+# Wrapper invoked by systemd — docker volumes, host paths, prune, optional copy.
 backup_run_script_path: /usr/local/bin/backup-run.sh
 backup_systemd_unit: ansible-backup
-backup_systemd_description: Restic backup (docker volumes + retention)
+backup_systemd_description: Restic backup (paths + docker volumes + retention)
+backup_failure_mail_to: root
 
 # Retention applied after each successful backup run.
 backup_prune_enabled: true
@@ -35,8 +49,34 @@ backup_prune_keep_daily: 7
 backup_prune_keep_weekly: 4
 backup_prune_keep_monthly: 6
 
-# Optional second restic repository on separate storage (e.g. kif /archive/restic/).
-# Uses the same RESTIC_PASSWORD_FILE. Enables restic copy after primary backup.
+# Optional second restic repository. restic copy source is --from-repo; dest is -r.
+# Leave disabled when both paths would share the same disk array.
 backup_offsite_repository: ""
 backup_offsite_copy_enabled: false
 backup_offsite_init: true
+
+# Kif-driven AD backup (offline samba-tool on source DC after peer LDAP preflight).
+backup_ad_enabled: false
+backup_ad_source: false
+backup_ad_peer_ldap_uri: ldap://192.168.1.11
+backup_ad_ssh_user: ansible
+backup_ad_ssh_identity: ""
+backup_ad_source_ssh_host: dc1.home.2123studios.com
+backup_ad_source_host_key_file: /etc/ssh/ssh_host_ed25519_key.pub
+backup_ad_ldap_timeout_sec: 10
+backup_ad_offline_timeout_sec: 1200
+backup_ad_schedule_on_calendar: "*-*-* 01:15:00"
+backup_ad_schedule_randomized_delay_sec: 0
+backup_ad_timer_persistent: false
+backup_ad_timeout_sec: 1800
+backup_ad_script_path: /usr/local/bin/backup-ad.sh
+backup_ad_dc_script_path: /usr/local/bin/backup-ad-offline.sh
+backup_ad_dc_env_path: /etc/default/backup-ad-offline
+backup_ad_dc_workdir: /var/tmp/ad-backup-work
+backup_ad_dc_latest: /var/tmp/ad-backup-latest.tar.bz2
+backup_ad_staging_dir: /var/backups/ad
+backup_ad_artifact_name: ad-backup-latest.tar.bz2
+backup_ad_max_age_hours: 36
+backup_ad_systemd_unit: ansible-backup-ad
+backup_ad_packages:
+  - ldap-utils
