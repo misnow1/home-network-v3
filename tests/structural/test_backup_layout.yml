@@ -42,6 +42,8 @@
         test -f "{{ repo_root }}/roles/backup/templates/backup.timer.j2"
         test -f "{{ repo_root }}/roles/backup/templates/backup-paths.sh.j2"
         test -f "{{ repo_root }}/roles/backup/templates/backup-ad.sh.j2"
+        test -f "{{ repo_root }}/roles/backup/files/backup-offsite-bundle.sh"
+        test -f "{{ repo_root }}/roles/backup/tasks/offsite_bundle.yml"
       args:
         executable: /bin/bash
       changed_when: false
@@ -98,6 +100,25 @@
         set -euo pipefail
         grep -q 'known_hosts' "{{ repo_root }}/roles/backup/tasks/ad_kif.yml"
         grep -q 'CheckHostIP=no' "{{ repo_root }}/roles/backup/templates/backup-ad.sh.j2"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Backup | assert offsite bundle refuses RAID6 and copies by tag
+      ansible.builtin.shell: |
+        set -euo pipefail
+        script="{{ repo_root }}/roles/backup/files/backup-offsite-bundle.sh"
+        tasks="{{ repo_root }}/roles/backup/tasks/offsite_bundle.yml"
+        grep -q 'mountpoint -q' "$script"
+        grep -q 'same device as /archive' "$script"
+        grep -q -- '--from-repo' "$script"
+        grep -q -- '--from-password-file' "$script"
+        grep -q 'ansible-backup.lock' "$script"
+        if grep -q backup_offsite_bundle_repository "$tasks"; then
+          echo "offsite_bundle.yml must not mention the restic repo path (do not mkdir it)" >&2
+          exit 1
+        fi
+        grep -q 'backup_offsite_bundle_mount' "$tasks"
       args:
         executable: /bin/bash
       changed_when: false

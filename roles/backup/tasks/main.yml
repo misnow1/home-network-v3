@@ -24,6 +24,11 @@
   when: backup_offsite_copy_enabled | bool
   tags: [backup_offsite]
 
+- name: Configure live offsite bundle (removable media)
+  ansible.builtin.include_tasks: offsite_bundle.yml
+  when: backup_offsite_bundle_enabled | bool
+  tags: [backup_offsite_bundle]
+
 - name: Configure scheduled backups
   ansible.builtin.include_tasks: schedule.yml
   when: backup_schedule_enabled | bool

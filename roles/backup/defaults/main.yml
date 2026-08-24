@@ -55,6 +55,32 @@ backup_offsite_repository: ""
 backup_offsite_copy_enabled: false
 backup_offsite_init: true
 
+# Live go-bag on removable media (issue #55). Ansible never creates the restic
+# directory itself — that would silently land on RAID6 if the USB is unmounted.
+backup_offsite_bundle_enabled: false
+backup_offsite_bundle_mount: /mnt/restic-live-bundle
+backup_offsite_bundle_repository: /mnt/restic-live-bundle/restic
+backup_offsite_bundle_script_path: /usr/local/bin/backup-offsite-bundle.sh
+backup_offsite_bundle_env_path: /etc/default/backup-offsite-bundle
+backup_offsite_bundle_kopia_list_path: /etc/ansible-managed/backup-offsite-kopia.paths
+backup_offsite_bundle_copy_tags:
+  - home
+  - docker
+  - ad
+  - docker-compose
+backup_offsite_bundle_kopia_paths:
+  - /archive/misnow1/kopia
+backup_offsite_bundle_prune_enabled: true
+backup_offsite_bundle_keep_daily: 7
+backup_offsite_bundle_keep_weekly: 4
+backup_offsite_bundle_keep_monthly: 6
+backup_offsite_bundle_systemd_unit: ansible-backup-offsite-bundle
+backup_offsite_bundle_timeout_sec: 43200
+backup_offsite_bundle_timer_enabled: false
+backup_offsite_bundle_schedule_on_calendar: "Sun *-*-* 12:00:00"
+backup_offsite_bundle_schedule_randomized_delay_sec: 0
+backup_offsite_bundle_timer_persistent: false
+
 # Kif-driven AD backup (offline samba-tool on source DC after peer LDAP preflight).
 backup_ad_enabled: false
 backup_ad_source: false

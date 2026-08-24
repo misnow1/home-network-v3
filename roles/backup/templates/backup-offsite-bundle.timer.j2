@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Run live offsite bundle when removable media is expected
+Documentation=file:///usr/share/doc/home-network-v3/backup-runbook.md
+
+[Timer]
+OnCalendar={{ backup_offsite_bundle_schedule_on_calendar }}
+RandomizedDelaySec={{ backup_offsite_bundle_schedule_randomized_delay_sec }}
+Persistent={{ backup_offsite_bundle_timer_persistent | lower }}
+
+[Install]
+WantedBy=timers.target

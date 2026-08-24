@@ -268,8 +268,10 @@ Envoy Gateway are manual** — see [kubernetes-runbook.md](kubernetes-runbook.md
 | `restic` | Backup client |
 
 When `backup_schedule_enabled: true`, deploys `ansible-backup.timer` (docker volumes,
-host paths, retention prune, optional `restic copy`). When `backup_ad_enabled: true`,
-also deploys `ansible-backup-ad.timer`. See [backup-runbook.md](backup-runbook.md).
+host paths, retention prune). When `backup_ad_enabled: true`, also deploys
+`ansible-backup-ad.timer`. When `backup_offsite_bundle_enabled: true`, deploys
+`backup-offsite-bundle.sh` (USB live go-bag; timer opt-in). See
+[backup-runbook.md](backup-runbook.md).
 
 ### Host firewall (`host_firewall`)
 
