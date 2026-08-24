@@ -48,6 +48,7 @@ ansible-playbook playbooks/backup.yml --limit hv01.lab.test
 | Scheduled wrapper (opt-in) | `/usr/local/bin/backup-run.sh` + `ansible-backup.timer` |
 | AD orchestrator (kif, opt-in) | `/usr/local/bin/backup-ad.sh` + `ansible-backup-ad.timer` (01:15) |
 | AD helper (dc1) | `/usr/local/bin/backup-ad-offline.sh` + `/etc/default/backup-ad-offline` |
+| Live offsite bundle (opt-in) | `/usr/local/bin/backup-offsite-bundle.sh` — USB mount, not RAID6 |
 
 Scope is declared in host_vars:
 
@@ -62,7 +63,9 @@ Scheduling variables (defaults off in lab):
 | `backup_schedule_enabled` | `false` | Enable systemd timer |
 | `backup_schedule_on_calendar` | `daily` | systemd `OnCalendar` expression |
 | `backup_offsite_repository` | `""` | Second restic repo path |
-| `backup_offsite_copy_enabled` | `false` | Run `restic copy` after backup |
+| `backup_offsite_copy_enabled` | `false` | Full-repo `restic copy` after backup (do not use on same array) |
+| `backup_offsite_bundle_enabled` | `false` | Deploy live go-bag script (USB / removable) |
+| `backup_offsite_bundle_timer_enabled` | `false` | Weekly reminder timer; keep off until the disk exists |
 | `backup_prune_enabled` | `true` | Apply retention after backup |
 | `backup_min_free_percent` | `15` | Abort (and mail) when repo filesystem is this low |
 | `backup_ad_enabled` | `false` | Kif AD orchestrator + timer |
@@ -183,10 +186,48 @@ Install is out of band. Repo layout: `\\kif\archive\<user>\kopia\<hostname>`
 5. AD restore is `playbooks/dc-restore.yml` from the staged tarball — **only on an
    isolated network** (a restored DC on the LAN is a rogue DC).
 
-### True 3-2-1 offsite (manual)
+### Live offsite bundle (issue #55)
 
-The RAID6 restic repo is **on-host**. Periodically copy it to media unreachable from
-the LAN. ROADMAP Slice 23+ tracks SFTP/object-storage automation.
+A **portable subset** of the nightly repo, plus Kopia trees the nightly restic job
+excludes. It is not a second copy of `/archive` and not `/media/projects` (#54).
+
+| Item | How it gets on the disk |
+|---|---|
+| `/home` (Documents, etc.) | `restic copy --tag home` |
+| Docker named volumes | `restic copy --tag docker` |
+| `/srv/docker` compose | `restic copy --tag docker-compose` |
+| AD tarball | `restic copy --tag ad` |
+| Kopia (`/archive/<user>/kopia`) | `restic backup` into the bundle repo (`--tag kopia`) |
+
+Same restic password file as production (`/root/.restic-password`). Physical theft of
+the disk is therefore as serious as theft of that password — keep the spare off-site
+and consider LUKS on the partition later.
+
+Ansible creates **only** the mountpoint (`/mnt/restic-live-bundle`). It never `mkdir`
+the restic directory, so an unplugged disk cannot grow a fake repo on RAID6. The
+script refuses to run unless that path is a real mountpoint **and** `stat` says it is
+a different device from `/archive`.
+
+```bash
+# After converging backup.yml with backup_offsite_bundle_enabled: true
+lsblk
+sudo mount /dev/sdX1 /mnt/restic-live-bundle
+sudo /usr/local/bin/backup-offsite-bundle.sh
+sudo RESTIC_PASSWORD_FILE=/root/.restic-password HOME=/root \
+  restic -r /mnt/restic-live-bundle/restic snapshots
+sudo umount /mnt/restic-live-bundle
+```
+
+Do not start this while `ansible-backup.service` is running — both take
+`/run/ansible-backup.lock`. First fill is hundreds of GB (mostly `/home`); USB3 will
+take a while. Restore a file from the bundle once and date it here.
+
+`backup_offsite_bundle_timer_enabled` stays **false** until you want a Sunday noon
+nudge that mails `root` when the disk is missing.
+
+### `/media/projects` offline archive (issue #54)
+
+Finished video trees on 2×8TB rotated disks — later, not this job.
 
 ## Nightly window (America/New_York)
 

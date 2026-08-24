@@ -216,6 +216,11 @@ backup_schedule_enabled: true
 backup_schedule_on_calendar: "02:30"
 backup_schedule_randomized_delay_sec: 300
 backup_offsite_copy_enabled: false
+# Live go-bag on USB (issue #55). Timer off until a disk is mounted at the path.
+backup_offsite_bundle_enabled: true
+backup_offsite_bundle_timer_enabled: false
+backup_offsite_bundle_mount: /mnt/restic-live-bundle
+backup_offsite_bundle_repository: /mnt/restic-live-bundle/restic
 backup_ad_enabled: true
 backup_ad_peer_ldap_uri: ldap://192.168.1.11
 backup_ad_source_ssh_host: dc1.home.2123studios.com

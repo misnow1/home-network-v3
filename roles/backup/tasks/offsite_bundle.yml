@@ -1,0 +1,67 @@
+---
+# Do not mkdir the restic directory on the mount. An unmounted path would
+# land the repo on the parent filesystem (usually RAID6 or root).
+- name: Backup offsite bundle | Mountpoint directory
+  ansible.builtin.file:
+    path: "{{ backup_offsite_bundle_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Deploy config
+  ansible.builtin.template:
+    src: backup-offsite-bundle.env.j2
+    dest: "{{ backup_offsite_bundle_env_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Deploy kopia path list
+  ansible.builtin.template:
+    src: backup-offsite-kopia.paths.j2
+    dest: "{{ backup_offsite_bundle_kopia_list_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Deploy script
+  ansible.builtin.copy:
+    src: backup-offsite-bundle.sh
+    dest: "{{ backup_offsite_bundle_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Deploy systemd service
+  ansible.builtin.template:
+    src: backup-offsite-bundle.service.j2
+    dest: "/etc/systemd/system/{{ backup_offsite_bundle_systemd_unit }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd backup units
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Deploy systemd timer
+  ansible.builtin.template:
+    src: backup-offsite-bundle.timer.j2
+    dest: "/etc/systemd/system/{{ backup_offsite_bundle_systemd_unit }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd backup units
+  tags: [backup_offsite_bundle]
+
+- name: Backup offsite bundle | Enable timer when requested
+  ansible.builtin.systemd:
+    name: "{{ backup_offsite_bundle_systemd_unit }}.timer"
+    state: "{{ 'started' if backup_offsite_bundle_timer_enabled | bool else 'stopped' }}"
+    enabled: "{{ backup_offsite_bundle_timer_enabled | bool }}"
+    daemon_reload: true
+  when: not ansible_check_mode
+  tags: [backup_offsite_bundle]
